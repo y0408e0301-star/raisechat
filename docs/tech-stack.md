@@ -135,7 +135,7 @@
 
 | 区分 | 使うもの | バージョン・種類 | BL | 用途・理由 |
 | --- | --- | --- | --- | --- |
-| API の実行 | Amazon ECS（Fargate） | ARM64（Graviton）、**1 vCPU・メモリ 2GB**、タスク 1 つ | 一部 | サーバー（EC2）を持たずにコンテナで動かす。画像の縮小（10MB の画像を読み込む）と WebSocket の接続を持つため、BookLog（0.5 vCPU・1GB）より大きくする。タスクは 1 つ（P-4） |
+| API の実行 | Amazon ECS（Fargate） | ARM64（Graviton）、**1 vCPU・メモリ 2GB**、タスク 1 つ | 一部 | サーバー（EC2）を持たずにコンテナで動かす。画像の縮小（10MB の画像を読み込む）と WebSocket の接続を持つため、BookLog（0.5 vCPU・1GB）より大きくする。この大きさは見込みで、インフラ設計書の費用の見積もりと性能テスト（要件定義書 11.1）で確かめ、足りなければ見直す。タスクは 1 つ（P-4） |
 | API のイメージ | Docker（backend/Dockerfile）、Amazon ECR | ベースは amazoncorretto:21-al2023-headless（ダイジェストで固定） | ○ | 手元で作った jar を入れるだけ |
 | データベース | Amazon RDS for PostgreSQL | 17、db.t4g.micro | ○ | |
 | 入口・HTTPS | Amazon CloudFront、CloudFront Functions | PriceClass_200、cloudfront-js-2.0 | ○ | HTTPS の終端。画面を S3 から配る。/ws も CloudFront を通す（CloudFront は WebSocket を中継できる。設定はインフラ設計書） |
