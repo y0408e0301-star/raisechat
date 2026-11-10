@@ -8,7 +8,7 @@
 | 最終更新日 | 2026-11-10 |
 | 作成者 | （氏名） |
 | 上位文書 | [基本設計書](basic-design.md)（RC-BD） |
-| 元にした文書 | [データ要件定義書](../requirements/data-requirements.md)（RC-REQ-DATA）版数 0.2、[機能定義書](../functions/function-definition.md)（RC-FD）版数 0.2、[技術スタック定義書](../tech-stack.md)（RC-TECH）版数 0.1 |
+| 元にした文書 | [データ要件定義書](../requirements/data-requirements.md)（RC-REQ-DATA）版数 0.2、[機能定義書](../functions/function-definition.md)（RC-FD）版数 0.2、[技術スタック定義書](../tech-stack.md)（RC-TECH）版数 0.2 |
 | 状態 | 承認待ち |
 
 ## 改訂履歴
@@ -362,6 +362,7 @@ DM の行は、ワークスペースを抜けても消さない（BR-9）。
 | --- | --- | --- |
 | users | lower(username) の一意の索引 | ログイン・重複の確認（A-2）、メンションの「@ユーザー ID」（FN-11） |
 | workspace_members | (user_id) | 自分のワークスペースの一覧（W-1） |
+| workspace_members | (last_opened_conversation_id) | 会話を削除したときになしにする（SET NULL）とき（全件を読まないため） |
 | workspace_members | (workspace_id) WHERE role = 'OWNER' の一意の索引 | オーナーは 1 人 |
 | workspaces | (owner_id) | 作れる数を数える（BR-5） |
 | invites | (workspace_id, id DESC) | 招待リンクの一覧（I-1） |
@@ -374,6 +375,7 @@ DM の行は、ワークスペースを抜けても消さない（BR-9）。
 | messages | (parent_id, id) WHERE parent_id IS NOT NULL | スレッドの返信の一覧（FN-08） |
 | messages | body の GIN の索引（gin_trgm_ops） | 検索（8.3。技術スタック定義書 5.4） |
 | attachments | (message_id, sort_order) の一意の索引 | メッセージの添付 |
+| attachments | (conversation_id) | チャンネル・ワークスペースの削除で一緒に消すとき（全件を読まないため） |
 | attachments | (created_at) WHERE message_id IS NULL | 送らなかったものをまとめて消す（BR-13） |
 | reactions | (message_id, created_at) | メッセージのリアクション（RE-5） |
 | mentions | (user_id, message_id DESC) | 読んでいないメンションの件数（8.2）、メンションの一覧（NT-5） |
