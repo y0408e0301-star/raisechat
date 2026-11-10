@@ -1,0 +1,18 @@
+# 開発用の PostgreSQL。リポジトリのルートで `docker compose up -d` を実行して起動する
+# 添付・アバターは S3 の開発用のバケットに置くので、ここでは起動しない（インフラ設計書 6 章）。
+# 文字の分類（LC_CTYPE）は en_US.UTF-8 にする。pg_trgm が日本語を索引に入れるため（データ設計書の冒頭）
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: raisechat
+      POSTGRES_USER: raisechat
+      POSTGRES_PASSWORD: raisechat
+      POSTGRES_INITDB_ARGS: --locale=en_US.UTF-8
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+volumes:
+  db-data:
