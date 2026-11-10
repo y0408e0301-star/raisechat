@@ -53,7 +53,7 @@ BookLog と同じく、次のものは最初から入れる。
 
 ## 3. 作る順番
 
-1 行を 1 つの Issue・1 つの Pull Request にする。終わったら、その Pull Request の中で「状態」を ✅ にする。
+1 行を 1 つの Issue・1 つの Pull Request にする。行に取りかかるときに Issue を立て、その Pull Request の中で「Issue」の欄に番号を書いて「状態」を ▶ にし、終わったら ✅ にする（▶ と ✅ は、次の行の Pull Request でまとめて直してもよい）。
 
 状態：✅ 終わった、▶ 作業中、空欄 まだ
 
