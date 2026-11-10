@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 1
+          fetch-depth: 0  # git log・git show で履歴を読めるようにする
 
       - uses: anthropics/claude-code-action@v1
         with:
@@ -35,7 +35,14 @@ jobs:
 
             レビューの前に、リポジトリの CLAUDE.md・CONTRIBUTING.md・README.md・docs/ の要件定義書があれば読み、
             そこに書かれたルールや要件に沿っているかも確認してください。
-            差分は `gh pr diff`、PR の説明は `gh pr view` で確認できます。PR のブランチはチェックアウト済みです。
+            PR のブランチはチェックアウト済みです。使えるのは次の操作だけです（ほかは許可されずに止められます）。
+            - PR のタイトル・本文：`gh pr view ${{ github.event.pull_request.number }} --json title,body,headRefName`
+              （--json で必要な項目だけを読む。付けないと、この環境では失敗することがある）
+            - 差分：`gh pr diff ${{ github.event.pull_request.number }}`（ファイルの一覧は `--name-only` を付ける）
+            - ファイルを読む・探す：Read・Glob・Grep のツール
+            - 履歴：`git log`・`git show`・`git diff`
+            コマンドは 1 つずつ実行し、パイプ（|）・&&・;・リダイレクトでつながない。長い出力は Read・Grep で必要な所だけを読む。
+            変更が大きいときも、変更されたファイルはすべて読み、読み切れなかったファイルがあればまとめにその名前を書く。
 
             見る観点:
             - バグ・不具合になりそうな箇所
@@ -51,4 +58,4 @@ jobs:
             - 推測で指摘しない。確かめられない点は「要確認」と書く
             - GitHub へのコメントとしてだけ出力し、メッセージとしては返さない
           claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git log:*),Bash(git show:*),Bash(git diff:*),Read,Glob,Grep"
