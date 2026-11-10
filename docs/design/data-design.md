@@ -371,7 +371,7 @@ DM の行は、ワークスペースを抜けても消さない（BR-9）。
 | conversations | (workspace_id) WHERE is_general の一意の索引 | general は 1 つ |
 | conversations | (workspace_id, dm_user_low, dm_user_high) WHERE type = 'DM' の一意の索引 | 同じ 2 人の DM は 1 つ（FN-12） |
 | conversation_members | (user_id, conversation_id) | 自分が入っている会話（サイドバー・見られるか） |
-| messages | (conversation_id, id) WHERE parent_id IS NULL | 会話のメッセージの一覧（MS-1・MS-2）、未読の件数（8.2）、DM の最後のメッセージ |
+| messages | (conversation_id, id) | 会話のメッセージの一覧（MS-1・MS-2）、未読の件数（8.2）、DM の最後のメッセージ、会話の削除で一緒に消すとき。返信を除く条件（parent_id IS NULL）は索引の外で絞る。部分索引にすると削除のときに使われないため、条件なしの索引にする |
 | messages | (parent_id, id) WHERE parent_id IS NOT NULL | スレッドの返信の一覧（FN-08） |
 | messages | body の GIN の索引（gin_trgm_ops） | 検索（8.3。技術スタック定義書 5.4） |
 | attachments | (message_id, sort_order) の一意の索引 | メッセージの添付 |

@@ -126,7 +126,7 @@ Terraform（deploy/terraform/）で作る。名前の頭は「rc-」にする。
 | リソース | 名前 | 設定 |
 | --- | --- | --- |
 | IAM ロール（タスクの実行） | rc-task-execution | ECS がタスクを起動するときに使う。AmazonECSTaskExecutionRolePolicy と、Parameter Store の /rc/db/password・/rc/jwt/secret の読み取り |
-| IAM ロール（タスク） | rc-app | アプリ（AWS SDK）が使う。S3：rc-files-{アカウント ID} の workspaces/*・avatars/* への PutObject・GetObject・DeleteObject のみ。署名付き URL もこのロールで署名する。ロールの一時的な鍵は期限の少し前に新しくなるが、古い鍵で署名した URL は古い鍵の期限で使えなくなるため、URL が書いた期限（15 分・1 時間）より早く使えなくなることがある。そのときは、表示は画面が読み直して新しい URL に替え（FN-09 AT-10）、アップロードは M-40 からやり直せる（AT-4）ので、このままにする |
+| IAM ロール（タスク） | rc-app | アプリ（AWS SDK）が使う。S3：rc-files-{アカウント ID} の workspaces/*・avatars/* への PutObject・GetObject・DeleteObject と、同じ接頭辞に限った ListBucket。ListBucket があると、まだ置かれていないファイルを読んだときに 403 ではなく 404 が返り、complete で「アップロードされていない」（UPLOAD_NOT_FOUND_IN_STORAGE）を権限のエラーと見分けられる。署名付き URL もこのロールで署名する。ロールの一時的な鍵は期限の少し前に新しくなるが、古い鍵で署名した URL は古い鍵の期限で使えなくなるため、URL が書いた期限（15 分・1 時間）より早く使えなくなることがある。そのときは、表示は画面が読み直して新しい URL に替え（FN-09 AT-10）、アップロードは M-40 からやり直せる（AT-4）ので、このままにする |
 | Parameter Store | /rc/db/password、/rc/jwt/secret | データベースのパスワード、JWT の署名に使う秘密の値（48 文字の乱数）。Terraform が作り、SecureString で置く |
 | CloudWatch Logs | /rc/app | Spring Boot のログ（JSON。基本設計書 2.3）。30 日で消す |
 | CloudWatch アラーム | rc-no-healthy-task、rc-api-5xx、rc-db-free-storage | ALB のヘルスチェックに通るタスクが 3 分続けてない、API の 5xx が 5 分で 10 回以上（この 2 つは動いている間だけ作る）、RDS の空き容量 2GB 未満で、SNS（rc-alerts）からメールを送る |

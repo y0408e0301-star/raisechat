@@ -7,7 +7,7 @@
 | 作成日 | 2026-11-10 |
 | 最終更新日 | 2026-11-10 |
 | 作成者 | （氏名） |
-| 元にした文書 | [要件定義書](../requirements/requirements.md)（RC-REQ）版数 0.6、[機能定義書](../functions/function-definition.md)（RC-FD）版数 0.2、[技術スタック定義書](../tech-stack.md)（RC-TECH）版数 0.1 |
+| 元にした文書 | [要件定義書](../requirements/requirements.md)（RC-REQ）版数 0.6、[機能定義書](../functions/function-definition.md)（RC-FD）版数 0.2、[技術スタック定義書](../tech-stack.md)（RC-TECH）版数 0.2 |
 | 状態 | 承認待ち |
 
 ## 改訂履歴
