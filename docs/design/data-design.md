@@ -376,8 +376,7 @@ DM の行は、ワークスペースを抜けても消さない（BR-9）。
 | attachments | (message_id, sort_order) の一意の索引 | メッセージの添付 |
 | attachments | (created_at) WHERE message_id IS NULL | 送らなかったものをまとめて消す（BR-13） |
 | reactions | (message_id, created_at) | メッセージのリアクション（RE-5） |
-| mentions | (user_id, message_id DESC) WHERE NOT is_read | 読んでいないメンションの件数（8.2） |
-| mentions | (user_id, message_id DESC) | メンションの一覧（NT-5） |
+| mentions | (user_id, message_id DESC) | 読んでいないメンションの件数（8.2）、メンションの一覧（NT-5） |
 | refresh_tokens | (user_id) | その人のリフレッシュトークンをすべて無効にする（BR-11） |
 | refresh_tokens | (expires_at) | 有効期限を過ぎたものをまとめて消す（BR-11） |
 
@@ -427,6 +426,7 @@ WHERE c.workspace_id = :ws
 ### 8.2 サイドバーの未読・メンションの件数（NT-1・NT-2）
 
 ```sql
+-- 先に :me が :ws のメンバーかを確かめる（BR-2）。キック・退出した人の DM の行が残っているため（BR-9）
 -- 自分が入っている会話ごとの未読の件数（100 件で数えるのをやめる）と、読んでいないメンションの件数
 SELECT cm.conversation_id,
        (SELECT count(*) FROM (
