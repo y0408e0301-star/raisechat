@@ -8,7 +8,7 @@
 | 最終更新日 | 2026-11-10 |
 | 作成者 | （氏名） |
 | 上位文書 | [基本設計書](basic-design.md)（RC-BD） |
-| 元にした文書 | [データ要件定義書](../requirements/data-requirements.md)（RC-REQ-DATA）版数 0.2、[機能定義書](../functions/function-definition.md)（RC-FD）版数 0.2、[技術スタック定義書](../tech-stack.md)（RC-TECH）版数 0.2 |
+| 元にした文書 | [データ要件定義書](../requirements/data-requirements.md)（RC-REQ-DATA）版数 0.2、[機能定義書](../functions/function-definition.md)（RC-FD）版数 0.3、[技術スタック定義書](../tech-stack.md)（RC-TECH）版数 0.2 |
 | 状態 | 承認待ち |
 
 ## 改訂履歴
@@ -393,7 +393,7 @@ DM の行は、ワークスペースを抜けても消さない（BR-9）。
 | BR-4 | ワークスペースの作成では、1 つのトランザクションで workspaces・workspace_members（OWNER）・conversations（general）・conversation_members を作る | W-3 |
 | BR-5 | 作れるワークスペースの数は、users の自分の行を SELECT … FOR UPDATE でロックしてから、owner_id が自分の workspaces を数えて確かめる（10 以上なら 409） | W-3、FN-03 の 5 章の 1 |
 | BR-6 | 参加（招待リンク）では、workspace_members と general の conversation_members を INSERT … ON CONFLICT DO NOTHING で足し、DM の conversation_members は残っている行を使う。会話のメンバーを足すときは last_read_message_id にその会話の最新のメッセージの ID を入れる | I-5、MB-7、CH-4、CH-7 |
-| BR-7 | メッセージの送信では、1 つのトランザクションで messages を足し、添付の message_id・sort_order を入れ（自分の・同じ会話の・READY の・まだ付いていないものだけ。違えば全体をやめる）、mentions を足す。返信なら親の reply_count を 1 増やし last_reply_at を入れる | MS-3、TH-3、AT-3、MN-4 |
+| BR-7 | メッセージの送信では、1 つのトランザクションで messages を足し、添付の message_id・sort_order を入れ（自分の・同じ会話の・READY の・まだ付いていないものだけ。違えば全体をやめる）、mentions を足す。返信なら、BR-8 と同じく先に親の行を SELECT … FOR UPDATE でロックしてから、親の reply_count を 1 増やし last_reply_at を入れる。「削除されました」の親（deleted_at あり）にも返信できる（FN-08 TH-7） | MS-3、TH-3、AT-3、MN-4 |
 | BR-8 | 返信の追加・削除と親の削除が同時に起きても件数が食い違わないよう、まず親の行を SELECT … FOR UPDATE でロックする。メッセージの削除では、返信のある親なら body を空にし deleted_at を入れ、attachments・reactions・mentions を消す。それ以外は行を消す。返信を消したら親の reply_count を 1 減らし、last_reply_at を残りの最後のものにする。親が deleted_at ありで reply_count が 0 になったら親も消す | MS-11、TH-7 |
 | BR-9 | キック・退出では、workspace_members の行と、そのワークスペースのチャンネル（type = 'CHANNEL'）の conversation_members の行を消す。DM の conversation_members の行は消さない | MB-4、MB-5、FN-05 の 5 章の 3 |
 | BR-10 | リアクションの種類の上限（50）は、messages の行を SELECT … FOR UPDATE でロックしてから、新しい絵文字のときだけ数えて確かめる | RE-7、FN-10 の 5 章の 2 |
@@ -450,7 +450,7 @@ JOIN workspace_members wm ON wm.workspace_id = c.workspace_id AND wm.user_id = :
 WHERE cm.user_id = :me AND c.workspace_id = :ws;
 ```
 
-参加していない公開チャンネルの読んでいないメンション（FN-14 の 5 章の 4）は、別に mentions から 8.1 の見られる会話に絞って数え、ヘッダーの合計に足す。DM のうち、相手が作ってまだメッセージのないもの（FN-12 の 5 章の 4）は、サイドバーに出さない。
+mention_count はスレッドの返信の中のメンションも数える（unread_count は親メッセージだけ。FN-14 NT-1・NT-2）。参加していない公開チャンネルの読んでいないメンション（FN-14 の 5 章の 4）は、別に mentions から 8.1 の見られる会話に絞って数え、ヘッダーの合計に足す。DM のうち、相手が作ってまだメッセージのないもの（FN-12 の 5 章の 4）は、サイドバーに出さない。
 
 ### 8.3 検索（FN-13）
 
