@@ -8,7 +8,7 @@
 | 最終更新日 | 2026-11-10 |
 | 作成者 | （氏名） |
 | 上位文書 | [基本設計書](basic-design.md)（RC-BD） |
-| 元にした文書 | [データ要件定義書](../requirements/data-requirements.md)（RC-REQ-DATA）版数 0.2、[機能定義書](../functions/function-definition.md)（RC-FD）版数 0.1、[技術スタック定義書](../tech-stack.md)（RC-TECH）版数 0.1 |
+| 元にした文書 | [データ要件定義書](../requirements/data-requirements.md)（RC-REQ-DATA）版数 0.2、[機能定義書](../functions/function-definition.md)（RC-FD）版数 0.2、[技術スタック定義書](../tech-stack.md)（RC-TECH）版数 0.1 |
 | 状態 | 承認待ち |
 
 ## 改訂履歴
@@ -28,7 +28,7 @@
 | No | 方針 | 理由 |
 | --- | --- | --- |
 | 1 | 第 3 正規形を基本とする。未読の件数・メンションの件数・メンバーの人数・リアクションの件数は列に持たず、その都度数える。例外は、親メッセージの返信の件数と最後の返信の日時（reply_count・last_reply_at）だけとする | 同じデータを 2 か所に持たないことで、食い違いを防ぐ。返信の件数は、会話の一覧の 50 件ごとに数えると重いため、返信を足す・消すときに同じトランザクションで直す（FN-08 の 5 章の 3） |
-| 2 | 各データの ID は、データベースが自動で付ける連番（bigint）とする | メッセージの ID の大きさで並べ、「この ID より前・後」で読み込む（FN-07）。ID を推測されても、見られるかは毎回確かめる（BR-3）ので困らない |
+| 2 | 各データの ID は、データベースが自動で付ける連番（bigint）とする | メッセージの ID の大きさで並べ、「この ID より前・後」で読み込む（FN-07）。ID を推測されても、見られるかは毎回確かめる（BR-2）ので困らない |
 | 3 | 削除は、データを実際に消す方式（物理削除）とする。ただし、返信のある親メッセージを消したときは、行を残して deleted_at を入れる | 「元に戻す」機能がないため。親メッセージはスレッドを残すために行が要る（FN-07 MS-11） |
 | 4 | 日時はタイムゾーン付き（timestamptz）で保存し、画面では日本時間で出す | 海外のサーバーを使っても時刻がずれないようにするため |
 | 5 | 添付・アバターのファイルは S3 に置き、データベースには置き場所（キー）だけを持つ | 要件定義書 P-2。データベースを小さく保つ |
@@ -399,7 +399,7 @@ DM の行は、ワークスペースを抜けても消さない（BR-9）。
 | BR-12 | メッセージの削除・編集での添付の取り外し・チャンネルとワークスペースの削除・アバターの変更では、先にデータベースから消し、コミットの後で S3 のファイル（縮小した画像を含む）を消す。消すのに失敗したファイルは storage_deletions に記録しておき、1 日 1 回（4:30）まとめて消し直す | N-11、FN-09 の 5 章の 7 |
 | BR-13 | message_id がなく、created_at から 24 時間を過ぎた attachments は、1 日 1 回（4:30）行を消し、S3 のファイルを消す（BR-12 と同じやり方） | AT-11 |
 | BR-14 | 期限切れか取り消し済みで、created_at から 30 日を過ぎた invites は、1 日 1 回まとめて消す | FN-04 の 5 章の 4 |
-| BR-15 | 既読の記録は last_read_message_id = GREATEST(last_read_message_id, :id) で進めるだけにする。あわせて、その会話の親メッセージ（parent_id IS NULL）の自分あての mentions の is_read を true にする | NT-4、FN-14 の 5 章の 3 |
+| BR-15 | 既読の記録は last_read_message_id = GREATEST(last_read_message_id, :id) で進めるだけにする。あわせて、その会話の親メッセージ（parent_id IS NULL）の自分あての mentions の is_read を true にする。スレッドを開いたとき（POST /api/messages/{親の ID}/thread-read）は、そのスレッドの返信（parent_id = 親の ID）の自分あての mentions の is_read を true にする | NT-4、FN-14 の 5 章の 3 |
 | BR-16 | ログインに失敗したら failed_login_count を 1 増やし、5 になったら locked_until を 15 分後にし、failed_login_count を 0 に戻す。locked_until より前はパスワードを確かめずに M-7 を返す。成功したら 0 に戻す | A-7 |
 
 ## 8. 特別な SQL
@@ -433,6 +433,7 @@ SELECT cm.conversation_id,
             SELECT 1 FROM messages m
             WHERE m.conversation_id = cm.conversation_id
               AND m.parent_id IS NULL
+              AND m.deleted_at IS NULL
               AND m.id > cm.last_read_message_id
               AND m.user_id <> :me
             LIMIT 100) u) AS unread_count,
