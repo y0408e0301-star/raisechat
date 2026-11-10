@@ -182,8 +182,7 @@ class AuthService {
 		}
 	}
 
-	// 自分の情報（FN-01 6 章）
-	// 自分の情報（機能定義書 3.5 の UserSummary と同じ形）。アバターの URL は 1-10 で署名付き URL を入れる
+	// 自分の情報（FN-01 6 章。機能定義書 3.5 の UserSummary と同じ形）。アバターの URL は 1-10 で署名付き URL を入れる
 	record Me(String username, String displayName, @Nullable String avatarUrl, @Nullable String statusEmoji,
 			@Nullable String statusText) {
 
