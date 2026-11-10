@@ -369,7 +369,8 @@ DM の行は、ワークスペースを抜けても消さない（BR-9）。
 | invites | (expires_at) | 30 日たったものをまとめて消す（BR-14） |
 | conversations | (workspace_id, lower(name)) WHERE type = 'CHANNEL' の一意の索引 | 同じ名前のチャンネルを作らない（CH-2）、名前の順の一覧（CH-3） |
 | conversations | (workspace_id) WHERE is_general の一意の索引 | general は 1 つ |
-| conversations | (workspace_id, dm_user_low, dm_user_high) WHERE type = 'DM' の一意の索引 | 同じ 2 人の DM は 1 つ（FN-12） |
+| conversations | (workspace_id, dm_user_low, dm_user_high) WHERE type = 'DM' の一意の索引 | 同じ 2 人の DM は 1 つ（FN-12）、自分が小さい方の DM を探す（8.1） |
+| conversations | (workspace_id, dm_user_high) WHERE type = 'DM' | 自分が大きい方の DM を探す（8.1） |
 | conversation_members | (user_id, conversation_id) | 自分が入っている会話（サイドバー・見られるか） |
 | messages | (conversation_id, id) | 会話のメッセージの一覧（MS-1・MS-2）、未読の件数（8.2）、DM の最後のメッセージ、会話の削除で一緒に消すとき。返信を除く条件（parent_id IS NULL）は索引の外で絞る。部分索引にすると削除のときに使われないため、条件なしの索引にする |
 | messages | (parent_id, id) WHERE parent_id IS NOT NULL | スレッドの返信の一覧（FN-08） |
@@ -393,7 +394,7 @@ DM の行は、ワークスペースを抜けても消さない（BR-9）。
 | BR-5 | 作れるワークスペースの数は、users の自分の行を SELECT … FOR UPDATE でロックしてから、owner_id が自分の workspaces を数えて確かめる（10 以上なら 409） | W-3、FN-03 の 5 章の 1 |
 | BR-6 | 参加（招待リンク）では、workspace_members と general の conversation_members を INSERT … ON CONFLICT DO NOTHING で足し、DM の conversation_members は残っている行を使う。会話のメンバーを足すときは last_read_message_id にその会話の最新のメッセージの ID を入れる | I-5、MB-7、CH-4、CH-7 |
 | BR-7 | メッセージの送信では、1 つのトランザクションで messages を足し、添付の message_id・sort_order を入れ（自分の・同じ会話の・READY の・まだ付いていないものだけ。違えば全体をやめる）、mentions を足す。返信なら親の reply_count を 1 増やし last_reply_at を入れる | MS-3、TH-3、AT-3、MN-4 |
-| BR-8 | メッセージの削除では、返信のある親なら body を空にし deleted_at を入れ、attachments・reactions・mentions を消す。それ以外は行を消す。返信を消したら親の reply_count を 1 減らし、last_reply_at を残りの最後のものにする。親が deleted_at ありで reply_count が 0 になったら親も消す | MS-11、TH-7 |
+| BR-8 | 返信の追加・削除と親の削除が同時に起きても件数が食い違わないよう、まず親の行を SELECT … FOR UPDATE でロックする。メッセージの削除では、返信のある親なら body を空にし deleted_at を入れ、attachments・reactions・mentions を消す。それ以外は行を消す。返信を消したら親の reply_count を 1 減らし、last_reply_at を残りの最後のものにする。親が deleted_at ありで reply_count が 0 になったら親も消す | MS-11、TH-7 |
 | BR-9 | キック・退出では、workspace_members の行と、そのワークスペースのチャンネル（type = 'CHANNEL'）の conversation_members の行を消す。DM の conversation_members の行は消さない | MB-4、MB-5、FN-05 の 5 章の 3 |
 | BR-10 | リアクションの種類の上限（50）は、messages の行を SELECT … FOR UPDATE でロックしてから、新しい絵文字のときだけ数えて確かめる | RE-7、FN-10 の 5 章の 2 |
 | BR-11 | リフレッシュトークンは、登録・ログインのたびに 1 行追加する。取り直しでは、今の行の revoked_at を入れ、新しい行を追加する（1 つのトランザクション）。revoked_at が入っている行のトークンが使われたら、その user_id の有効な行をすべて無効にする。expires_at を過ぎた行は、1 日 1 回まとめて消す | A-8、N-24 |
