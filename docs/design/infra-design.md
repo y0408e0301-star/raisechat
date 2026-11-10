@@ -200,7 +200,7 @@ BookLog と同じにする。
 | /assets/… | Vite がビルドした JS・CSS、絵文字のデータ | max-age=31536000, public, immutable（1 年） | ファイル名に中身のハッシュが付き、中身が変われば URL も変わる |
 | /w/1/c/2 などの画面の URL（最後の部分に拡張子がない） | index.html（CloudFront Function が書き換える） | no-cache | 直接開いたり読み直したりしても、画面（React Router）に任せる |
 | /api/…・/ws | API・WebSocket（ないものは JSON の 404） | | ALB へ送るので index.html を返さない |
-| /actuator/… | 稼働の確認 | | 同上 |
+| /actuator/… | 稼働の確認。外に出すのは /actuator/health だけにする（Spring Boot の設定で、ほかのエンドポイントを Web に出さない） | | 同上 |
 | 拡張子があってファイルがない | 403（S3 が返す） | | 同上 |
 
 CloudFront のエラーページの設定（403・404 のときに index.html を返す）は使わない。API の 403・404 まで index.html になってしまうため。

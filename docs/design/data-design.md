@@ -398,7 +398,7 @@ DM の行は、ワークスペースを抜けても消さない（BR-9）。
 | BR-12 | メッセージの削除・編集での添付の取り外し・チャンネルとワークスペースの削除・アバターの変更では、先にデータベースから消し、コミットの後で S3 のファイル（縮小した画像を含む）を消す。消すのに失敗したファイルは storage_deletions に記録しておき、1 日 1 回（4:30）まとめて消し直す | N-11、FN-09 の 5 章の 7 |
 | BR-13 | message_id がなく、created_at から 24 時間を過ぎた attachments は、1 日 1 回（4:30）行を消し、S3 のファイルを消す（BR-12 と同じやり方） | AT-11 |
 | BR-14 | 期限切れか取り消し済みで、created_at から 30 日を過ぎた invites は、1 日 1 回まとめて消す | FN-04 の 5 章の 4 |
-| BR-15 | 既読の記録は last_read_message_id = GREATEST(last_read_message_id, :id) で進めるだけにする。あわせて、その会話の親メッセージ（parent_id IS NULL）の自分あての mentions の is_read を true にする。スレッドを開いたとき（POST /api/messages/{親の ID}/thread-read）は、そのスレッドの返信（parent_id = 親の ID）の自分あての mentions の is_read を true にする | NT-4、FN-14 の 5 章の 3 |
+| BR-15 | 既読の記録は last_read_message_id = GREATEST(last_read_message_id, :id) で進めるだけにする。あわせて、その会話の親メッセージ（parent_id IS NULL）のうち ID が :id 以下のものの自分あての mentions の is_read を true にする（読んだ位置より後のメンションは既読にしない）。スレッドを開いたとき（POST /api/messages/{親の ID}/thread-read）は、そのスレッドの返信（parent_id = 親の ID）の自分あての mentions の is_read を true にする | NT-4、FN-14 の 5 章の 3 |
 | BR-16 | ログインに失敗したら failed_login_count を 1 増やし、5 になったら locked_until を 15 分後にし、failed_login_count を 0 に戻す。locked_until より前はパスワードを確かめずに M-7 を返す。成功したら 0 に戻す | A-7 |
 
 ## 8. 特別な SQL
@@ -458,12 +458,12 @@ WHERE m.conversation_id = ANY(:visible)
   AND m.deleted_at IS NULL
   AND m.body ILIKE '%' || :w1 || '%'
   AND m.body ILIKE '%' || :w2 || '%'
-  AND m.id < :cursor
+  AND m.id < :cursor  -- 最初のページは bigint の最大値
 ORDER BY m.id DESC
 LIMIT 21;  -- 21 件目は「続きがあるか」を知るため
 ```
 
-3 文字以上の言葉は、body の GIN の索引（gin_trgm_ops）で探せる。1〜2 文字の言葉だけのときは索引が効かないため、性能テストで N-5 を確かめる（基本設計書 2.4）。日本語の言葉で索引が使われることは、API のテストで実行計画（EXPLAIN）を見て確かめる。
+言葉の中の % と _ と \ は、\ を前に付けてただの文字にしてから渡す（FN-13 の 5 章の 2）。3 文字以上の言葉は、body の GIN の索引（gin_trgm_ops）で探せる。1〜2 文字の言葉だけのときは索引が効かないため、性能テストで N-5 を確かめる（基本設計書 2.4）。日本語の言葉で索引が使われることは、API のテストで実行計画（EXPLAIN）を見て確かめる。
 
 ## 9. CRUD 表
 
