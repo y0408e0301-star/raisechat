@@ -112,7 +112,7 @@ Terraform（deploy/terraform/）で作る。名前の頭は「rc-」にする。
 | --- | --- | --- |
 | CloudFront | raisechat | 価格クラスは PriceClass_200（日本を含む）。ビューワーは HTTPS に移す。既定は画面のバケット（OAC、CachingOptimized）。`/api/*`・`/ws`・`/actuator/*` は ALB の HTTP 80 へ、キャッシュしない（CachingDisabled）・すべてのメソッド・Cookie とクエリとヘッダーをすべて渡す（AllViewer。WebSocket のつなぎ始めのヘッダーも渡る）。止めている間は ALB へのビヘイビアをなくし、すべてのパスで止めている間のページを返す |
 | CloudFront Function | rc-router | 動いている間は画面の URL を index.html に、止めている間はすべてを maintenance/index.html に書き換える（5.4） |
-| ALB | rc-alb | インターネット向け、パブリックサブネット a・c、HTTP 80。X-Origin-Verify が合うときだけターゲットグループ rc-app（IP、8080、ヘルスチェック /actuator/health）に送り、ほかは 403。アイドルタイムアウトは 60 秒のまま（WebSocket は 20 秒ごとのハートビートで切れない。機能定義書 4.1）。止めている間は消す |
+| ALB | rc-alb | インターネット向け、パブリックサブネット a・c、HTTP 80。X-Origin-Verify が合うときだけターゲットグループ rc-app（IP、8080、ヘルスチェック /actuator/health）に送り、ほかは 403。アイドルタイムアウトは 60 秒のまま（WebSocket は 20 秒ごとのハートビートで切れない。機能定義書 4.1）。ターゲットの登録解除の遅延は 10 秒にする（既定の 300 秒のままだと、WebSocket の接続が残っている間、古いタスクの停止が待たされ、入れ替えの停止が長くなるため。方針 10）。止めている間は消す |
 | ECR | rc-app | API のイメージ。タグはコミット ID で上書きさせない（IMMUTABLE）。push したときに脆弱性を検査する。新しいものから 10 個だけ残す |
 | ECS クラスター | rc-cluster | Fargate。Container Insights は使わない（費用がかかるため） |
 | ECS タスク定義 | rc-app | Fargate、ARM64（Graviton）、1 vCPU・メモリ 2GB（技術スタック定義書 3.5）。環境変数で DB の接続先・Cookie の Secure・画面の URL（WebSocket の Origin と S3 の CORS に使う）・バケット名を、Parameter Store から DB のパスワード・JWT の秘密の値を渡す。ログは CloudWatch Logs の /rc/app へ。止めている間は消す |
@@ -128,6 +128,7 @@ Terraform（deploy/terraform/）で作る。名前の頭は「rc-」にする。
 | IAM ロール（タスクの実行） | rc-task-execution | ECS がタスクを起動するときに使う。AmazonECSTaskExecutionRolePolicy と、Parameter Store の /rc/db/password・/rc/jwt/secret の読み取り |
 | IAM ロール（タスク） | rc-app | アプリ（AWS SDK）が使う。S3：rc-files-{アカウント ID} の workspaces/*・avatars/* への PutObject・GetObject・DeleteObject と、同じ接頭辞に限った ListBucket。ListBucket があると、まだ置かれていないファイルを読んだときに 403 ではなく 404 が返り、complete で「アップロードされていない」（UPLOAD_NOT_FOUND_IN_STORAGE）を権限のエラーと見分けられる。署名付き URL もこのロールで署名する。ロールの一時的な鍵は期限の少し前に新しくなるが、古い鍵で署名した URL は古い鍵の期限で使えなくなるため、URL が書いた期限（15 分・1 時間）より早く使えなくなることがある。そのときは、表示は画面が読み直して新しい URL に替え（FN-09 AT-10）、アップロードは M-40 からやり直せる（AT-4）ので、このままにする |
 | Parameter Store | /rc/db/password、/rc/jwt/secret | データベースのパスワード、JWT の署名に使う秘密の値（48 文字の乱数）。Terraform が作り、SecureString で置く |
+| 秘密のヘッダーの値 | X-Origin-Verify | Terraform の random_password で 32 文字の乱数を作り、CloudFront のオリジンのカスタムヘッダーと ALB のリスナーの規則の両方に入れる。アプリには渡さない。値は Terraform の状態ファイルにだけ残る（BookLog と同じ） |
 | CloudWatch Logs | /rc/app | Spring Boot のログ（JSON。基本設計書 2.3）。30 日で消す |
 | CloudWatch アラーム | rc-no-healthy-task、rc-api-5xx、rc-db-free-storage | ALB のヘルスチェックに通るタスクが 3 分続けてない、API の 5xx が 5 分で 10 回以上（この 2 つは動いている間だけ作る）、RDS の空き容量 2GB 未満で、SNS（rc-alerts）からメールを送る |
 | AWS Budgets | rc-budget | 月の費用が予算（R-1。67 ドル ≒ 10,000 円）の 80% を超えたとき、月末の予測が予算を超えそうなときにメールを送る |
