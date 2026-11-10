@@ -31,7 +31,7 @@ docs/
 │   ├── data-design.md                 … データ設計書
 │   └── infra-design.md                … インフラ設計書
 ├── tech-stack.md                      … 技術スタック定義書
-└── development-plan.md                … 開発計画書（作る順番と進み具合）※これから作る
+└── development-plan.md                … 開発計画書（作る順番と進み具合）
 ```
 
 | 文書 | 文書番号 | 内容 | 承認 |
@@ -46,7 +46,7 @@ docs/
 | [データ設計書](design/data-design.md) | RC-BD-DATA | 方針、エンティティ一覧、ER 図、テーブル定義、索引、データのルール（BR）、特別な SQL、CRUD 表、データ量の見積もり | 〃 |
 | [インフラ設計書](design/infra-design.md) | RC-BD-INFRA | 方針、AWS の構成図、リソース一覧、セキュリティグループ（SG）、WebSocket と添付の流れ、開発環境との対応、費用の目安 | 〃 |
 | [技術スタック定義書](tech-stack.md) | RC-TECH | 使う言語・フレームワーク・サービス・開発ツールと選んだ理由 | 本書で行う |
-| 開発計画書（これから作る） | RC-PLAN | 作る順番（段階と Pull Request の単位）、段階ごとの完了条件、どこまでできたか | 本書で行う |
+| [開発計画書](development-plan.md) | RC-PLAN | 作る順番（段階と Pull Request の単位）、段階ごとの完了条件、どこまでできたか | 本書で行う |
 
 文書は BookLog（読書記録アプリ）・Raise timeline（タイムライン型 SNS）と同じ構成で作る。
 
