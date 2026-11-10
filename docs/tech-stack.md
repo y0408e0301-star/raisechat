@@ -122,7 +122,7 @@
 | 区分 | 開発環境 | AWS | BL | 用途・理由 |
 | --- | --- | --- | --- | --- |
 | データベース | PostgreSQL 17（Docker のイメージ postgres:17） | Amazon RDS for PostgreSQL 17 | ○ | 条件 1 |
-| 部分一致の検索 | PostgreSQL の pg_trgm（GIN の索引） | 同じ（RDS で使える） | 新 | 条件 9。本文に索引を付け、大文字・小文字を区別しない部分一致（ILIKE）を速くする（5.4）。PostgreSQL に含まれる拡張なので、イメージを変えずに使える |
+| 部分一致の検索 | PostgreSQL の pg_trgm（GIN の索引） | 同じ（RDS で使える） | 新 | 条件 9。本文に索引を付け、大文字・小文字を区別しない部分一致（ILIKE）を速くする（5.4）。PostgreSQL に含まれる拡張なので、イメージを変えずに使える。pg_trgm は、データベースの文字の分類（LC_CTYPE）が C だと日本語の文字を索引に入れないため、データベースは LC_CTYPE を en_US.UTF-8 にして作る（postgres:17・Testcontainers・RDS の既定はこれ）。日本語の検索で索引が使われることを、API のテストで実行計画（EXPLAIN）を見て確かめる |
 | 添付・アバターの保存先 | Amazon S3 の開発用のバケット。自動のテストでは MinIO（Docker のイメージ chainguard/minio。ダイジェストで固定） | Amazon S3 | ○ | 開発中は本番と同じ S3 で確かめる。テストは S3 と同じ API の MinIO を使い、AWS の鍵を GitHub に渡さない。画面からの直接のアップロードのため、バケットに CORS を設定する（FN-09 の 5 章の 9） |
 
 ### 3.4 外部のサービス
