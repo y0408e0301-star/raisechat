@@ -428,7 +428,7 @@ WHERE c.workspace_id = :ws
 ### 8.2 サイドバーの未読・メンションの件数（NT-1・NT-2）
 
 ```sql
--- 先に :me が :ws のメンバーかを確かめる（BR-2）。キック・退出した人の DM の行が残っているため（BR-9）
+-- キック・退出した人の DM の行が残っているため（BR-9）、workspace_members でいまのメンバーかを確かめる（8.1 と同じ条件）
 -- 自分が入っている会話ごとの未読の件数（100 件で数えるのをやめる）と、読んでいないメンションの件数
 SELECT cm.conversation_id,
        (SELECT count(*) FROM (
@@ -445,6 +445,7 @@ SELECT cm.conversation_id,
               AND m.conversation_id = cm.conversation_id) AS mention_count
 FROM conversation_members cm
 JOIN conversations c ON c.id = cm.conversation_id
+JOIN workspace_members wm ON wm.workspace_id = c.workspace_id AND wm.user_id = :me  -- いまのメンバーだけ（BR-2）
 WHERE cm.user_id = :me AND c.workspace_id = :ws;
 ```
 

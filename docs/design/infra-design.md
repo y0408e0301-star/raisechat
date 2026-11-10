@@ -31,7 +31,7 @@
 | 2 | 画面（React をビルドしたファイル）は S3 に置き、CloudFront から配る。API・WebSocket と同じ CloudFront の URL にし、/api/*・/ws・/actuator/* だけを ALB に送る | 画面の配信に API のサーバーを使わない。同じ URL なので、JWT を入れる Cookie と CSRF 対策・WebSocket の Origin の確かめが開発中と同じに動く |
 | 3 | WebSocket（/ws）も CloudFront と ALB を通す。CloudFront で wss（HTTPS の上の WebSocket）を受け、ALB からは ws（HTTP の上）で送る | CloudFront と ALB は WebSocket を中継できる（技術スタック定義書 3.5）。入口を 1 つにでき、N-12 の wss を CloudFront の証明書で満たせる |
 | 4 | API は ECS Fargate で動かす。サーバー（EC2）は自分で持たない。タスクは 1 つだけにする | 要件定義書 P-4。WebSocket の通知の配信（Spring の simple broker）はタスクのメモリの中にあり、タスクが 2 つになると、片方につないだ人にはもう片方の通知が届かないため |
-| 5 | Fargate の前に ALB を置く。HTTPS は CloudFront で受け、CloudFront → ALB は HTTP にする | タスクは作り直すたびに IP が変わるので、ALB で受け止めてヘルスチェックに通ったタスクにだけ送る。独自ドメインがないため ALB に証明書を付けられず、HTTPS は CloudFront の https://〜.cloudfront.net で受ける（N-12） |
+| 5 | Fargate の前に ALB を置く。HTTPS は CloudFront で受け、CloudFront → ALB は HTTP にする | タスクは作り直すたびに IP が変わるので、ALB で受け止めてヘルスチェックに通ったタスクにだけ送る。独自ドメインがないため ALB に証明書を付けられず、HTTPS は CloudFront の https://〜.cloudfront.net で受ける。CloudFront → ALB の間の Cookie（JWT）・CSRF トークン・秘密のヘッダーは暗号化されないが、公開は検収のときだけで学習用であるため受け入れる（N-12、基本設計書 Q-2） |
 | 6 | ALB は CloudFront からの通信だけを受け、さらに CloudFront が付ける秘密のヘッダー（X-Origin-Verify）がなければ 403 を返す | セキュリティグループだけでは、ほかの人の CloudFront を通した通信も届いてしまうため |
 | 7 | Fargate のタスクはパブリックサブネットに置き、パブリック IP を付けるが、ALB からの通信しか受け付けない（SG-2） | タスクから ECR・Parameter Store・CloudWatch Logs に出る必要がある。プライベートサブネットに置くと NAT ゲートウェイ（月 7,000 円ほど）が要る。BookLog と同じ |
 | 8 | RDS はプライベートサブネットに置き、Fargate のタスクからしか接続できないようにする。Multi-AZ にはしない | データベースは外から見えないのが基本。Multi-AZ は費用が 2 倍になり、学習用には要らない |
