@@ -1,0 +1,54 @@
+# Pull Request が開かれたとき・push されたときに Claude Code がレビューしてコメントする
+# 認証は Pro / Max のサブスクリプションのトークン（secrets.CLAUDE_CODE_OAUTH_TOKEN）
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# 同じ PR に続けて push したら、古いレビューは止めて最新のコミットだけレビューする
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            この Pull Request をレビューしてください。コメントはすべて日本語で書いてください。
+
+            レビューの前に、リポジトリの CLAUDE.md・CONTRIBUTING.md・README.md・docs/ の要件定義書があれば読み、
+            そこに書かれたルールや要件に沿っているかも確認してください。
+            差分は `gh pr diff`、PR の説明は `gh pr view` で確認できます。PR のブランチはチェックアウト済みです。
+
+            見る観点:
+            - バグ・不具合になりそうな箇所
+            - セキュリティ上の問題
+            - 要件定義書・リポジトリのルールとの食い違い
+            - テストの不足
+            - 性能の問題
+            - 読みやすさ・標準的な書き方から外れている箇所
+
+            書き方:
+            - 具体的なコードの指摘は `mcp__github_inline_comment__create_inline_comment`（`confirmed: true`）でインラインコメントにする
+            - 全体のまとめは `gh pr comment` で 1 件だけ投稿する。重要度（高・中・低）順に並べ、問題がなければそう書く
+            - 推測で指摘しない。確かめられない点は「要確認」と書く
+            - GitHub へのコメントとしてだけ出力し、メッセージとしては返さない
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
