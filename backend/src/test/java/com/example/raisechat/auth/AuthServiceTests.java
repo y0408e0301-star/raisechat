@@ -29,6 +29,7 @@ import com.example.raisechat.TestEntities;
 import com.example.raisechat.common.ErrorCode;
 import com.example.raisechat.user.User;
 import com.example.raisechat.user.UserRepository;
+import com.example.raisechat.user.UserSummary;
 
 // ユーザー登録・ログイン・取り直し・ログアウト（機能定義書 FN-01）の処理を、データベースを使わずに確かめる
 @ExtendWith(MockitoExtension.class)
@@ -110,7 +111,7 @@ class AuthServiceTests {
 			assertThat(saved.getValue().getDisplayName()).isEqualTo("たろう");
 			assertThat(saved.getValue().getPasswordHash()).isEqualTo("hashed");
 			assertThat(saved.getValue().getCreatedAt()).isEqualTo(TestEntities.NOW);
-			assertThat(result.me()).isEqualTo(new AuthService.Me("taro_y", "たろう", null, null, null));
+			assertThat(result.me()).isEqualTo(new UserSummary("taro_y", "たろう", null, null, null));
 			assertThat(result.tokens()).isEqualTo(TOKENS);
 		}
 
@@ -390,7 +391,7 @@ class AuthServiceTests {
 			User user = TestEntities.user(1, "taro_y");
 			when(AuthServiceTests.this.users.findById(1L)).thenReturn(Optional.of(user));
 			assertThat(AuthServiceTests.this.service.me(1))
-				.isEqualTo(new AuthService.Me("taro_y", "taro_yの表示名", null, null, null));
+				.isEqualTo(new UserSummary("taro_y", "taro_yの表示名", null, null, null));
 		}
 
 		@Test

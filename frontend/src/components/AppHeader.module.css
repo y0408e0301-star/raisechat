@@ -1,0 +1,20 @@
+/* 画面設計書 2.6 ヘッダー。区切り線はヘッダーの下だけ */
+.header { position: sticky; top: 0; z-index: 10; background: var(--bg); border-bottom: 1px solid var(--line); }
+.inner { height: 56px; padding: 0 16px; display: flex; align-items: center; gap: 16px; }
+.left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* 2.2 アプリ名は 18px・太字 */
+.appName { font-size: 18px; font-weight: bold; color: var(--text); white-space: nowrap; }
+.appName:hover { text-decoration: none; }
+.separator { color: var(--sub); }
+.workspaceName {
+  font-size: 18px; font-weight: bold; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.right { margin-left: auto; display: flex; align-items: center; gap: 12px; flex: none; }
+/* 自分のアバターのボタン（枠なし） */
+.me { display: inline-flex; padding: 0; border: none; border-radius: 50%; background: none; cursor: pointer; }
+
+/* 画面の横幅が 600px 未満のときは、ワークスペース用のヘッダーではアプリ名を出さない */
+@media (max-width: 599px) {
+  .hideNarrow { display: none; }
+}

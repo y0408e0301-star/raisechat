@@ -18,6 +18,10 @@ info:
     | UNAUTHENTICATED | 401 | ログインの有効期限が切れました。もう一度ログインしてください。 |
     | TOKEN_EXPIRED | 401 | ログインの有効期限が切れました。もう一度ログインしてください。 |
     | REFRESH_FAILED | 401 | ログインの有効期限が切れました。もう一度ログインしてください。 |
+    | WORKSPACE_NAME_REQUIRED | 400 | ワークスペースの名前を入力してください。 |
+    | WORKSPACE_LIMIT | 409 | 作れるワークスペースは 10 個までです。 |
+    | WORKSPACE_NOT_FOUND | 404 | このワークスペースは見つからないか、参加していません。 |
+    | CONVERSATION_NOT_FOUND | 404 | このチャンネルは見つからないか、参加していません。 |
     | BAD_REQUEST | 400 | 入力が正しくありません。 |
     | FORBIDDEN | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
     | NOT_FOUND | 404 | 見つかりません。 |
@@ -44,7 +48,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Me"
+                $ref: "#/components/schemas/UserSummary"
           description: OK
         "4XX":
           content:
@@ -98,7 +102,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Me"
+                $ref: "#/components/schemas/UserSummary"
           description: OK
         "4XX":
           content:
@@ -130,7 +134,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Me"
+                $ref: "#/components/schemas/UserSummary"
           description: 取り直した
         "4XX":
           content:
@@ -163,7 +167,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Me"
+                $ref: "#/components/schemas/UserSummary"
           description: 登録した
         "4XX":
           content:
@@ -213,8 +217,339 @@ paths:
       summary: ユーザー ID が使えるか
       tags:
       - FN-01 ユーザー登録・ログイン
+  /api/conversations/{conversationId}:
+    get:
+      description: 見られないとき（入っていないワークスペース・プライベートチャンネルなど）は 404
+      operationId: get_1
+      parameters:
+      - in: path
+        name: conversationId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationDetail"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 会話の詳細
+      tags:
+      - FN-06 チャンネル
+  /api/conversations/{conversationId}/read:
+    post:
+      description: 最後に開いた会話として記録する。最後に読んだメッセージを進めるのはメッセージ（1-4）から
+      operationId: read
+      parameters:
+      - in: path
+        name: conversationId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReadRequest"
+        required: true
+      responses:
+        "204":
+          description: 記録した
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 会話を開いた・読んだ（FN-14）
+      tags:
+      - FN-06 チャンネル
+  /api/workspaces:
+    get:
+      description: 名前の順（同じ名前は作った順）。ページングしない
+      operationId: list
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceSummary"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 自分が入っているワークスペースの一覧
+      tags:
+      - FN-03 ワークスペース
+    post:
+      description: 自分をオーナーにし、公開チャンネル general を作って自分を入れる。1 人 10 個まで（409）
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkspaceRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceDetail"
+          description: 作った
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: ワークスペースを作る
+      tags:
+      - FN-03 ワークスペース
+  /api/workspaces/{workspaceId}:
+    get:
+      description: 入っていない・存在しないときは 404
+      operationId: get
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceDetail"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: ワークスペースの詳細
+      tags:
+      - FN-03 ワークスペース
+  /api/workspaces/{workspaceId}/conversations:
+    get:
+      description: 自分が入っているチャンネル（general が先頭、あとは名前の順）。ページングしない
+      operationId: list_1
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConversationSummary"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: サイドバーの会話の一覧
+      tags:
+      - FN-06 チャンネル
 components:
   schemas:
+    ConversationDetail:
+      type: object
+      properties:
+        canPost:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          $ref: "#/components/schemas/UserSummary"
+        description:
+          type:
+          - string
+          - "null"
+        dmPartner:
+          oneOf:
+          - $ref: "#/components/schemas/UserSummary"
+          - type: "null"
+        general:
+          type: boolean
+        hasUnread:
+          type: boolean
+        id:
+          type: integer
+          format: int64
+        joined:
+          type: boolean
+        memberCount:
+          type: integer
+          format: int64
+        mentionCount:
+          type: integer
+          format: int32
+        name:
+          type:
+          - string
+          - "null"
+        type:
+          type: string
+          enum:
+          - CHANNEL
+          - DM
+        unreadCount:
+          type: integer
+          format: int32
+        visibility:
+          type:
+          - string
+          - "null"
+          enum:
+          - PUBLIC
+          - PRIVATE
+        workspaceId:
+          type: integer
+          format: int64
+      required:
+      - canPost
+      - createdAt
+      - createdBy
+      - description
+      - dmPartner
+      - general
+      - hasUnread
+      - id
+      - joined
+      - memberCount
+      - mentionCount
+      - name
+      - type
+      - unreadCount
+      - visibility
+      - workspaceId
+    ConversationSummary:
+      type: object
+      properties:
+        canPost:
+          type: boolean
+        dmPartner:
+          oneOf:
+          - $ref: "#/components/schemas/UserSummary"
+          - type: "null"
+        general:
+          type: boolean
+        hasUnread:
+          type: boolean
+        id:
+          type: integer
+          format: int64
+        joined:
+          type: boolean
+        mentionCount:
+          type: integer
+          format: int32
+        name:
+          type:
+          - string
+          - "null"
+        type:
+          type: string
+          enum:
+          - CHANNEL
+          - DM
+        unreadCount:
+          type: integer
+          format: int32
+        visibility:
+          type:
+          - string
+          - "null"
+          enum:
+          - PUBLIC
+          - PRIVATE
+        workspaceId:
+          type: integer
+          format: int64
+      required:
+      - canPost
+      - dmPartner
+      - general
+      - hasUnread
+      - id
+      - joined
+      - mentionCount
+      - name
+      - type
+      - unreadCount
+      - visibility
+      - workspaceId
+    CreateWorkspaceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: 前後の空白を除いて 1〜50 文字。改行を含まない（FN-03 4 章）
+      required:
+      - name
     ErrorResponse:
       type: object
       properties:
@@ -240,7 +575,32 @@ components:
       required:
       - password
       - username
-    Me:
+    ReadRequest:
+      type: object
+      properties:
+        lastMessageId:
+          type: integer
+          format: int64
+          description: 画面に出したいちばん新しいメッセージの ID（なければ 0）
+      required:
+      - lastMessageId
+    SignupRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+          description: 前後の空白を除いて 1〜30 文字（A-4）
+        password:
+          type: string
+          description: 8〜64 文字の半角文字で、英字と数字を 1 文字以上ずつ含む（A-3）
+        username:
+          type: string
+          description: 前後の空白を除いて 3〜15 文字の半角英数字と「_」（A-2）
+      required:
+      - displayName
+      - password
+      - username
+    UserSummary:
       type: object
       properties:
         avatarUrl:
@@ -265,22 +625,6 @@ components:
       - statusEmoji
       - statusText
       - username
-    SignupRequest:
-      type: object
-      properties:
-        displayName:
-          type: string
-          description: 前後の空白を除いて 1〜30 文字（A-4）
-        password:
-          type: string
-          description: 8〜64 文字の半角文字で、英字と数字を 1 文字以上ずつ含む（A-3）
-        username:
-          type: string
-          description: 前後の空白を除いて 3〜15 文字の半角英数字と「_」（A-2）
-      required:
-      - displayName
-      - password
-      - username
     UsernameAvailability:
       type: object
       properties:
@@ -288,6 +632,71 @@ components:
           type: boolean
       required:
       - available
+    WorkspaceDetail:
+      type: object
+      properties:
+        generalConversationId:
+          type: integer
+          format: int64
+        hasUnread:
+          type: boolean
+        id:
+          type: integer
+          format: int64
+        lastOpenedConversationId:
+          type:
+          - integer
+          - "null"
+          format: int64
+        memberCount:
+          type: integer
+          format: int64
+        mentionCount:
+          type: integer
+          format: int32
+        name:
+          type: string
+        owner:
+          $ref: "#/components/schemas/UserSummary"
+        role:
+          type: string
+          enum:
+          - OWNER
+          - MEMBER
+      required:
+      - generalConversationId
+      - hasUnread
+      - id
+      - lastOpenedConversationId
+      - memberCount
+      - mentionCount
+      - name
+      - owner
+      - role
+    WorkspaceSummary:
+      type: object
+      properties:
+        hasUnread:
+          type: boolean
+        id:
+          type: integer
+          format: int64
+        mentionCount:
+          type: integer
+          format: int32
+        name:
+          type: string
+        role:
+          type: string
+          enum:
+          - OWNER
+          - MEMBER
+      required:
+      - hasUnread
+      - id
+      - mentionCount
+      - name
+      - role
   securitySchemes:
     accessToken:
       description: ログイン（POST /api/auth/login）で受け取る JWT の Cookie（機能定義書 3.2）。GET 以外では、Cookie

@@ -1,7 +1,11 @@
 /* 色・文字は画面設計書 2 章（共通仕様）のとおり。画面ごとの見た目は *.module.css に書く */
 :root {
-  /* 2.1 色。サイドバーの色などは、使う画面を作るときに足す */
+  /* 2.1 色 */
   --bg: #ffffff;
+  --sidebar-bg: #1f2937;
+  --sidebar-text: #d1d5db;
+  --sidebar-strong: #ffffff;
+  --sidebar-active: #1a5fb4;
   --line: #e5e7eb;
   --text: #101828;
   --sub: #475467;

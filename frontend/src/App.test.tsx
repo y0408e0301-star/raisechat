@@ -10,9 +10,17 @@ import { me } from './test/render'
 // 仮の G-3 に出す文
 const G3 = M[16]
 
+// ログインした後に開く画面の API。ワークスペースはまだない。/w/1 は入っていないので 404（M-13 を出して G-3 に移る）
+const afterLogin = {
+  'GET /api/workspaces': () => json(200, []),
+  'GET /api/workspaces/1': () => json(404, { code: 'WORKSPACE_NOT_FOUND', message: M[13] }),
+  'GET /api/workspaces/1/conversations': () => json(404, { code: 'WORKSPACE_NOT_FOUND', message: M[13] }),
+}
+
 const notLoggedIn = {
   'GET /api/auth/me': () => json(401, { code: 'UNAUTHENTICATED', message: '…' }),
   'POST /api/auth/refresh': () => json(401, { code: 'REFRESH_FAILED', message: '…' }),
+  ...afterLogin,
 }
 
 function renderAt(path: string) {
@@ -31,7 +39,7 @@ describe('ログイン（G-1）', () => {
     await userEvent.type(screen.getByLabelText('パスワード'), 'password1')
     await userEvent.click(button)
     expect(await screen.findByText(G3)).toBeInTheDocument()
-    expect(screen.getByTitle('たろう（@taro_y）')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'たろう（@taro_y）のメニュー' })).toBeInTheDocument()
   })
 
   it('失敗したら API のメッセージをフォームの上に出す', async () => {
@@ -47,13 +55,13 @@ describe('ログイン（G-1）', () => {
   })
 
   it('ログインしていれば G-1 を開いても G-3 に移る', async () => {
-    mockFetch({ 'GET /api/auth/me': () => json(200, me) })
+    mockFetch({ 'GET /api/auth/me': () => json(200, me), ...afterLogin })
     renderAt('/login')
     expect(await screen.findByText(G3)).toBeInTheDocument()
   })
 
   it('ログアウトすると G-1 に戻る', async () => {
-    const fetch = mockFetch({ 'GET /api/auth/me': () => json(200, me), 'POST /api/auth/logout': () => json(204) })
+    const fetch = mockFetch({ 'GET /api/auth/me': () => json(200, me), 'POST /api/auth/logout': () => json(204), ...afterLogin })
     renderAt('/')
     await userEvent.click(await screen.findByRole('button', { name: 'ログアウト' }))
     expect(await screen.findByRole('button', { name: 'ログイン' })).toBeInTheDocument()
@@ -114,7 +122,7 @@ describe('ユーザー登録（G-2）', () => {
   })
 })
 
-// TC-01-6。G-5 などはまだないので、ログインした後に開こうとした URL へ移ったことを、ない画面から G-3 へ移る前の URL で確かめる
+// TC-01-6。ログインした後に開こうとした URL（入っていないワークスペースなので、そこから G-3 へ移る）へ移ったかを確かめる
 describe('ログインしていないときに開いた画面（A-10）', () => {
   it('G-1 → G-2 で登録すると、開こうとした画面へ移す', async () => {
     mockFetch({

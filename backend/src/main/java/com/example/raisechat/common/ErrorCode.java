@@ -26,6 +26,16 @@ public enum ErrorCode {
 
 	REFRESH_FAILED(HttpStatus.UNAUTHORIZED, "ログインの有効期限が切れました。もう一度ログインしてください。"),
 
+	// ワークスペース（FN-03 9 章。M-11〜M-13）
+	WORKSPACE_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "ワークスペースの名前を入力してください。"),
+
+	WORKSPACE_LIMIT(HttpStatus.CONFLICT, "作れるワークスペースは 10 個までです。"),
+
+	WORKSPACE_NOT_FOUND(HttpStatus.NOT_FOUND, "このワークスペースは見つからないか、参加していません。"),
+
+	// 会話（FN-06・FN-12 9 章。M-27）
+	CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "このチャンネルは見つからないか、参加していません。"),
+
 	// 画面を通さずに送られた、条件に合わない入力（JSON が読めない、上限を超えた文字数など）
 	BAD_REQUEST(HttpStatus.BAD_REQUEST, "入力が正しくありません。"),
 

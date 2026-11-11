@@ -1,0 +1,22 @@
+/* 画面設計書 2.5 ダイアログ共通。後ろの画面を黒・透明度 50% で覆い、中央に幅 480px で出す */
+.overlay {
+  position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.5);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.panel {
+  position: static; margin: 0; border: none; color: var(--text);
+  width: 480px; max-width: 100%; max-height: calc(100vh - 32px); overflow-y: auto;
+  background: var(--bg); border-radius: 8px; padding: 24px;
+}
+.panel:focus { outline: none; }
+/* 2.2 ダイアログの見出しは 18px・太字 */
+.title { font-size: 18px; margin: 0 0 16px; }
+
+/* 画面の横幅が 600px 未満のときは、横幅いっぱい・下から出す */
+@media (max-width: 599px) {
+  .overlay { align-items: flex-end; padding: 0; }
+  .panel { width: 100%; border-radius: 8px 8px 0 0; }
+}
+
+/* ダイアログの下に並べるボタン（左に「キャンセル」、右に実行のボタン） */
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }

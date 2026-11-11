@@ -1,2 +1,20 @@
-/* G-3（画面設計書 5 章）。2.2 画面の見出しは 18px・太字 */
-.title { font-size: 18px; margin: 0 0 16px; }
+/* G-3（画面設計書 5 章） */
+.head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+/* 2.2 画面の見出しは 18px・太字 */
+.title { font-size: 18px; margin: 0; }
+
+.list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; }
+.list li + li { border-top: 1px solid var(--line); }
+.row { display: flex; align-items: center; gap: 8px; padding: 12px 16px; color: var(--text); }
+.row:hover { background: var(--frame); text-decoration: none; }
+.name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 未読があれば太字（W-1。色だけで区別しない N-30） */
+.unread .name { font-weight: bold; }
+/* 自分がオーナーのときの小さな枠 */
+.owner { flex: none; font-size: 12px; color: var(--sub); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; }
+/* 2.1 件数の丸 */
+.count {
+  flex: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
+  background: var(--danger); color: #fff; font-size: 12px; font-weight: bold;
+  display: inline-flex; align-items: center; justify-content: center;
+}

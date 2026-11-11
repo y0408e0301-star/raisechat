@@ -5,8 +5,14 @@ import { M } from './messages'
 // API を変えたら、backend の mvnw verify で仕様書を書き直し、npm run gen:api で型を作り直す（README）
 type Schemas = components['schemas']
 
-// ログインしている自分（GET /api/auth/me などが返す）
-export type Me = Schemas['Me']
+// ユーザー（機能定義書 3.5）。ログインしている自分（GET /api/auth/me などが返す）もこの形
+export type UserSummary = Schemas['UserSummary']
+export type Me = UserSummary
+
+export type WorkspaceSummary = Schemas['WorkspaceSummary']
+export type WorkspaceDetail = Schemas['WorkspaceDetail']
+export type ConversationSummary = Schemas['ConversationSummary']
+export type ConversationDetail = Schemas['ConversationDetail']
 
 // API がエラーを返したとき（機能定義書 3.3）。message は画面にそのまま出せる文、
 // field があればその入力欄の下に出す
@@ -157,3 +163,41 @@ export function login(username: string, password: string): Promise<Me> {
 export async function logout(): Promise<void> {
   await request('POST', '/api/auth/logout', undefined, false)
 }
+
+// ---------------------------------------------------------------- FN-03 ワークスペース
+
+export function fetchWorkspaces(): Promise<WorkspaceSummary[]> {
+  return requestJson<WorkspaceSummary[]>('GET', '/api/workspaces')
+}
+
+export function createWorkspace(name: string): Promise<WorkspaceDetail> {
+  return requestJson<WorkspaceDetail>('POST', '/api/workspaces', { name } satisfies Schemas['CreateWorkspaceRequest'])
+}
+
+export function fetchWorkspace(workspaceId: number): Promise<WorkspaceDetail> {
+  return requestJson<WorkspaceDetail>('GET', `/api/workspaces/${workspaceId}`)
+}
+
+// ---------------------------------------------------------------- FN-06 会話・FN-14 既読
+
+// サイドバーに出す会話（自分が入っているチャンネル。DM は 1-9 で足す）
+export function fetchConversations(workspaceId: number): Promise<ConversationSummary[]> {
+  return requestJson<ConversationSummary[]>('GET', `/api/workspaces/${workspaceId}/conversations`)
+}
+
+export function fetchConversation(conversationId: number): Promise<ConversationDetail> {
+  return requestJson<ConversationDetail>('GET', `/api/conversations/${conversationId}`)
+}
+
+// 会話を開いた・読んだ。lastMessageId は画面に出したいちばん新しいメッセージ（メッセージを作る 1-4 までは 0）
+export async function markRead(conversationId: number, lastMessageId: number): Promise<void> {
+  await request('POST', `/api/conversations/${conversationId}/read`,
+    { lastMessageId } satisfies Schemas['ReadRequest'])
+}
+
+// ---------------------------------------------------------------- 画面の URL（画面一覧 1 章）
+
+// G-5 チャット画面。ワークスペースだけなら、最後に開いた会話（なければ general）を開く（W-4）
+export const workspaceUrl = (workspaceId: number) => `/w/${workspaceId}`
+export const conversationUrl = (workspaceId: number, conversationId: number) =>
+  `/w/${workspaceId}/c/${conversationId}`

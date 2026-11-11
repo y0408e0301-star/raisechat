@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  ApiError, ensureOk, fetchMe, isUsernameAvailable, login, logout, setSessionExpiredHandler, signup,
+  ApiError, conversationUrl, createWorkspace, ensureOk, fetchConversation, fetchConversations, fetchMe, fetchWorkspace,
+  fetchWorkspaces, isUsernameAvailable, login, logout, markRead, setSessionExpiredHandler, signup, workspaceUrl,
 } from './api'
 import { M } from './messages'
 import { json, mockFetch, sentJson } from './test/fetchMock'
@@ -91,6 +92,34 @@ describe('API の呼び出し方', () => {
     await expect(login('taro_y', 'password1')).resolves.toEqual(me)
     expect(sentJson(fetch, 0)).toEqual({ username: 'taro_y', displayName: 'たろう', password: 'password1' })
     expect(sentJson(fetch, 1)).toEqual({ username: 'taro_y', password: 'password1' })
+  })
+
+  it('ワークスペース（FN-03 6 章）と会話（FN-06・FN-14 6 章）の API', async () => {
+    const fetch = mockFetch({
+      'GET /api/workspaces': () => json(200, []),
+      'POST /api/workspaces': () => json(201, { id: 3 }),
+      'GET /api/workspaces/3': () => json(200, { id: 3 }),
+      'GET /api/workspaces/3/conversations': () => json(200, []),
+      'GET /api/conversations/12': () => json(200, { id: 12 }),
+      'POST /api/conversations/12/read': () => json(204),
+    })
+    await fetchWorkspaces()
+    await createWorkspace('仲間うち')
+    await fetchWorkspace(3)
+    await fetchConversations(3)
+    await fetchConversation(12)
+    await markRead(12, 0)
+    expect(fetch.keys()).toEqual([
+      'GET /api/workspaces', 'POST /api/workspaces', 'GET /api/workspaces/3', 'GET /api/workspaces/3/conversations',
+      'GET /api/conversations/12', 'POST /api/conversations/12/read',
+    ])
+    expect(sentJson(fetch, 1)).toEqual({ name: '仲間うち' })
+    expect(sentJson(fetch, 5)).toEqual({ lastMessageId: 0 })
+  })
+
+  it('画面の URL を作る（画面一覧 1 章）', () => {
+    expect(workspaceUrl(3)).toBe('/w/3')
+    expect(conversationUrl(3, 12)).toBe('/w/3/c/12')
   })
 
   it('ユーザー ID が使えるかは、ユーザー ID を URL のエンコードをして聞く', async () => {
