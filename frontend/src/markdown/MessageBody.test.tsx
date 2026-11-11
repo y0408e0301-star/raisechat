@@ -47,6 +47,17 @@ describe('MessageBody', () => {
     expect(html('~1つ~')).toBe('<p>~1つ~</p>')
   })
 
+  it('入れ子にしても、飾らないものは書いたままにする', () => {
+    // 箇条書きの中のチェックボックス
+    expect(text('- 親\n  - [x] 子')).toContain('[x] 子')
+    expect(html('- 親\n  - [x] 子')).not.toContain('<input')
+    // 引用の中の URL はリンクにし、[文字](URL) は書いたまま
+    expect(html('> https://example.com と [ここ](https://example.com)')).toContain('<a href="https://example.com"')
+    expect(text('> https://example.com と [ここ](https://example.com)')).toContain('[ここ](https://example.com)')
+    // 太字の中の HTML のタグ
+    expect(html('**<b>x</b>**')).toBe('<p><strong>&lt;b&gt;x&lt;/b&gt;</strong></p>')
+  })
+
   // TC-07-6
   it('script・img のタグは文字のまま出し、実行しない', () => {
     expect(html('<script>alert(1)</script>')).toBe('<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>')

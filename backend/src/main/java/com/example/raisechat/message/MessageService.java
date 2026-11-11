@@ -38,6 +38,9 @@ class MessageService {
 	// 1 回に読み込む件数の上限と、指定がないときの件数（FN-07 6 章）
 	static final int MAX_LIMIT = 50;
 
+	// 同じ人が同じ clientId で 2 回追加しないための一意の制約の名前（V3__create_messages.sql）
+	private static final String CLIENT_ID_CONSTRAINT = "messages_user_client_key";
+
 	private final MessageRepository messages;
 
 	private final ConversationRepository conversations;
@@ -107,7 +110,10 @@ class MessageService {
 			return run(() -> insert(me, conversationId, body, clientId));
 		}
 		catch (DataIntegrityViolationException ex) {
-			// 同じ clientId が同時に送られ、もう一方が先に追加した（一意の制約）
+			// 同じ clientId が同時に送られ、もう一方が先に追加した（一意の制約）。それ以外の失敗はそのまま投げる
+			if (!String.valueOf(ex.getMostSpecificCause().getMessage()).contains(CLIENT_ID_CONSTRAINT)) {
+				throw ex;
+			}
 			return run(() -> this.messages.findByUserIdAndClientId(me, clientId)
 				.map((m) -> sameSend(me, conversationId, m))
 				.orElseThrow(() -> ex));
@@ -135,7 +141,9 @@ class MessageService {
 		return view(me, requireVisible(me, conversationId), sent);
 	}
 
-	// 編集（MS-9）。送った本人だけ。オーナーでもほかの人のものは編集できない（MS-10）
+	// 編集（MS-9）。送った本人だけ。オーナーでもほかの人のものは編集できない（MS-10）。
+	// 送れるか（チャンネルのメンバーか）は確かめない。本人がワークスペースのメンバーで会話を見られる間は、
+	// チャンネルから抜けた後でも自分のメッセージを直せる（FN-07 5 章の 5）
 	@Transactional
 	MessageView edit(long me, long messageId, @Nullable String rawBody) {
 		String body = MessageBodies.valid(rawBody);

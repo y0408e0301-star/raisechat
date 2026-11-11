@@ -310,4 +310,35 @@ class MessageApiTests {
 			.isLenientlyEqualTo("{\"field\":\"lastMessageId\"}");
 	}
 
+	// FN-14 5 章の 4
+	@Test
+	void 参加していない公開チャンネルを読んでも既読の行は作らず_開いた会話だけを記録する() {
+		Long channel = this.jdbc.queryForObject(
+				"INSERT INTO conversations (workspace_id, type, name, visibility, "
+						+ "created_by) VALUES (?, 'CHANNEL', '雑談', 'PUBLIC', ?) RETURNING id",
+				Long.class, this.workspace, userId(this.jdbc, "taro_y"));
+		this.jdbc.update("INSERT INTO conversation_members (conversation_id, user_id) VALUES (?, ?)", channel,
+				userId(this.jdbc, "taro_y"));
+		long message = readLong(send(this.taro, channel, "雑談", UUID.randomUUID().toString()), "$.id");
+
+		assertThat(post(this.mvc, this.hanako, "/api/conversations/%d/read".formatted(channel),
+				"{\"lastMessageId\":%d}".formatted(message)))
+			.hasStatus(HttpStatus.NO_CONTENT);
+		assertThat(this.jdbc.queryForObject("SELECT count(*) FROM conversation_members WHERE conversation_id = ?",
+				Long.class, channel))
+			.isEqualTo(1);
+		assertThat(this.jdbc.queryForObject(
+				"SELECT last_opened_conversation_id FROM workspace_members " + "WHERE user_id = ?", Long.class,
+				userId(this.jdbc, "hanako")))
+			.isEqualTo(channel);
+	}
+
+	// FN-07 5 章の 5
+	@Test
+	void チャンネルから抜けても_見られる間は自分のメッセージを編集できる() {
+		long message = send(this.hanako, "はなこ");
+		this.jdbc.update("DELETE FROM conversation_members WHERE user_id = ?", userId(this.jdbc, "hanako"));
+		assertThat(patch(this.mvc, this.hanako, "/api/messages/" + message, "{\"body\":\"直した\"}")).hasStatusOk();
+	}
+
 }
