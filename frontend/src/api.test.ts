@@ -162,6 +162,40 @@ describe('JWT の取り直し（FN-01 3.3）', () => {
     expect(expiredHandler).toHaveBeenCalledOnce()
   })
 
+  it('同時に 401 になって取り直しに失敗したら、取り直しも M-8 も 1 回だけ', async () => {
+    const expiredHandler = vi.fn()
+    setSessionExpiredHandler(expiredHandler)
+    const fetch = mockFetch({ [AVAILABILITY]: expired, 'POST /api/auth/refresh': refreshFailed })
+    await Promise.all([
+      expect(isUsernameAvailable('taro_y')).rejects.toMatchObject({ status: 401 }),
+      expect(isUsernameAvailable('taro_y')).rejects.toMatchObject({ status: 401 }),
+    ])
+    expect(fetch.keys().filter((k) => k === 'POST /api/auth/refresh')).toHaveLength(1)
+    expect(expiredHandler).toHaveBeenCalledOnce()
+  })
+
+  it('取り直しに失敗した後に 401 が返ってきた API も、取り直さずに M-8 を 2 回出さない', async () => {
+    const expiredHandler = vi.fn()
+    setSessionExpiredHandler(expiredHandler)
+    let releaseSlow: (() => void) | undefined
+    const fetch = mockFetch({
+      [AVAILABILITY]: [
+        expired,
+        () => new Promise<Response>((resolve) => {
+          releaseSlow = () => resolve(expired())
+        }),
+      ],
+      'POST /api/auth/refresh': refreshFailed,
+    })
+    const first = isUsernameAvailable('taro_y')
+    const second = isUsernameAvailable('taro_y')
+    await expect(first).rejects.toMatchObject({ status: 401 })
+    releaseSlow?.()
+    await expect(second).rejects.toMatchObject({ status: 401 })
+    expect(fetch.keys().filter((k) => k === 'POST /api/auth/refresh')).toHaveLength(1)
+    expect(expiredHandler).toHaveBeenCalledOnce()
+  })
+
   it('取り直しの通信が失敗しても、取り直しに失敗したものとして扱う', async () => {
     const expiredHandler = vi.fn()
     setSessionExpiredHandler(expiredHandler)

@@ -49,8 +49,13 @@ export function setSessionExpiredHandler(handler: () => void): void {
 
 let refreshing: Promise<boolean> | null = null
 
-// 取り直しに成功した回数。API を送ったときの値と比べて、送った後に取り直しが済んだかを知る
-let refreshed = 0
+// 取り直しを終えた回数（成功・失敗の両方）と、最後の取り直しの結果。
+// API を送ったときの回数と比べて、送った後にほかの API の 401 で取り直しが済んでいたかを知る
+let refreshCount = 0
+let lastRefreshOk = false
+
+// M-8 を出す処理を最後に呼んだときの refreshCount。1 回の失敗につき 1 回だけ呼ぶ
+let notifiedAt = -1
 
 // 同時に複数の API が 401 になっても、取り直しは 1 回だけにする。
 // 2 回送ると、2 回目は無効にしたリフレッシュトークンを使ったことになり、全部のログインが切れるため（FN-01 5 章の 5）
@@ -58,7 +63,8 @@ function refreshOnce(): Promise<boolean> {
   refreshing ??= fetch('/api/auth/refresh', { method: 'POST', headers: csrfHeader() })
     .then((res) => res.ok, () => false)
     .then((ok) => {
-      if (ok) refreshed++
+      refreshCount++
+      lastRefreshOk = ok
       return ok
     })
     .finally(() => {
@@ -98,12 +104,17 @@ async function call(method: string, url: string, body?: unknown): Promise<Respon
 // UNAUTHENTICATED（Cookie がない）が返ることがある。そのため 401 ならどちらでも取り直しを試す（FN-01 3.3）。
 // notifyExpired が false なら、取り直しに失敗しても M-8 を出さない
 async function request(method: string, url: string, body?: unknown, notifyExpired = true): Promise<Response> {
-  const sentAt = refreshed
+  const sentAt = refreshCount
   const res = await call(method, url, body)
   if (res.status !== 401 || NO_REFRESH.includes(url)) return ensureOk(res)
-  // 送った後に、ほかの API の 401 で取り直しが済んでいたら、取り直さずにやり直す
-  if (refreshed === sentAt && !(await refreshOnce())) {
-    if (notifyExpired) onSessionExpired()
+  // 送った後に、ほかの API の 401 で取り直しが済んでいたら、取り直さずにその結果を使う。
+  // 失敗していたときにもう一度取り直すと、無駄な取り直しと 2 回目の M-8 になるため
+  const ok = refreshCount === sentAt ? await refreshOnce() : lastRefreshOk
+  if (!ok) {
+    if (notifyExpired && notifiedAt !== refreshCount) {
+      notifiedAt = refreshCount
+      onSessionExpired()
+    }
     return ensureOk(res)
   }
   return ensureOk(await call(method, url, body))
