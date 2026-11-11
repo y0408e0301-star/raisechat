@@ -89,6 +89,7 @@ class MessageService {
 			found = new ArrayList<>(this.messages.findAfter(conversationId, after, plusOne));
 			hasMoreAfter = found.size() > limit;
 			found = found.subList(0, Math.min(limit, found.size()));
+			// 前があるか：読んだものの最初より前。1 件もなければ after 以前（after + 1 より前）にあるか
 			hasMoreBefore = this.messages.existsBefore(conversationId, found.isEmpty() ? after + 1 : first(found));
 		}
 		else {
@@ -97,6 +98,8 @@ class MessageService {
 			hasMoreBefore = found.size() > limit;
 			found = new ArrayList<>(found.subList(0, Math.min(limit, found.size())));
 			Collections.reverse(found);
+			// 後ろがあるか：最新を読んだときはない。before を指定したときは、読んだものの最後より後ろ。
+			// 1 件もなければ before 以降（before - 1 より後ろ）にあるか
 			hasMoreAfter = (before != null)
 					&& this.messages.existsAfter(conversationId, found.isEmpty() ? before - 1 : last(found));
 		}
@@ -133,7 +136,7 @@ class MessageService {
 		return view(me, conversation, message);
 	}
 
-	// 同じ clientId で前に送ったもの。同じ送信のやり直しなので、それを返す。
+	// 同じ clientId で前に送ったもの。同じ送信のやり直しなので、それを返す（その後で「削除されました」にしていれば、その状態で返す）。
 	// ほかの会話に送ったものと同じ clientId は、画面が送信ごとに作り直すので起きない。起きたら入力の誤りにする
 	private MessageView sameSend(long me, long conversationId, Message sent) {
 		if (sent.getConversationId() != conversationId) {
@@ -144,11 +147,12 @@ class MessageService {
 
 	// 編集（MS-9）。送った本人だけ。オーナーでもほかの人のものは編集できない（MS-10）。
 	// 送れるか（チャンネルのメンバーか）は確かめない。本人がワークスペースのメンバーで会話を見られる間は、
-	// チャンネルから抜けた後でも自分のメッセージを直せる（FN-07 5 章の 5）
+	// チャンネルから抜けた後でも自分のメッセージを直せる（FN-07 5 章の 5）。
+	// 同時に「削除されました」にされたとき、消した本文を編集で戻さないよう、削除と同じく行をロックする
 	@Transactional
 	MessageView edit(long me, long messageId, @Nullable String rawBody) {
 		String body = MessageBodies.valid(rawBody);
-		Message message = this.messages.findById(messageId).orElseThrow(MessageService::notFound);
+		Message message = this.messages.findByIdForUpdate(messageId).orElseThrow(MessageService::notFound);
 		Conversation conversation = this.conversations.findVisible(me, message.getConversationId())
 			.orElseThrow(MessageService::notFound);
 		if (message.isDeleted()) {

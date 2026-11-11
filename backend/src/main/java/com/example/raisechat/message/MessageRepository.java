@@ -58,7 +58,8 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 			""")
 	boolean isParentInConversation(@Param("id") long id, @Param("conversationId") long conversationId);
 
-	// 削除で使う。返信の追加・削除と同時に起きても件数が食い違わないよう行をロックする（BR-8）
+	// 編集・削除で使う。返信の追加・削除と同時に起きても件数が食い違わないよう（BR-8）、
+	// また「削除されました」にした本文を同時の編集で戻さないよう、行をロックする
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select m from Message m where m.id = :id")
 	Optional<Message> findByIdForUpdate(@Param("id") long id);
