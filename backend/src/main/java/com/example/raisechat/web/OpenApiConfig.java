@@ -25,6 +25,7 @@ import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.core.util.Json;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.SpecVersion;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
@@ -141,13 +142,27 @@ class OpenApiConfig {
 					continue;
 				}
 				if (component.getAnnotatedType().isAnnotationPresent(Nullable.class)) {
-					property.addType("null");
+					model.getProperties().put(component.getName(), nullable(property));
 				}
 				if (model.getRequired() == null || !model.getRequired().contains(component.getName())) {
 					model.addRequiredItem(component.getName());
 				}
 			}
 			return resolved;
+		}
+
+		// null も取れる型にする。ほかの型（UserSummary など）を指す項目は、type を足しても画面の型に反映されないので、
+		// 「その型か null」（oneOf）にする
+		@SuppressWarnings({ "rawtypes", "unchecked" })
+		private static Schema nullable(Schema property) {
+			if (property.get$ref() == null) {
+				property.addType("null");
+				return property;
+			}
+			Schema ref = new Schema<>().specVersion(SpecVersion.V31).$ref(property.get$ref());
+			Schema none = new Schema<>().specVersion(SpecVersion.V31);
+			none.addType("null");
+			return new Schema<>().specVersion(SpecVersion.V31).oneOf(List.of(ref, none));
 		}
 
 		Set<String> conflicts() {

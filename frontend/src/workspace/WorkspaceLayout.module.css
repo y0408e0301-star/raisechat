@@ -1,0 +1,10 @@
+/* G-5 の並べ方（画面設計書 2.19）。ヘッダーの下を画面の高さいっぱいに使い、サイドバーと会話はそれぞれの中だけをスクロールする */
+.page { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
+.body { flex: 1; min-height: 0; display: flex; }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* 600px 未満：サイドバーと会話を 1 つずつ画面いっぱいに出す */
+@media (max-width: 599px) {
+  .body:not(.sidebarOpen) > :first-child { display: none; }
+  .sidebarOpen > .main { display: none; }
+}

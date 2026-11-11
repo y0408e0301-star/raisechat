@@ -18,6 +18,7 @@ import com.example.raisechat.common.ErrorCode;
 import com.example.raisechat.user.DisplayNames;
 import com.example.raisechat.user.User;
 import com.example.raisechat.user.UserRepository;
+import com.example.raisechat.user.UserSummary;
 
 // ユーザー登録・ログイン・JWT の取り直し・ログアウト（機能定義書 FN-01）
 @Service
@@ -84,7 +85,7 @@ class AuthService {
 		catch (DataIntegrityViolationException ex) {
 			throw new ApiException(ErrorCode.USERNAME_TAKEN, "username");
 		}
-		return new LoginResult(Me.of(user, this.clock.instant()), this.tokens.issue(user));
+		return new LoginResult(UserSummary.of(user, this.clock.instant()), this.tokens.issue(user));
 	}
 
 	// 失敗の回数を増やしたことは、401・423 を返すときもコミットする（noRollbackFor）
@@ -111,7 +112,7 @@ class AuthService {
 			throw new ApiException(user.isLocked(now) ? ErrorCode.LOGIN_LOCKED : ErrorCode.LOGIN_FAILED);
 		}
 		user.recordSuccessfulLogin(now);
-		return new LoginResult(Me.of(user, this.clock.instant()), this.tokens.issue(user));
+		return new LoginResult(UserSummary.of(user, this.clock.instant()), this.tokens.issue(user));
 	}
 
 	// リフレッシュトークンを使って、両方のトークンを新しくする（FN-01 3.3、BR-11）。
@@ -135,7 +136,7 @@ class AuthService {
 		current.revoke(now);
 		User user = this.users.findById(current.getUserId())
 			.orElseThrow(() -> new ApiException(ErrorCode.REFRESH_FAILED));
-		return new LoginResult(Me.of(user, this.clock.instant()), this.tokens.issue(user));
+		return new LoginResult(UserSummary.of(user, this.clock.instant()), this.tokens.issue(user));
 	}
 
 	// ログアウトしたブラウザのリフレッシュトークンだけを無効にする（ほかのブラウザのログインは続く。FN-01 5 章 No.7）
@@ -150,10 +151,10 @@ class AuthService {
 	}
 
 	@Transactional(readOnly = true)
-	Me me(long userId) {
+	UserSummary me(long userId) {
 		// JWT は正しいがユーザーがいないときは、ログインしていないものとして扱う（退会はないが、DB を作り直したときなど）
 		return this.users.findById(userId)
-			.map((user) -> Me.of(user, this.clock.instant()))
+			.map((user) -> UserSummary.of(user, this.clock.instant()))
 			.orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED));
 	}
 
@@ -182,18 +183,7 @@ class AuthService {
 		}
 	}
 
-	// 自分の情報（FN-01 6 章。機能定義書 3.5 の UserSummary と同じ形）。アバターの URL は 1-10 で署名付き URL を入れる
-	record Me(String username, String displayName, @Nullable String avatarUrl, @Nullable String statusEmoji,
-			@Nullable String statusText) {
-
-		static Me of(User user, Instant now) {
-			return new Me(user.getUsername(), user.getDisplayName(), null, user.currentStatusEmoji(now),
-					user.currentStatusText(now));
-		}
-
-	}
-
-	record LoginResult(Me me, TokenService.IssuedTokens tokens) {
+	record LoginResult(UserSummary me, TokenService.IssuedTokens tokens) {
 	}
 
 }

@@ -118,10 +118,164 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conversations/{conversationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 会話の詳細
+         * @description 見られないとき（入っていないワークスペース・プライベートチャンネルなど）は 404
+         */
+        get: operations["get_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversations/{conversationId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 会話を開いた・読んだ（FN-14）
+         * @description 最後に開いた会話として記録する。最後に読んだメッセージを進めるのはメッセージ（1-4）から
+         */
+        post: operations["read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 自分が入っているワークスペースの一覧
+         * @description 名前の順（同じ名前は作った順）。ページングしない
+         */
+        get: operations["list"];
+        put?: never;
+        /**
+         * ワークスペースを作る
+         * @description 自分をオーナーにし、公開チャンネル general を作って自分を入れる。1 人 10 個まで（409）
+         */
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspaces/{workspaceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * ワークスペースの詳細
+         * @description 入っていない・存在しないときは 404
+         */
+        get: operations["get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspaces/{workspaceId}/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * サイドバーの会話の一覧
+         * @description 自分が入っているチャンネル（general が先頭、あとは名前の順）。ページングしない
+         */
+        get: operations["list_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ConversationDetail: {
+            canPost: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            createdBy: components["schemas"]["UserSummary"];
+            description: string | null;
+            dmPartner: components["schemas"]["UserSummary"] | null;
+            general: boolean;
+            hasUnread: boolean;
+            /** Format: int64 */
+            id: number;
+            joined: boolean;
+            /** Format: int64 */
+            memberCount: number;
+            /** Format: int32 */
+            mentionCount: number;
+            name: string | null;
+            /** @enum {string} */
+            type: "CHANNEL" | "DM";
+            /** Format: int32 */
+            unreadCount: number;
+            /** @enum {string|null} */
+            visibility: "PUBLIC" | "PRIVATE" | null;
+            /** Format: int64 */
+            workspaceId: number;
+        };
+        ConversationSummary: {
+            canPost: boolean;
+            dmPartner: components["schemas"]["UserSummary"] | null;
+            general: boolean;
+            hasUnread: boolean;
+            /** Format: int64 */
+            id: number;
+            joined: boolean;
+            /** Format: int32 */
+            mentionCount: number;
+            name: string | null;
+            /** @enum {string} */
+            type: "CHANNEL" | "DM";
+            /** Format: int32 */
+            unreadCount: number;
+            /** @enum {string|null} */
+            visibility: "PUBLIC" | "PRIVATE" | null;
+            /** Format: int64 */
+            workspaceId: number;
+        };
+        CreateWorkspaceRequest: {
+            /** @description 前後の空白を除いて 1〜50 文字。改行を含まない（FN-03 4 章） */
+            name: string;
+        };
         ErrorResponse: {
             code: string;
             field: string | null;
@@ -131,12 +285,12 @@ export interface components {
             password: string;
             username: string;
         };
-        Me: {
-            avatarUrl: string | null;
-            displayName: string;
-            statusEmoji: string | null;
-            statusText: string | null;
-            username: string;
+        ReadRequest: {
+            /**
+             * Format: int64
+             * @description 画面に出したいちばん新しいメッセージの ID（なければ 0）
+             */
+            lastMessageId: number;
         };
         SignupRequest: {
             /** @description 前後の空白を除いて 1〜30 文字（A-4） */
@@ -146,8 +300,42 @@ export interface components {
             /** @description 前後の空白を除いて 3〜15 文字の半角英数字と「_」（A-2） */
             username: string;
         };
+        UserSummary: {
+            avatarUrl: string | null;
+            displayName: string;
+            statusEmoji: string | null;
+            statusText: string | null;
+            username: string;
+        };
         UsernameAvailability: {
             available: boolean;
+        };
+        WorkspaceDetail: {
+            /** Format: int64 */
+            generalConversationId: number;
+            hasUnread: boolean;
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            lastOpenedConversationId: number | null;
+            /** Format: int64 */
+            memberCount: number;
+            /** Format: int32 */
+            mentionCount: number;
+            name: string;
+            owner: components["schemas"]["UserSummary"];
+            /** @enum {string} */
+            role: "OWNER" | "MEMBER";
+        };
+        WorkspaceSummary: {
+            hasUnread: boolean;
+            /** Format: int64 */
+            id: number;
+            /** Format: int32 */
+            mentionCount: number;
+            name: string;
+            /** @enum {string} */
+            role: "OWNER" | "MEMBER";
         };
     };
     responses: never;
@@ -177,7 +365,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Me"];
+                    "application/json": components["schemas"]["UserSummary"];
                 };
             };
             /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
@@ -253,7 +441,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Me"];
+                    "application/json": components["schemas"]["UserSummary"];
                 };
             };
             /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
@@ -293,7 +481,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Me"];
+                    "application/json": components["schemas"]["UserSummary"];
                 };
             };
             /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
@@ -335,7 +523,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Me"];
+                    "application/json": components["schemas"]["UserSummary"];
                 };
             };
             /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
@@ -376,6 +564,248 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UsernameAvailability"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReadRequest"];
+            };
+        };
+        responses: {
+            /** @description 記録した */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceSummary"][];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWorkspaceRequest"];
+            };
+        };
+        responses: {
+            /** @description 作った */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceDetail"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceDetail"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"][];
                 };
             };
             /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */

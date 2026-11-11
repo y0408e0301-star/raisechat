@@ -1,12 +1,3 @@
-/* 画面設計書 2.6 簡単なヘッダー。区切り線はヘッダーの下だけ */
-.header { position: sticky; top: 0; z-index: 10; background: var(--bg); border-bottom: 1px solid var(--line); }
-.inner { height: 56px; padding: 0 16px; display: flex; align-items: center; gap: 16px; }
-/* 2.2 アプリ名は 18px・太字 */
-.appName { font-size: 18px; font-weight: bold; color: var(--text); white-space: nowrap; }
-.appName:hover { text-decoration: none; }
-.right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-.me { display: inline-flex; border-radius: 50%; }
-
 /* 2.19 画面の幅：G-3・G-10 は中身を横幅 720px の 1 列にして画面の中央に置く。600px 未満では横幅いっぱい（左右の余白 16px） */
 .container { max-width: 720px; margin: 0 auto; padding: 24px 16px; }
 

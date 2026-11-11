@@ -1,0 +1,18 @@
+/* 画面設計書 7.1 会話の見出し */
+.head { flex: none; display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--line); min-height: 56px; }
+.titles { flex: 1; min-width: 0; }
+/* 2.2 会話の見出しの名前は 18px・太字 */
+.name { margin: 0; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 説明は 1 行。長いときは「…」 */
+.description { margin: 0; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.members { flex: none; color: var(--sub); }
+.back {
+  display: none; flex: none; width: 32px; height: 32px; border: none; border-radius: 8px;
+  background: none; cursor: pointer; font-size: 18px; color: var(--text);
+}
+.back:hover { background: var(--frame); }
+.messages { flex: 1; min-height: 0; overflow-y: auto; }
+
+@media (max-width: 599px) {
+  .back { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; }
+}

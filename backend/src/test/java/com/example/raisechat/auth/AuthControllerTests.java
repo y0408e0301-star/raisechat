@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import com.example.raisechat.ControllerTest;
 import com.example.raisechat.common.ApiException;
 import com.example.raisechat.common.ErrorCode;
+import com.example.raisechat.user.UserSummary;
 
 import jakarta.servlet.http.Cookie;
 
@@ -30,7 +31,7 @@ import jakarta.servlet.http.Cookie;
 class AuthControllerTests {
 
 	private static final AuthService.LoginResult RESULT = new AuthService.LoginResult(
-			new AuthService.Me("taro_y", "たろう", null, null, null),
+			new UserSummary("taro_y", "たろう", null, null, null),
 			new TokenService.IssuedTokens("new-access", "new-refresh"));
 
 	@Autowired
@@ -142,7 +143,7 @@ class AuthControllerTests {
 
 	@Test
 	void 自分の情報はJWTのユーザーのIDで探す() {
-		when(this.authService.me(7)).thenReturn(new AuthService.Me("hanako", "はなこ", null, null, null));
+		when(this.authService.me(7)).thenReturn(new UserSummary("hanako", "はなこ", null, null, null));
 		assertThat(this.mvc.get().uri("/api/auth/me").with(loggedIn(7)).exchange()).hasStatusOk()
 			.bodyJson()
 			.isStrictlyEqualTo(

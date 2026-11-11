@@ -19,7 +19,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.raisechat.common.ApiException;
+import com.example.raisechat.common.CurrentUser;
 import com.example.raisechat.common.ErrorResponse;
+import com.example.raisechat.user.UserSummary;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -60,7 +62,7 @@ class AuthController {
 	@ApiResponse(responseCode = "201", description = "登録した")
 	@SecurityRequirements
 	@PostMapping("/signup")
-	ResponseEntity<AuthService.Me> signup(@RequestBody SignupRequest request, HttpServletRequest httpRequest,
+	ResponseEntity<UserSummary> signup(@RequestBody SignupRequest request, HttpServletRequest httpRequest,
 			HttpServletResponse httpResponse) {
 		AuthService.LoginResult result = this.authService.signup(request.username(), request.displayName(),
 				request.password());
@@ -71,7 +73,7 @@ class AuthController {
 	@Operation(summary = "ログイン", description = "access_token・refresh_token の Cookie を返す。続けて失敗すると 15 分ロックする（423）")
 	@SecurityRequirements
 	@PostMapping("/login")
-	ResponseEntity<AuthService.Me> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest,
+	ResponseEntity<UserSummary> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest,
 			HttpServletResponse httpResponse) {
 		AuthService.LoginResult result = this.authService.login(request.username(), request.password());
 		signedIn(result, httpRequest, httpResponse);
@@ -81,7 +83,7 @@ class AuthController {
 	// 取り直しに失敗したときは、使えなくなった Cookie を消してから 401 を返す
 	@Operation(summary = "JWT の取り直し", description = "refresh_token の Cookie で、access_token・refresh_token を取り直す")
 	@ApiResponse(responseCode = "200", description = "取り直した",
-			content = @Content(schema = @Schema(implementation = AuthService.Me.class)))
+			content = @Content(schema = @Schema(implementation = UserSummary.class)))
 	@SecurityRequirements
 	@PostMapping("/refresh")
 	ResponseEntity<?> refresh(@CookieValue(name = AuthCookies.REFRESH_TOKEN, required = false) @Nullable String token) {
@@ -101,14 +103,14 @@ class AuthController {
 	@PostMapping("/logout")
 	ResponseEntity<Void> logout(@AuthenticationPrincipal Jwt jwt,
 			@CookieValue(name = AuthCookies.REFRESH_TOKEN, required = false) @Nullable String token) {
-		this.authService.logout(userId(jwt), token);
+		this.authService.logout(CurrentUser.id(jwt), token);
 		return withCookies(ResponseEntity.status(HttpStatus.NO_CONTENT), this.cookies.clear()).build();
 	}
 
 	@Operation(summary = "ログインしている自分")
 	@GetMapping("/me")
-	AuthService.Me me(@AuthenticationPrincipal Jwt jwt) {
-		return this.authService.me(userId(jwt));
+	UserSummary me(@AuthenticationPrincipal Jwt jwt) {
+		return this.authService.me(CurrentUser.id(jwt));
 	}
 
 	// ログインした（登録した）ときの Cookie。access_token・refresh_token を出し、CSRF トークンも新しくする。
@@ -120,11 +122,6 @@ class AuthController {
 		this.cookies.issue(result.tokens())
 			.forEach((cookie) -> response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString()));
 		this.csrfTokenRepository.saveToken(this.csrfTokenRepository.generateToken(request), request, response);
-	}
-
-	// JWT の sub にはユーザーの ID（users.id）が入っている（TokenService）
-	private static long userId(Jwt jwt) {
-		return Long.parseLong(jwt.getSubject());
 	}
 
 	private static ResponseEntity.BodyBuilder withCookies(ResponseEntity.BodyBuilder builder,

@@ -23,6 +23,7 @@ import com.example.raisechat.ControllerTest;
 import com.example.raisechat.MutableClock;
 import com.example.raisechat.TestEntities;
 import com.example.raisechat.common.ErrorCode;
+import com.example.raisechat.user.UserSummary;
 
 import jakarta.servlet.http.Cookie;
 
@@ -45,7 +46,7 @@ class SecurityConfigTests {
 	@BeforeEach
 	void setUp() {
 		this.clock.reset();
-		when(this.authService.me(1)).thenReturn(new AuthService.Me("taro_y", "たろう", null, null, null));
+		when(this.authService.me(1)).thenReturn(new UserSummary("taro_y", "たろう", null, null, null));
 	}
 
 	@Test
@@ -86,7 +87,7 @@ class SecurityConfigTests {
 	@Test
 	void ログインがいらないAPIでは期限切れのCookieが残っていても読まない() {
 		when(this.authService.login(any(), any())).thenReturn(new AuthService.LoginResult(
-				new AuthService.Me("taro_y", "たろう", null, null, null), new TokenService.IssuedTokens("a", "r")));
+				new UserSummary("taro_y", "たろう", null, null, null), new TokenService.IssuedTokens("a", "r")));
 		Cookie expired = accessToken();
 		this.clock.advance(Duration.ofHours(1));
 

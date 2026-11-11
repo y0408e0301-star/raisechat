@@ -1,0 +1,9 @@
+.root { position: relative; display: inline-flex; }
+.menu {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; min-width: 200px;
+  margin: 0; padding: 4px 0; list-style: none;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+.right { left: auto; right: 0; }
+.item { display: block; padding: 8px 16px; color: var(--text); white-space: nowrap; }
+.item:hover { background: var(--frame); text-decoration: none; }
