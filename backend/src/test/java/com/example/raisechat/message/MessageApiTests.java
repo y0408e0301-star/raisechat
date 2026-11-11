@@ -127,6 +127,16 @@ class MessageApiTests {
 		// ほかの人が同じ clientId を使っても、別のメッセージになる
 		assertThat(send(this.hanako, this.general, "はなこ", clientId)).hasStatus(HttpStatus.CREATED);
 		assertThat(this.jdbc.queryForObject("SELECT count(*) FROM messages", Long.class)).isEqualTo(2);
+		// 同じ人が同じ clientId をほかの会話に送ったら、前のものを返さずに 400
+		Long other = this.jdbc.queryForObject(
+				"INSERT INTO conversations (workspace_id, type, name, visibility, "
+						+ "created_by) VALUES (?, 'CHANNEL', '雑談', 'PUBLIC', ?) RETURNING id",
+				Long.class, this.workspace, userId(this.jdbc, "taro_y"));
+		this.jdbc.update("INSERT INTO conversation_members (conversation_id, user_id) VALUES (?, ?)", other,
+				userId(this.jdbc, "taro_y"));
+		assertThat(send(this.taro, other, "1 回目", clientId)).hasStatus(HttpStatus.BAD_REQUEST)
+			.bodyJson()
+			.isLenientlyEqualTo("{\"code\":\"BAD_REQUEST\",\"field\":\"clientId\"}");
 	}
 
 	// TC-07-12（応答が届く前に同じものをもう一度送った）

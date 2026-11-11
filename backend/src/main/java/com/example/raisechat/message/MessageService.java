@@ -109,7 +109,7 @@ class MessageService {
 		catch (DataIntegrityViolationException ex) {
 			// 同じ clientId が同時に送られ、もう一方が先に追加した（一意の制約）
 			return run(() -> this.messages.findByUserIdAndClientId(me, clientId)
-				.map((m) -> view(me, requireVisible(me, m.getConversationId()), m))
+				.map((m) -> sameSend(me, conversationId, m))
 				.orElseThrow(() -> ex));
 		}
 	}
@@ -118,12 +118,21 @@ class MessageService {
 		Conversation conversation = requireVisible(me, conversationId);
 		Optional<Message> sent = this.messages.findByUserIdAndClientId(me, clientId);
 		if (sent.isPresent()) {
-			return view(me, conversation, sent.get());
+			return sameSend(me, conversationId, sent.get());
 		}
 		requireCanPost(me, conversation);
 		Message message = this.messages
 			.saveAndFlush(new Message(conversationId, me, clientId, body, this.clock.instant()));
 		return view(me, conversation, message);
+	}
+
+	// 同じ clientId で前に送ったもの。同じ送信のやり直しなので、それを返す。
+	// ほかの会話に送ったものと同じ clientId は、画面が送信ごとに作り直すので起きない。起きたら入力の誤りにする
+	private MessageView sameSend(long me, long conversationId, Message sent) {
+		if (sent.getConversationId() != conversationId) {
+			throw new ApiException(ErrorCode.BAD_REQUEST, "clientId");
+		}
+		return view(me, requireVisible(me, conversationId), sent);
 	}
 
 	// 編集（MS-9）。送った本人だけ。オーナーでもほかの人のものは編集できない（MS-10）
