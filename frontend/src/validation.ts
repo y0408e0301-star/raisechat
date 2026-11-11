@@ -3,6 +3,7 @@
 export const USERNAME_MAX = 15
 export const DISPLAY_NAME_MAX = 30
 export const WORKSPACE_NAME_MAX = 50
+export const MESSAGE_MAX = 4000
 export const PASSWORD_MAX = 64
 
 // 文字数は Unicode の文字（コードポイント）で数える（画面設計書 2.18）。API の数え方と同じ

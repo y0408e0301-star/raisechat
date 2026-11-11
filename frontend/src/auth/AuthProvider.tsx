@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { fetchMe, logout, setSessionExpiredHandler, type Me } from '../api'
+import { clearDrafts } from '../drafts'
 import { M } from '../messages'
 import { AuthContext, type Auth } from './AuthContext'
 
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 操作の途中で取り直しに失敗したら、M-8 を出して G-1 に移す（A-8）
   useEffect(() => {
     setSessionExpiredHandler(() => {
+      clearDrafts()
       setMe(null)
       navigate('/login', { replace: true, state: { message: M[8] } })
     })
@@ -41,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // 何もしない
     }
+    clearDrafts()
     setMe(null)
     navigate('/login', { replace: true })
   }, [navigate])

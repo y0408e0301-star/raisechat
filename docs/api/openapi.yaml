@@ -22,6 +22,11 @@ info:
     | WORKSPACE_LIMIT | 409 | 作れるワークスペースは 10 個までです。 |
     | WORKSPACE_NOT_FOUND | 404 | このワークスペースは見つからないか、参加していません。 |
     | CONVERSATION_NOT_FOUND | 404 | このチャンネルは見つからないか、参加していません。 |
+    | MESSAGE_EMPTY | 400 | メッセージを入力してください。 |
+    | MESSAGE_TOO_LONG | 400 | メッセージは 4,000 文字までです。 |
+    | NOT_CHANNEL_MEMBER | 403 | このチャンネルに参加すると、メッセージを送れます。 |
+    | NOT_AUTHOR | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
+    | MESSAGE_NOT_FOUND | 404 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
     | BAD_REQUEST | 400 | 入力が正しくありません。 |
     | FORBIDDEN | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
     | NOT_FOUND | 404 | 見つかりません。 |
@@ -250,9 +255,99 @@ paths:
       summary: 会話の詳細
       tags:
       - FN-06 チャンネル
+  /api/conversations/{conversationId}/messages:
+    get:
+      description: 親メッセージ（スレッドの返信でないもの）を古い順に返す。before（その ID より前）・after（その ID より後）のどちらか、またはなし（最新）。limit
+        は 1〜50（指定がなければ 50）。around は検索（1-16）で足す
+      operationId: list_1
+      parameters:
+      - in: path
+        name: conversationId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: before
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: after
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessagePage"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 会話のメッセージの一覧
+      tags:
+      - FN-07 メッセージ
+    post:
+      description: 同じ clientId で 2 回送ったときは、2 つ目を追加せず 1 つ目を返す
+      operationId: post
+      parameters:
+      - in: path
+        name: conversationId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostMessageRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageView"
+          description: 送った
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: メッセージを送る
+      tags:
+      - FN-07 メッセージ
   /api/conversations/{conversationId}/read:
     post:
-      description: 最後に開いた会話として記録する。最後に読んだメッセージを進めるのはメッセージ（1-4）から
+      description: 最後に読んだメッセージを進め（戻さない）、最後に開いた会話として記録する
       operationId: read
       parameters:
       - in: path
@@ -285,6 +380,83 @@ paths:
       summary: 会話を開いた・読んだ（FN-14）
       tags:
       - FN-06 チャンネル
+  /api/messages/{messageId}:
+    delete:
+      description: 送った本人とオーナーだけ。返信のある親メッセージは「削除されました」にして 200 で返し、それ以外は消して 204
+      operationId: delete
+      parameters:
+      - in: path
+        name: messageId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageView"
+          description: 「削除されました」にした
+        "204":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageView"
+          description: 消した
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: メッセージを削除する
+      tags:
+      - FN-07 メッセージ
+    patch:
+      description: 送った本人だけ（オーナーでもほかの人のものは 403）
+      operationId: edit
+      parameters:
+      - in: path
+        name: messageId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditMessageRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageView"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: メッセージを編集する
+      tags:
+      - FN-07 メッセージ
   /api/workspaces:
     get:
       description: 名前の順（同じ名前は作った順）。ページングしない
@@ -380,7 +552,7 @@ paths:
   /api/workspaces/{workspaceId}/conversations:
     get:
       description: 自分が入っているチャンネル（general が先頭、あとは名前の順）。ページングしない
-      operationId: list_1
+      operationId: list_2
       parameters:
       - in: path
         name: workspaceId
@@ -550,6 +722,14 @@ components:
           description: 前後の空白を除いて 1〜50 文字。改行を含まない（FN-03 4 章）
       required:
       - name
+    EditMessageRequest:
+      type: object
+      properties:
+        body:
+          type: string
+          description: "前後の空白を除き、改行を LF にそろえて 1〜4,000 文字（FN-07 4 章）"
+      required:
+      - body
     ErrorResponse:
       type: object
       properties:
@@ -575,13 +755,93 @@ components:
       required:
       - password
       - username
+    MessagePage:
+      type: object
+      properties:
+        hasMoreAfter:
+          type: boolean
+        hasMoreBefore:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessageView"
+      required:
+      - hasMoreAfter
+      - hasMoreBefore
+      - items
+    MessageView:
+      type: object
+      properties:
+        author:
+          $ref: "#/components/schemas/UserSummary"
+        body:
+          type: string
+        canDelete:
+          type: boolean
+        conversationId:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        deleted:
+          type: boolean
+        editedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        lastReplyAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        mine:
+          type: boolean
+        parentId:
+          type:
+          - integer
+          - "null"
+          format: int64
+        replyCount:
+          type: integer
+          format: int32
+      required:
+      - author
+      - body
+      - canDelete
+      - conversationId
+      - createdAt
+      - deleted
+      - editedAt
+      - id
+      - lastReplyAt
+      - mine
+      - parentId
+      - replyCount
+    PostMessageRequest:
+      type: object
+      properties:
+        body:
+          type: string
+          description: "前後の空白を除き、改行を LF にそろえて 1〜4,000 文字（FN-07 4 章）"
+        clientId:
+          type: string
+          description: 画面が送信ごとに作る UUID。同じ送信を 2 回追加しないために使う
+      required:
+      - body
+      - clientId
     ReadRequest:
       type: object
       properties:
         lastMessageId:
           type: integer
           format: int64
-          description: 画面に出したいちばん新しいメッセージの ID（なければ 0）
+          description: 画面に出したいちばん新しい親メッセージの ID。メッセージがまだない会話では 0（FN-14 4 章）
       required:
       - lastMessageId
     SignupRequest:

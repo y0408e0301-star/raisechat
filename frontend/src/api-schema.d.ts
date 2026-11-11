@@ -138,6 +138,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conversations/{conversationId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 会話のメッセージの一覧
+         * @description 親メッセージ（スレッドの返信でないもの）を古い順に返す。before（その ID より前）・after（その ID より後）のどちらか、またはなし（最新）。limit は 1〜50（指定がなければ 50）。around は検索（1-16）で足す
+         */
+        get: operations["list_1"];
+        put?: never;
+        /**
+         * メッセージを送る
+         * @description 同じ clientId で 2 回送ったときは、2 つ目を追加せず 1 つ目を返す
+         */
+        post: operations["post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/conversations/{conversationId}/read": {
         parameters: {
             query?: never;
@@ -149,13 +173,37 @@ export interface paths {
         put?: never;
         /**
          * 会話を開いた・読んだ（FN-14）
-         * @description 最後に開いた会話として記録する。最後に読んだメッセージを進めるのはメッセージ（1-4）から
+         * @description 最後に読んだメッセージを進め（戻さない）、最後に開いた会話として記録する
          */
         post: operations["read"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{messageId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * メッセージを削除する
+         * @description 送った本人とオーナーだけ。返信のある親メッセージは「削除されました」にして 200 で返し、それ以外は消して 204
+         */
+        delete: operations["delete"];
+        options?: never;
+        head?: never;
+        /**
+         * メッセージを編集する
+         * @description 送った本人だけ（オーナーでもほかの人のものは 403）
+         */
+        patch: operations["edit"];
         trace?: never;
     };
     "/api/workspaces": {
@@ -213,7 +261,7 @@ export interface paths {
          * サイドバーの会話の一覧
          * @description 自分が入っているチャンネル（general が先頭、あとは名前の順）。ページングしない
          */
-        get: operations["list_1"];
+        get: operations["list_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -276,6 +324,10 @@ export interface components {
             /** @description 前後の空白を除いて 1〜50 文字。改行を含まない（FN-03 4 章） */
             name: string;
         };
+        EditMessageRequest: {
+            /** @description 前後の空白を除き、改行を LF にそろえて 1〜4,000 文字（FN-07 4 章） */
+            body: string;
+        };
         ErrorResponse: {
             code: string;
             field: string | null;
@@ -285,10 +337,42 @@ export interface components {
             password: string;
             username: string;
         };
+        MessagePage: {
+            hasMoreAfter: boolean;
+            hasMoreBefore: boolean;
+            items: components["schemas"]["MessageView"][];
+        };
+        MessageView: {
+            author: components["schemas"]["UserSummary"];
+            body: string;
+            canDelete: boolean;
+            /** Format: int64 */
+            conversationId: number;
+            /** Format: date-time */
+            createdAt: string;
+            deleted: boolean;
+            /** Format: date-time */
+            editedAt: string | null;
+            /** Format: int64 */
+            id: number;
+            /** Format: date-time */
+            lastReplyAt: string | null;
+            mine: boolean;
+            /** Format: int64 */
+            parentId: number | null;
+            /** Format: int32 */
+            replyCount: number;
+        };
+        PostMessageRequest: {
+            /** @description 前後の空白を除き、改行を LF にそろえて 1〜4,000 文字（FN-07 4 章） */
+            body: string;
+            /** @description 画面が送信ごとに作る UUID。同じ送信を 2 回追加しないために使う */
+            clientId: string;
+        };
         ReadRequest: {
             /**
              * Format: int64
-             * @description 画面に出したいちばん新しいメッセージの ID（なければ 0）
+             * @description 画面に出したいちばん新しい親メッセージの ID。メッセージがまだない会話では 0（FN-14 4 章）
              */
             lastMessageId: number;
         };
@@ -626,6 +710,94 @@ export interface operations {
             };
         };
     };
+    list_1: {
+        parameters: {
+            query?: {
+                before?: number;
+                after?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                conversationId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagePage"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description 送った */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageView"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     read: {
         parameters: {
             query?: never;
@@ -647,6 +819,99 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 「削除されました」にした */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageView"];
+                };
+            };
+            /** @description 消した */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageView"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    edit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageView"];
+                };
             };
             /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
             "4XX": {
@@ -788,7 +1053,7 @@ export interface operations {
             };
         };
     };
-    list_1: {
+    list_2: {
         parameters: {
             query?: never;
             header?: never;
