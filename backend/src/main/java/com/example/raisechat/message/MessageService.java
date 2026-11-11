@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import org.hibernate.exception.ConstraintViolationException;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
@@ -111,7 +112,7 @@ class MessageService {
 		}
 		catch (DataIntegrityViolationException ex) {
 			// 同じ clientId が同時に送られ、もう一方が先に追加した（一意の制約）。それ以外の失敗はそのまま投げる
-			if (!String.valueOf(ex.getMostSpecificCause().getMessage()).contains(CLIENT_ID_CONSTRAINT)) {
+			if (!isDuplicateClientId(ex)) {
 				throw ex;
 			}
 			return run(() -> this.messages.findByUserIdAndClientId(me, clientId)
@@ -225,6 +226,16 @@ class MessageService {
 			throw new IllegalStateException("トランザクションの結果がありません");
 		}
 		return result;
+	}
+
+	// 一意の制約（user_id, client_id）に反したか。例外の文はドライバの言語設定で変わるので、制約の名前で比べる
+	private static boolean isDuplicateClientId(DataIntegrityViolationException ex) {
+		for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+			if (cause instanceof ConstraintViolationException violation) {
+				return CLIENT_ID_CONSTRAINT.equals(violation.getConstraintName());
+			}
+		}
+		return false;
 	}
 
 	private static UUID parseClientId(@Nullable String raw) {
