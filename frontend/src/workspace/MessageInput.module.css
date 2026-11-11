@@ -1,0 +1,11 @@
+/* 画面設計書 2.14 入力欄の本文。2.2 入力欄は 15px */
+.textarea {
+  display: block; width: 100%; resize: none; overflow-y: auto;
+  border: none; padding: 8px 4px; font-size: 15px; line-height: 22px; color: var(--text); background: transparent;
+  /* 入力に合わせて高くし、10 行（22px × 10 ＋ 上下の余白）より多いときは入力欄の中をスクロールする */
+  field-sizing: content; max-height: 236px;
+}
+.textarea:focus { outline: none; }
+/* 残りの文字数は入力欄の右下 */
+.remaining { margin: 0; text-align: right; font-size: 14px; color: var(--sub); }
+.over { color: var(--danger); }

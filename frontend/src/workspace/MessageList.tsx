@@ -1,0 +1,104 @@
+import { Fragment, useLayoutEffect, useRef } from 'react'
+import type { ConversationDetail, MessageView } from '../api'
+import { dayKey, formatDayDivider } from '../dates'
+import { entryKey, type Entry } from './entries'
+import MessageItem from './MessageItem'
+import styles from './MessageList.module.css'
+
+// 同じ人が続けて送ったものをまとめる間隔（MS-12）
+const GROUP_MS = 5 * 60 * 1000
+
+// いちばん上からこの距離まで戻ったら、前を読み込む（MS-2）
+const LOAD_OLDER_AT = 80
+
+type Props = {
+  conversation: ConversationDetail
+  entries: Entry[]
+  hasMoreBefore: boolean
+  loadingOlder: boolean
+  onLoadOlder: () => void
+  onDelete: (message: MessageView) => void
+  onEdited: (message: MessageView) => void
+  onGone: (messageId: number) => void
+  onRetry: (clientId: string) => void
+  onCancel: (clientId: string) => void
+}
+
+function info(e: Entry) {
+  return e.kind === 'sent'
+    ? { username: e.message.author.username, createdAt: e.message.createdAt, deleted: e.message.deleted }
+    : { username: e.author.username, createdAt: e.createdAt, deleted: false }
+}
+
+// 同じ人が 5 分以内に、同じ日に続けて送ったか（MS-12）
+function continues(prev: Entry | undefined, current: Entry): boolean {
+  if (!prev) return false
+  const a = info(prev)
+  const b = info(current)
+  return a.username === b.username && !a.deleted && !b.deleted && dayKey(a.createdAt) === dayKey(b.createdAt)
+    && Date.parse(b.createdAt) - Date.parse(a.createdAt) <= GROUP_MS
+}
+
+// G-5 の会話のメッセージの一覧（MS-1・MS-2・MS-12、画面設計書 2.9・7.1）。
+// 開いたときと、いちばん下に足したときは、いちばん下を出す。前を読み込んだときは、見ていた位置を保つ。
+// 「新着」の線は通知（開発計画書 1-15）、上の方を見ているときの「新しいメッセージ」はリアルタイムの通知（1-5）で足す
+export default function MessageList({ conversation, entries, hasMoreBefore, loadingOlder, onLoadOlder, ...handlers }: Props) {
+  const list = useRef<HTMLDivElement>(null)
+  // 前を読み込む前の高さと位置
+  const anchor = useRef<{ height: number, top: number } | null>(null)
+  const lastKey = useRef<string | null>(null)
+
+  const last = entries.at(-1)
+  const currentLastKey = last ? entryKey(last) : null
+
+  useLayoutEffect(() => {
+    const el = list.current
+    if (!el) return
+    if (anchor.current) {
+      el.scrollTop = el.scrollHeight - anchor.current.height + anchor.current.top
+      anchor.current = null
+    } else if (currentLastKey !== lastKey.current) {
+      el.scrollTop = el.scrollHeight
+    }
+    lastKey.current = currentLastKey
+  })
+
+  function handleScroll() {
+    const el = list.current
+    if (!el || !hasMoreBefore || loadingOlder || el.scrollTop > LOAD_OLDER_AT) return
+    anchor.current = { height: el.scrollHeight, top: el.scrollTop }
+    onLoadOlder()
+  }
+
+  return (
+    <div ref={list} className={styles.list} onScroll={handleScroll}>
+      {loadingOlder && <p className={styles.loading}>読み込み中…</p>}
+      {!hasMoreBefore && (
+        // 会話の始まり（MS-2）
+        <div className={styles.start}>
+          <h2 className={styles.startTitle}>
+            <span aria-hidden="true">{conversation.visibility === 'PRIVATE' ? '🔒 ' : '# '}</span>{conversation.name}
+          </h2>
+          <p className={styles.startText}>このチャンネルはここから始まります。</p>
+          {conversation.description && <p className={styles.startText}>{conversation.description}</p>}
+        </div>
+      )}
+      {entries.map((entry, i) => {
+        const prev = entries[i - 1]
+        const createdAt = info(entry).createdAt
+        const newDay = !prev || dayKey(info(prev).createdAt) !== dayKey(createdAt)
+        return (
+          <Fragment key={entryKey(entry)}>
+            {newDay && (
+              // 日付の区切り（MS-12）
+              <div className={styles.divider}>
+                <span>{formatDayDivider(createdAt)}</span>
+              </div>
+            )}
+            <MessageItem entry={entry} compact={!newDay && continues(prev, entry)} {...handlers} />
+          </Fragment>
+        )
+      })}
+    </div>
+  )
+}

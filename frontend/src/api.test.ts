@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  ApiError, conversationUrl, createWorkspace, ensureOk, fetchConversation, fetchConversations, fetchMe, fetchWorkspace,
-  fetchWorkspaces, isUsernameAvailable, login, logout, markRead, setSessionExpiredHandler, signup, workspaceUrl,
+  ApiError, conversationUrl, createWorkspace, deleteMessage, editMessage, ensureOk, fetchConversation, fetchConversations, fetchMe, fetchWorkspace,
+  fetchMessages, fetchWorkspaces, isUsernameAvailable, login, logout, markRead, sendMessage, setSessionExpiredHandler, signup,
+  workspaceUrl,
 } from './api'
 import { M } from './messages'
 import { json, mockFetch, sentJson } from './test/fetchMock'
@@ -115,6 +116,26 @@ describe('API の呼び出し方', () => {
     ])
     expect(sentJson(fetch, 1)).toEqual({ name: '仲間うち' })
     expect(sentJson(fetch, 5)).toEqual({ lastMessageId: 0 })
+  })
+
+  it('メッセージ（FN-07 6 章）の API', async () => {
+    const view = { id: 30 }
+    const fetch = mockFetch({
+      'GET /api/conversations/12/messages': () => json(200, { items: [], hasMoreBefore: false, hasMoreAfter: false }),
+      'GET /api/conversations/12/messages?before=30': () => json(200, { items: [], hasMoreBefore: false, hasMoreAfter: true }),
+      'POST /api/conversations/12/messages': () => json(201, view),
+      'PATCH /api/messages/30': () => json(200, view),
+      'DELETE /api/messages/30': [() => json(204), () => json(200, { id: 30, deleted: true })],
+    })
+    await fetchMessages(12)
+    await fetchMessages(12, 30)
+    await sendMessage(12, '本文', 'client-1')
+    await editMessage(30, '直した')
+    // データごと消したら null、「削除されました」にしたらそのメッセージ
+    await expect(deleteMessage(30)).resolves.toBeNull()
+    await expect(deleteMessage(30)).resolves.toEqual({ id: 30, deleted: true })
+    expect(sentJson(fetch, 2)).toEqual({ body: '本文', clientId: 'client-1' })
+    expect(sentJson(fetch, 3)).toEqual({ body: '直した' })
   })
 
   it('画面の URL を作る（画面一覧 1 章）', () => {

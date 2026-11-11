@@ -1,0 +1,25 @@
+package com.example.raisechat.message;
+
+import java.time.Instant;
+
+import org.jspecify.annotations.Nullable;
+
+import com.example.raisechat.user.UserSummary;
+
+// メッセージ（機能定義書 3.5 の MessageView）。
+// 添付（attachments）は 1-11、リアクション（reactions）は 1-13、メンション（mentions）は 1-14 で足す
+record MessageView(long id, long conversationId, @Nullable Long parentId, UserSummary author, String body,
+		int replyCount, @Nullable Instant lastReplyAt, Instant createdAt, @Nullable Instant editedAt, boolean deleted,
+		boolean mine, boolean canDelete) {
+
+	// me：見ている人、owner：見ている人がそのワークスペースのオーナーか
+	static MessageView of(Message m, UserSummary author, long me, boolean owner) {
+		boolean mine = m.getUserId() == me;
+		// 「削除されました」の親メッセージは、もう消せない（本文がない）
+		boolean canDelete = !m.isDeleted() && (mine || owner);
+		return new MessageView(m.getId(), m.getConversationId(), m.getParentId(), author, m.getBody(),
+				m.getReplyCount(), m.getLastReplyAt(), m.getCreatedAt(), m.getEditedAt(), m.isDeleted(), mine,
+				canDelete);
+	}
+
+}

@@ -11,7 +11,7 @@
   background: none; cursor: pointer; font-size: 18px; color: var(--text);
 }
 .back:hover { background: var(--frame); }
-.messages { flex: 1; min-height: 0; overflow-y: auto; }
+.olderFailed { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 8px; color: var(--sub); }
 
 @media (max-width: 599px) {
   .back { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; }

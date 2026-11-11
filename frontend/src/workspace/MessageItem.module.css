@@ -1,0 +1,46 @@
+/* 画面設計書 2.9 メッセージ */
+.message { position: relative; display: flex; gap: 8px; padding: 6px 16px; }
+.message:hover, .message:focus-within { background: var(--frame); }
+.compact { padding-top: 2px; padding-bottom: 2px; }
+/* 送信中は透明度 50%（MS-3） */
+.sending { opacity: 0.5; }
+.side { flex: none; width: 36px; display: flex; justify-content: center; }
+.main { flex: 1; min-width: 0; }
+.header { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+/* 2.2 メッセージの表示名は 15px・太字 */
+.name { font-size: 15px; font-weight: bold; }
+.status { font-size: 15px; }
+.time { color: var(--sub); font-size: 12px; white-space: nowrap; }
+.edited { color: var(--sub); font-size: 12px; }
+/* 続けて送ったメッセージの時刻は、左の余白に、重ねたときだけ出す（MS-12） */
+.compact .side .time { visibility: hidden; padding-top: 4px; font-size: 11px; }
+.compact:hover .side .time, .compact:focus-within .side .time { visibility: visible; }
+
+/* 削除された親メッセージ（MS-11） */
+.deletedAvatar { width: 36px; height: 36px; border-radius: 50%; background: var(--frame); }
+.deletedText { margin: 0; color: var(--sub); }
+
+/* 送れなかったとき（MS-13） */
+.failed { margin: 2px 0 0; color: var(--danger); display: flex; gap: 12px; flex-wrap: wrap; }
+.link { border: none; background: none; padding: 0; color: var(--primary); cursor: pointer; text-decoration: underline; }
+
+/* 重ねたときに右上に出す操作。キーボードの Tab キーでも移れるよう、隠すときは透明にする（移ると出る） */
+.actions {
+  position: absolute; top: -12px; right: 16px; display: flex; gap: 2px; padding: 2px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  opacity: 0; pointer-events: none;
+}
+.message:hover .actions, .message:focus-within .actions { opacity: 1; pointer-events: auto; }
+.action { width: 32px; height: 32px; border: none; border-radius: 6px; background: none; cursor: pointer; }
+.action:hover { background: var(--frame); }
+
+/* 編集の状態（MS-9） */
+.editor { border: 1px solid var(--sub); border-radius: 8px; padding: 4px 8px 8px; background: var(--bg); }
+.editorActions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.hint { margin-right: auto; color: var(--sub); }
+
+/* スマートフォンでは操作を常に出し、押せる大きさを 44px にする */
+@media (pointer: coarse) {
+  .actions { position: static; margin-left: auto; border: none; background: none; opacity: 1; pointer-events: auto; }
+  .action { width: 44px; height: 44px; }
+}

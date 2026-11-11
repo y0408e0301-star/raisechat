@@ -13,6 +13,8 @@ export type WorkspaceSummary = Schemas['WorkspaceSummary']
 export type WorkspaceDetail = Schemas['WorkspaceDetail']
 export type ConversationSummary = Schemas['ConversationSummary']
 export type ConversationDetail = Schemas['ConversationDetail']
+export type MessageView = Schemas['MessageView']
+export type MessagePage = Schemas['MessagePage']
 
 // API がエラーを返したとき（機能定義書 3.3）。message は画面にそのまま出せる文、
 // field があればその入力欄の下に出す
@@ -193,6 +195,30 @@ export function fetchConversation(conversationId: number): Promise<ConversationD
 export async function markRead(conversationId: number, lastMessageId: number): Promise<void> {
   await request('POST', `/api/conversations/${conversationId}/read`,
     { lastMessageId } satisfies Schemas['ReadRequest'])
+}
+
+// ---------------------------------------------------------------- FN-07 メッセージ
+
+// 会話のメッセージ（親メッセージだけ）を古い順に。before（その ID より前）か、なし（最新）
+export function fetchMessages(conversationId: number, before?: number): Promise<MessagePage> {
+  const query = before === undefined ? '' : `?before=${before}`
+  return requestJson<MessagePage>('GET', `/api/conversations/${conversationId}/messages${query}`)
+}
+
+// clientId は送信ごとに作る UUID。もう一度送るときは同じものを使い、2 回追加されないようにする（FN-07 5 章の 8）
+export function sendMessage(conversationId: number, body: string, clientId: string): Promise<MessageView> {
+  return requestJson<MessageView>('POST', `/api/conversations/${conversationId}/messages`,
+    { body, clientId } satisfies Schemas['PostMessageRequest'])
+}
+
+export function editMessage(messageId: number, body: string): Promise<MessageView> {
+  return requestJson<MessageView>('PATCH', `/api/messages/${messageId}`, { body } satisfies Schemas['EditMessageRequest'])
+}
+
+// データごと消したときは null、「削除されました」にしたときはそのメッセージを返す（MS-11）
+export async function deleteMessage(messageId: number): Promise<MessageView | null> {
+  const res = await request('DELETE', `/api/messages/${messageId}`)
+  return res.status === 204 ? null : res.json() as Promise<MessageView>
 }
 
 // ---------------------------------------------------------------- 画面の URL（画面一覧 1 章）

@@ -1,0 +1,15 @@
+/* 画面設計書 2.10 Markdown の見た目。本文は 15px（2.2） */
+.body { font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+.body p { margin: 0; }
+.body p + p, .body p + ul, .body p + ol, .body p + pre, .body p + blockquote,
+.body ul + p, .body ol + p, .body pre + p, .body blockquote + p { margin-top: 4px; }
+.body ul, .body ol { margin: 0; padding-left: 24px; }
+.body blockquote { margin: 0; padding-left: 12px; border-left: 4px solid var(--frame); color: var(--sub); }
+.body code { font-family: Consolas, Menlo, monospace; font-size: 13px; background: var(--frame); border-radius: 4px; padding: 1px 4px; }
+/* コードブロックは箱の中だけを横にスクロールする（画面全体は横にスクロールしない。N-29） */
+.body pre {
+  margin: 4px 0 0; padding: 8px 12px; background: var(--frame); border-radius: 4px;
+  overflow-x: auto; max-width: 100%;
+}
+.body pre code { padding: 0; background: none; overflow-wrap: normal; white-space: pre; }
+.body a { text-decoration: underline; }

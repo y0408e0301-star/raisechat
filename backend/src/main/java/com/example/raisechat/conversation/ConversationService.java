@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.example.raisechat.common.ApiException;
 import com.example.raisechat.common.ErrorCode;
+import com.example.raisechat.message.MessageRepository;
 import com.example.raisechat.user.UserRepository;
 import com.example.raisechat.user.UserSummary;
 import com.example.raisechat.workspace.WorkspaceAccess;
@@ -24,6 +25,8 @@ class ConversationService {
 
 	private final ConversationMemberRepository members;
 
+	private final MessageRepository messages;
+
 	private final WorkspaceAccess workspaceAccess;
 
 	private final UserRepository users;
@@ -31,9 +34,10 @@ class ConversationService {
 	private final Clock clock;
 
 	ConversationService(ConversationRepository conversations, ConversationMemberRepository members,
-			WorkspaceAccess workspaceAccess, UserRepository users, Clock clock) {
+			MessageRepository messages, WorkspaceAccess workspaceAccess, UserRepository users, Clock clock) {
 		this.conversations = conversations;
 		this.members = members;
+		this.messages = messages;
 		this.workspaceAccess = workspaceAccess;
 		this.users = users;
 		this.clock = clock;
@@ -60,14 +64,21 @@ class ConversationService {
 				createdBy);
 	}
 
-	// 会話を開いた（FN-14 6 章の read）。この段階では最後に開いた会話（W-4）だけを記録する。
-	// 最後に読んだメッセージを進めるのはメッセージ（開発計画書 1-4）、メンションを読んだことにするのは 1-14・1-15 で足す
+	// 会話を開いた・読んだ（FN-14 6 章の read）。最後に読んだメッセージを進め、最後に開いた会話（W-4）を記録する。
+	// lastMessageId はその会話の親メッセージの ID（FN-14 4 章）。メッセージがまだない会話では 0。
+	// メンションを読んだことにするのは、メンション・通知（開発計画書 1-14・1-15）で足す
 	@Transactional
 	void read(long userId, long conversationId, @Nullable Long lastMessageId) {
 		if (lastMessageId == null || lastMessageId < 0) {
 			throw new ApiException(ErrorCode.BAD_REQUEST, "lastMessageId");
 		}
 		Conversation conversation = requireVisible(userId, conversationId);
+		if (lastMessageId > 0) {
+			if (!this.messages.isParentInConversation(lastMessageId, conversationId)) {
+				throw new ApiException(ErrorCode.BAD_REQUEST, "lastMessageId");
+			}
+			this.members.advanceLastRead(conversationId, userId, lastMessageId);
+		}
 		WorkspaceMember member = this.workspaceAccess.requireMember(userId, conversation.getWorkspaceId());
 		member.openConversation(conversationId);
 	}

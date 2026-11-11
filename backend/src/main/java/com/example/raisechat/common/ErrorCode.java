@@ -36,6 +36,17 @@ public enum ErrorCode {
 	// 会話（FN-06・FN-12 9 章。M-27）
 	CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "このチャンネルは見つからないか、参加していません。"),
 
+	// メッセージ（FN-07 9 章。M-30・M-35・M-49）。本文が空のときは画面では送れないので、画面には出さない
+	MESSAGE_EMPTY(HttpStatus.BAD_REQUEST, "メッセージを入力してください。"),
+
+	MESSAGE_TOO_LONG(HttpStatus.BAD_REQUEST, "メッセージは 4,000 文字までです。"),
+
+	NOT_CHANNEL_MEMBER(HttpStatus.FORBIDDEN, "このチャンネルに参加すると、メッセージを送れます。"),
+
+	NOT_AUTHOR(HttpStatus.FORBIDDEN, "操作に失敗しました。時間をおいてもう一度お試しください。"),
+
+	MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "操作に失敗しました。時間をおいてもう一度お試しください。"),
+
 	// 画面を通さずに送られた、条件に合わない入力（JSON が読めない、上限を超えた文字数など）
 	BAD_REQUEST(HttpStatus.BAD_REQUEST, "入力が正しくありません。"),
 

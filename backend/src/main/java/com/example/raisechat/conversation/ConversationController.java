@@ -43,7 +43,7 @@ class ConversationController {
 		return this.conversationService.get(CurrentUser.id(jwt), conversationId);
 	}
 
-	@Operation(summary = "会話を開いた・読んだ（FN-14）", description = "最後に開いた会話として記録する。最後に読んだメッセージを進めるのはメッセージ（1-4）から")
+	@Operation(summary = "会話を開いた・読んだ（FN-14）", description = "最後に読んだメッセージを進め（戻さない）、最後に開いた会話として記録する")
 	@ApiResponse(responseCode = "204", description = "記録した")
 	@PostMapping("/api/conversations/{conversationId}/read")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
@@ -52,7 +52,7 @@ class ConversationController {
 	}
 
 	record ReadRequest(@Schema(requiredMode = Schema.RequiredMode.REQUIRED,
-			description = "画面に出したいちばん新しいメッセージの ID（なければ 0）") @Nullable Long lastMessageId) {
+			description = "画面に出したいちばん新しい親メッセージの ID。メッセージがまだない会話では 0（FN-14 4 章）") @Nullable Long lastMessageId) {
 	}
 
 }
