@@ -29,12 +29,12 @@ public enum ErrorCode {
 	// 画面を通さずに送られた、条件に合わない入力（JSON が読めない、上限を超えた文字数など）
 	BAD_REQUEST(HttpStatus.BAD_REQUEST, "入力が正しくありません。"),
 
-	// 他人のものを変えようとした、CSRF トークンが合わないとき。画面には M-30 を出す
+	// 他人のものを変えようとした、CSRF トークンが合わないとき。画面には M-49 を出す
 	FORBIDDEN(HttpStatus.FORBIDDEN, "操作に失敗しました。時間をおいてもう一度お試しください。"),
 
 	NOT_FOUND(HttpStatus.NOT_FOUND, "見つかりません。"),
 
-	// 思いがけない失敗（M-30）
+	// 思いがけない失敗（M-49）
 	INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "操作に失敗しました。時間をおいてもう一度お試しください。");
 
 	private final HttpStatus status;
