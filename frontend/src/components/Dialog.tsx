@@ -39,7 +39,11 @@ export default function Dialog({ title, onClose, children }: Props) {
       }
       if (e.key !== 'Tab' || !panel.current) return
       const items = Array.from(panel.current.querySelectorAll<HTMLElement>(FOCUSABLE))
-      if (items.length === 0) return
+      // 中に押せる部品がなければ、ダイアログから動かさない
+      if (items.length === 0) {
+        e.preventDefault()
+        return
+      }
       const first = items[0]
       const last = items[items.length - 1]
       if (e.shiftKey && (document.activeElement === first || document.activeElement === panel.current)) {

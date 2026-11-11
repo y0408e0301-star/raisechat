@@ -31,9 +31,18 @@ describe('Dialog', () => {
     expect(screen.getByLabelText('名前')).toHaveFocus()
   })
 
-  it('data-autofocus がなければダイアログにカーソルを置く', () => {
-    render(<Dialog title="見出し" onClose={() => {}}><p>本文</p></Dialog>)
+  it('data-autofocus がなければダイアログにカーソルを置き、押せる部品がなければ Tab キーでも外に出ない', async () => {
+    render(<><Dialog title="見出し" onClose={() => {}}><p>本文</p></Dialog><button type="button">外</button></>)
     expect(screen.getByRole('dialog')).toHaveFocus()
+    await userEvent.tab()
+    expect(screen.getByRole('dialog')).toHaveFocus()
+  })
+
+  it('ダイアログにカーソルがあるとき、Tab キーで中の最初の部品に移る', async () => {
+    render(<><Dialog title="見出し" onClose={() => {}}><button type="button">中</button></Dialog><button type="button">外</button></>)
+    expect(screen.getByRole('dialog')).toHaveFocus()
+    await userEvent.tab()
+    expect(screen.getByRole('button', { name: '中' })).toHaveFocus()
   })
 
   it('見出しで読み上げ、data-autofocus の入力欄にカーソルを置く', async () => {
