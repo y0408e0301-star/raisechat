@@ -10,8 +10,9 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
 	long countByConversationId(long conversationId);
 
 	// 最後に読んだメッセージを進める。古い位置を送られても戻さない（FN-14 5 章の 3、BR-15）。
-	// 参加していない公開チャンネルでは行がないので何もしない（未読を出さない。FN-14 5 章の 4）
-	@Modifying
+	// 参加していない公開チャンネルでは行がないので何もしない（未読を出さない。FN-14 5 章の 4）。
+	// 同じトランザクションで後から会話のメンバーを読んでも古い値が残らないよう、更新の後で読み込んだものを捨てる
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
 	@Query(value = """
 			UPDATE conversation_members SET last_read_message_id = GREATEST(last_read_message_id, :messageId)
 			WHERE conversation_id = :conversationId AND user_id = :userId
