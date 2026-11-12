@@ -20,6 +20,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const realtime = useMemo<Realtime>(() => ({
     state,
     subscribeConversation: connection.subscribeConversation,
+    subscribeUser: connection.subscribeUser,
     onReconnect: connection.onReconnect,
   }), [connection, state])
   return <RealtimeContext value={realtime}>{children}</RealtimeContext>

@@ -15,6 +15,10 @@ export type ConversationSummary = Schemas['ConversationSummary']
 export type ConversationDetail = Schemas['ConversationDetail']
 export type MessageView = Schemas['MessageView']
 export type MessagePage = Schemas['MessagePage']
+export type ChannelListItem = Schemas['ChannelListItem']
+export type ChannelPage = Schemas['ChannelPage']
+export type MemberPage = Schemas['MemberPage']
+export type Visibility = ChannelListItem['visibility']
 
 // API がエラーを返したとき（機能定義書 3.3）。message は画面にそのまま出せる文、
 // field があればその入力欄の下に出す
@@ -203,6 +207,55 @@ export async function markRead(conversationId: number, lastMessageId: number): P
     { lastMessageId } satisfies Schemas['ReadRequest'])
 }
 
+// ---------------------------------------------------------------- FN-06 チャンネル
+
+// クエリを組み立てる（値がないものは付けない）
+function queryString(params: Record<string, string | null | undefined>): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) if (value) search.set(key, value)
+  const text = search.toString()
+  return text ? `?${text}` : ''
+}
+
+// G-8 のチャンネルの一覧（公開と、入っているプライベート。名前の順に 50 件ずつ）
+export function fetchChannels(workspaceId: number, q: string, cursor?: string | null): Promise<ChannelPage> {
+  return requestJson<ChannelPage>('GET', `/api/workspaces/${workspaceId}/channels${queryString({ q, cursor })}`)
+}
+
+export function createChannel(workspaceId: number, name: string, description: string,
+  visibility: Visibility): Promise<ConversationDetail> {
+  return requestJson<ConversationDetail>('POST', `/api/workspaces/${workspaceId}/channels`,
+    { name, description, visibility } satisfies Schemas['CreateChannelRequest'])
+}
+
+// 会話のメンバー（表示名の順に 50 人ずつ）
+export function fetchConversationMembers(conversationId: number, q: string, cursor?: string | null): Promise<MemberPage> {
+  return requestJson<MemberPage>('GET', `/api/conversations/${conversationId}/members${queryString({ q, cursor })}`)
+}
+
+// プライベートチャンネルに招待できる人（そのチャンネルにいないワークスペースのメンバー）
+export function fetchInviteCandidates(conversationId: number, q: string): Promise<UserSummary[]> {
+  return requestJson<UserSummary[]>('GET', `/api/conversations/${conversationId}/candidates${queryString({ q })}`)
+}
+
+export function joinChannel(conversationId: number): Promise<ConversationDetail> {
+  return requestJson<ConversationDetail>('POST', `/api/conversations/${conversationId}/join`)
+}
+
+export async function leaveChannel(conversationId: number): Promise<void> {
+  await request('POST', `/api/conversations/${conversationId}/leave`)
+}
+
+// 招待する。足した人を返す（もう入っていた人は含まない）
+export function inviteToChannel(conversationId: number, usernames: string[]): Promise<UserSummary[]> {
+  return requestJson<UserSummary[]>('POST', `/api/conversations/${conversationId}/members`,
+    { usernames } satisfies Schemas['InviteRequest'])
+}
+
+export async function deleteChannel(conversationId: number): Promise<void> {
+  await request('DELETE', `/api/conversations/${conversationId}`)
+}
+
 // ---------------------------------------------------------------- FN-07 メッセージ
 
 // 会話のメッセージ（親メッセージだけ）を古い順に。before（その ID より前）か、なし（最新）
@@ -233,3 +286,5 @@ export async function deleteMessage(messageId: number): Promise<MessageView | nu
 export const workspaceUrl = (workspaceId: number) => `/w/${workspaceId}`
 export const conversationUrl = (workspaceId: number, conversationId: number) =>
   `/w/${workspaceId}/c/${conversationId}`
+// G-8 チャンネル一覧画面
+export const channelsUrl = (workspaceId: number) => `/w/${workspaceId}/channels`

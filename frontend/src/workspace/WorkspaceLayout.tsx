@@ -1,19 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Navigate, Outlet, useParams } from 'react-router'
+import { Navigate, Outlet, useNavigate, useParams } from 'react-router'
 import {
-  ApiError, fetchConversations, fetchWorkspace, type ConversationSummary, type WorkspaceDetail,
+  ApiError, conversationUrl, fetchConversations, fetchWorkspace, type ConversationSummary, type WorkspaceDetail,
 } from '../api'
 import AppHeader from '../components/AppHeader'
 import { useToast } from '../components/ToastContext'
 import ui from '../components/ui.module.css'
 import { M } from '../messages'
+import type { RealtimeEvent } from '../realtime/events'
 import { useRealtime } from '../realtime/RealtimeContext'
+import CreateChannelDialog from './CreateChannelDialog'
 import Sidebar from './Sidebar'
+import { removeConversation, upsertConversation } from './sidebarList'
 import type { WorkspaceContext } from './WorkspaceContext'
 import styles from './WorkspaceLayout.module.css'
 
-// G-5 チャット画面の枠（画面設計書 7 章）：ワークスペース用のヘッダー・サイドバー・会話（Outlet）。
-// ワークスペースを切り替えたら読み込み直すよう、ID ごとに作り直す
+// G-5 チャット画面の枠（画面設計書 7 章）：ワークスペース用のヘッダー・サイドバー・会話・G-8（Outlet）。
+// ワークスペースを切り替えたら読み込み直すよう、ID ごとに作り直す。
+// 本人あての通知（conversation.updated・removed）で、ほかのタブ・招待・削除をサイドバーにすぐ反映する（CH-7・CH-10）
 export default function WorkspaceLayout() {
   const { workspaceId } = useParams()
   return <WorkspaceView key={workspaceId} workspaceId={Number(workspaceId)} />
@@ -27,7 +31,9 @@ function WorkspaceView({ workspaceId }: { workspaceId: number }) {
   const [loaded, setLoaded] = useState<Loaded | 'failed' | 'notFound' | undefined>(undefined)
   // 画面の横幅が 600px 未満のとき、サイドバーと会話のどちらを出すか（画面設計書 2.19）
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { onReconnect } = useRealtime()
+  const [creating, setCreating] = useState(false)
+  const { onReconnect, subscribeUser } = useRealtime()
+  const navigate = useNavigate()
 
   const load = useCallback(async () => {
     if (!Number.isSafeInteger(workspaceId) || workspaceId <= 0) return 'notFound' as const
@@ -68,6 +74,20 @@ function WorkspaceView({ workspaceId }: { workspaceId: number }) {
     }
   }), [onReconnect, workspaceId, toast])
 
+  const changeConversations = useCallback((change: (list: ConversationSummary[]) => ConversationSummary[]) => {
+    setLoaded((current) => (typeof current === 'object' ? { ...current, conversations: change(current.conversations) } : current))
+  }, [])
+
+  // ほかのワークスペースの通知は、そのワークスペースを開いたときに読み直すので無視する
+  useEffect(() => subscribeUser((event: RealtimeEvent) => {
+    if (event.workspaceId !== workspaceId) return
+    if (event.type === 'conversation.updated') changeConversations((list) => upsertConversation(list, event.payload))
+    if (event.type === 'conversation.removed') {
+      const removedId = event.payload.conversationId
+      changeConversations((list) => removeConversation(list, removedId))
+    }
+  }), [subscribeUser, workspaceId, changeConversations])
+
   async function reload() {
     setLoaded(undefined)
     setLoaded(await load())
@@ -88,17 +108,33 @@ function WorkspaceView({ workspaceId }: { workspaceId: number }) {
     )
   }
 
-  const context: WorkspaceContext = { ...loaded, showSidebar: () => setSidebarOpen(true) }
+  const context: WorkspaceContext = {
+    ...loaded,
+    showSidebar: () => setSidebarOpen(true),
+    upsertConversation: (summary) => changeConversations((list) => upsertConversation(list, summary)),
+    removeConversation: (id) => changeConversations((list) => removeConversation(list, id)),
+    openCreateChannel: () => setCreating(true),
+  }
   return (
     <div className={styles.page}>
       <AppHeader workspace={loaded.workspace} />
       <div className={`${styles.body} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
         <Sidebar workspace={loaded.workspace} conversations={loaded.conversations}
-          onSelect={() => setSidebarOpen(false)} />
+          onSelect={() => setSidebarOpen(false)} onCreateChannel={() => setCreating(true)} />
         <main className={styles.main}>
           <Outlet context={context} />
         </main>
       </div>
+      {creating && (
+        // G-13。作ったらサイドバーに足し、G-5 でそのチャンネルを開く（CH-2）
+        <CreateChannelDialog workspaceId={workspaceId} onClose={() => setCreating(false)}
+          onCreated={(created) => {
+            setCreating(false)
+            context.upsertConversation(created)
+            setSidebarOpen(false)
+            navigate(conversationUrl(workspaceId, created.id))
+          }} />
+      )}
     </div>
   )
 }

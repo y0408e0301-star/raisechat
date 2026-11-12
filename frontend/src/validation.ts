@@ -3,6 +3,9 @@
 export const USERNAME_MAX = 15
 export const DISPLAY_NAME_MAX = 30
 export const WORKSPACE_NAME_MAX = 50
+export const CHANNEL_NAME_MAX = 80
+export const CHANNEL_DESCRIPTION_MAX = 250
+export const SEARCH_MAX = 80
 export const MESSAGE_MAX = 4000
 export const PASSWORD_MAX = 64
 
@@ -31,4 +34,9 @@ export function isValidPassword(password: string): boolean {
 export function isValidDisplayName(displayName: string): boolean {
   const length = countChars(displayName)
   return length >= 1 && length <= DISPLAY_NAME_MAX
+}
+
+// チャンネルの名前（FN-06 4 章）。入力したときに空白（半角・全角・タブ・改行）を「-」に替える（画面設計書 15 章）
+export function channelNameInput(text: string): string {
+  return limitChars(text.replace(/\s/g, '-'), CHANNEL_NAME_MAX)
 }

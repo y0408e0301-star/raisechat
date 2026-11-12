@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Navigate, useParams } from 'react-router'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Navigate, useNavigate, useParams } from 'react-router'
 import {
-  ApiError, conversationUrl, fetchConversation, fetchMessages, markRead, sendMessage, type ConversationDetail,
-  type MessageView,
+  ApiError, conversationUrl, fetchConversation, fetchMessages, joinChannel, markRead, sendMessage,
+  type ConversationDetail, type MessageView,
 } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import { useToast } from '../components/ToastContext'
 import ui from '../components/ui.module.css'
 import { loadDraft, saveDraft } from '../drafts'
-import { M, M36 } from '../messages'
+import { M, M28, M36 } from '../messages'
 import type { RealtimeEvent } from '../realtime/events'
 import { useRealtime } from '../realtime/RealtimeContext'
+import ChannelDetailsDialog from './ChannelDetailsDialog'
 import Composer from './Composer'
 import styles from './ConversationPage.module.css'
 import DeleteMessageDialog from './DeleteMessageDialog'
@@ -34,16 +35,19 @@ type Pending = Extract<Entry, { kind: 'pending' }>
 const lastId = (items: MessageView[]) => items.at(-1)?.id ?? 0
 
 function ConversationView({ conversationId }: { conversationId: number }) {
-  const { workspace, showSidebar } = useWorkspace()
+  const { workspace, showSidebar, upsertConversation, removeConversation } = useWorkspace()
   const { me } = useAuth()
   const toast = useToast()
-  const { subscribeConversation, onReconnect } = useRealtime()
+  const navigate = useNavigate()
+  const { subscribeConversation, subscribeUser, onReconnect } = useRealtime()
   // undefined：読み込み中、'failed'：読み込みに失敗、'notFound'：見られない
   const [loaded, setLoaded] = useState<Loaded | 'failed' | 'notFound' | undefined>(undefined)
   const [pending, setPending] = useState<Pending[]>([])
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [olderFailed, setOlderFailed] = useState(false)
   const [deleting, setDeleting] = useState<MessageView | null>(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [joining, setJoining] = useState(false)
   // 入力の文。会話ごとに覚えておき、戻ってきたときに戻す（MS-15）
   const [draft, setDraftState] = useState(() => loadDraft(conversationId))
 
@@ -104,6 +108,19 @@ function ConversationView({ conversationId }: { conversationId: number }) {
     })
   }, [subscribeConversation, conversationId, me, owner, updateItems])
 
+  // 開いている会話から抜けた・削除されたら general に移る。削除のときは M-28 を出す（CH-8・CH-10、画面設計書 7.3）
+  const generalUrl = conversationUrl(workspace.id, workspace.generalConversationId)
+  const name = useRef('')
+  const loadedName = typeof loaded === 'object' ? (loaded.conversation.name ?? '') : ''
+  useEffect(() => {
+    name.current = loadedName
+  }, [loadedName])
+  useEffect(() => subscribeUser((event: RealtimeEvent) => {
+    if (event.type !== 'conversation.removed' || event.payload.conversationId !== conversationId) return
+    if (event.payload.reason === 'DELETED') toast(M28(name.current))
+    navigate(generalUrl, { replace: true })
+  }), [subscribeUser, conversationId, toast, navigate, generalUrl])
+
   // つなぎ直したら、切れていた間の取りこぼしをなくすため、会話と最新の 50 件を取り直して置き換える（機能定義書 4.4）。
   // 見られなくなっていたら、開いたときと同じく M-27 を出して general に移す
   useEffect(() => onReconnect(async () => {
@@ -151,6 +168,27 @@ function ConversationView({ conversationId }: { conversationId: number }) {
     setDraft(draft ? `${target.body}\n${draft}` : target.body)
   }
 
+  // 参加していない公開チャンネルの「参加する」。入力欄を出し、サイドバーにも足す（CH-5）
+  async function join() {
+    setJoining(true)
+    try {
+      const joined = await joinChannel(conversationId)
+      setLoaded((current) => (typeof current === 'object' ? { ...current, conversation: joined } : current))
+      upsertConversation(joined)
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : M[49])
+    } finally {
+      setJoining(false)
+    }
+  }
+
+  // 自分で退出・削除したら、サイドバーから消して general に移る（CH-8・CH-9）
+  function leaveConversation() {
+    setDetailsOpen(false)
+    removeConversation(conversationId)
+    navigate(generalUrl, { replace: true })
+  }
+
   // 上まで戻ったら、前の 50 件を読み込む（MS-2）
   async function loadOlder() {
     if (typeof loaded !== 'object' || loaded.items.length === 0) return
@@ -187,16 +225,24 @@ function ConversationView({ conversationId }: { conversationId: number }) {
         {conversation && (
           <div className={styles.titles}>
             <h1 className={styles.name}>
-              <span aria-hidden="true">{conversation.visibility === 'PRIVATE' ? '🔒 ' : '# '}</span>
-              {conversation.name}
+              {/* 名前・人数・ⓘ を押すと G-14（CH-6） */}
+              <button type="button" className={styles.titleButton} onClick={() => setDetailsOpen(true)}>
+                <span aria-hidden="true">{conversation.visibility === 'PRIVATE' ? '🔒 ' : '# '}</span>
+                {conversation.name}
+              </button>
             </h1>
             {conversation.description && <p className={styles.description}>{conversation.description}</p>}
           </div>
         )}
         {conversation && (
-          <span className={styles.members} aria-label={`メンバー ${conversation.memberCount} 人`}>
-            👥 {conversation.memberCount}
-          </span>
+          <>
+            <button type="button" className={styles.members} onClick={() => setDetailsOpen(true)}
+              aria-label={`メンバー ${conversation.memberCount} 人`}>
+              👥 {conversation.memberCount}
+            </button>
+            <button type="button" className={styles.info} onClick={() => setDetailsOpen(true)}
+              aria-label="チャンネルの詳細" title="チャンネルの詳細">ⓘ</button>
+          </>
         )}
       </div>
       {loaded === 'failed' && (
@@ -224,14 +270,29 @@ function ConversationView({ conversationId }: { conversationId: number }) {
                 placeholder={`# ${loaded.conversation.name} へのメッセージ`} />
             )
             : (
-              // 送れない会話は、入力欄の代わりに理由を出す（MS-16）。M-30 の「参加する」はチャンネル（開発計画書 1-6）で足す
-              <p className={styles.cannotPost}>
-                {loaded.conversation.type === 'DM' && loaded.conversation.dmPartner
-                  ? M36(loaded.conversation.dmPartner.displayName)
-                  : M[30]}
-              </p>
+              // 送れない会話は、入力欄の代わりに理由を出す（MS-16）。参加していない公開チャンネルは「参加する」も出す（CH-5）
+              <div className={styles.cannotPost}>
+                <p>
+                  {loaded.conversation.type === 'DM' && loaded.conversation.dmPartner
+                    ? M36(loaded.conversation.dmPartner.displayName)
+                    : M[30]}
+                </p>
+                {loaded.conversation.type === 'CHANNEL' && !loaded.conversation.joined && (
+                  <button type="button" className={ui.primary} onClick={join} disabled={joining}>
+                    {joining ? '参加中…' : '参加する'}
+                  </button>
+                )}
+              </div>
             )}
         </>
+      )}
+      {detailsOpen && typeof loaded === 'object' && (
+        <ChannelDetailsDialog channel={loaded.conversation} owner={workspace.role === 'OWNER'}
+          onClose={() => setDetailsOpen(false)}
+          onInvited={(count) => setLoaded((current) => (typeof current === 'object'
+            ? { ...current, conversation: { ...current.conversation, memberCount: current.conversation.memberCount + count } }
+            : current))}
+          onLeft={leaveConversation} onDeleted={leaveConversation} />
       )}
       {deleting && (
         <DeleteMessageDialog message={deleting} onClose={() => setDeleting(null)}

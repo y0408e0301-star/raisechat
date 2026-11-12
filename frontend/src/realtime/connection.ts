@@ -114,7 +114,7 @@ export class RealtimeConnection {
     }
   }
 
-  // 本人あての通知を受け取る（サイドバーの未読などは 1-6 以降で使う）
+  // 本人あての通知を受け取る
   subscribeUser = (handler: EventHandler): (() => void) => {
     this.userHandlers.add(handler)
     return () => this.userHandlers.delete(handler)

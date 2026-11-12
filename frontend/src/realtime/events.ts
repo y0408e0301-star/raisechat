@@ -1,4 +1,4 @@
-import type { MessageView } from '../api'
+import type { ConversationSummary, MessageView } from '../api'
 
 // リアルタイムの通知の形（機能定義書 4.3）。OpenAPI では書けないので、機能定義書 4.3 の表を正として手で書く。
 // サーバーの形（backend の RealtimeEvent）と同じにする。サーバーが実際に送った JSON の見本（docs/api/realtime-events.json）を
@@ -6,6 +6,9 @@ import type { MessageView } from '../api'
 
 // message.deleted の payload
 export type MessageDeleted = { id: number, parentId: number | null }
+
+// conversation.removed の payload。LEFT：抜けた、DELETED：チャンネルが削除された
+export type ConversationRemoved = { conversationId: number, reason: 'LEFT' | 'DELETED' }
 
 type Event<Type extends string, Payload> = {
   type: Type
@@ -20,6 +23,9 @@ export type RealtimeEvent =
   | Event<'message.created', MessageView>
   | Event<'message.updated', MessageView>
   | Event<'message.deleted', MessageDeleted>
+  // 本人あて（/user/queue/events）
+  | Event<'conversation.updated', ConversationSummary>
+  | Event<'conversation.removed', ConversationRemoved>
 
 type Json = Record<string, unknown>
 
@@ -36,10 +42,19 @@ function isMessageView(v: unknown): v is MessageView {
 
 const isMessageDeleted = (v: unknown): v is MessageDeleted => isObject(v) && isId(v.id) && isIdOrNull(v.parentId)
 
+const isConversationSummary = (v: unknown): v is ConversationSummary =>
+  isObject(v) && isId(v.id) && isId(v.workspaceId) && (v.type === 'CHANNEL' || v.type === 'DM')
+  && typeof v.joined === 'boolean' && typeof v.general === 'boolean'
+
+const isConversationRemoved = (v: unknown): v is ConversationRemoved =>
+  isObject(v) && isId(v.conversationId) && (v.reason === 'LEFT' || v.reason === 'DELETED')
+
 const payloadCheck: Record<RealtimeEvent['type'], (payload: unknown) => boolean> = {
   'message.created': isMessageView,
   'message.updated': isMessageView,
   'message.deleted': isMessageDeleted,
+  'conversation.updated': isConversationSummary,
+  'conversation.removed': isConversationRemoved,
 }
 
 // 届いた本文（JSON の文字列）を読む。形が違う・知らない種類の通知は null（無視する）
