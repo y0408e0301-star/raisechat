@@ -3,6 +3,7 @@ package com.example.raisechat.message;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.sql.SQLException;
@@ -23,6 +24,7 @@ import com.example.raisechat.conversation.Conversation;
 import com.example.raisechat.conversation.ConversationMember;
 import com.example.raisechat.conversation.ConversationMemberRepository;
 import com.example.raisechat.conversation.ConversationRepository;
+import com.example.raisechat.realtime.RealtimeNotifier;
 import com.example.raisechat.user.UserRepository;
 import com.example.raisechat.workspace.WorkspaceAccess;
 import com.example.raisechat.workspace.WorkspaceMember;
@@ -52,12 +54,16 @@ class MessageServiceTests {
 	@Mock
 	UserRepository users;
 
+	@Mock
+	RealtimeNotifier notifier;
+
 	private MessageService service;
 
 	@BeforeEach
 	void setUp() {
 		this.service = new MessageService(this.messages, this.conversations, this.conversationMembers,
-				this.workspaceAccess, this.users, TestEntities.fixedClock(), TestEntities.immediateTransaction());
+				this.workspaceAccess, this.users, TestEntities.fixedClock(), TestEntities.immediateTransaction(),
+				this.notifier);
 		when(this.conversations.findVisible(TARO, CONVERSATION)).thenReturn(
 				Optional.of(TestEntities.withId(Conversation.general(3, TARO, TestEntities.NOW), CONVERSATION)));
 		when(this.conversationMembers.existsById(new ConversationMember.Key(CONVERSATION, TARO))).thenReturn(true);
@@ -81,6 +87,8 @@ class MessageServiceTests {
 		MessageView view = this.service.post(TARO, CONVERSATION, "本文", CLIENT_ID.toString());
 
 		assertThat(view.id()).isEqualTo(30);
+		// 先に追加した方が通知を送っているので、2 つ目は送らない
+		verifyNoInteractions(this.notifier);
 	}
 
 	@Test

@@ -64,7 +64,10 @@ class SecurityConfig {
 			.permitAll()
 			.requestMatchers("/api/**")
 			.authenticated()
-			// /api 以外（/actuator/health と、あとで配る画面のファイル）は誰でも読める
+			// WebSocket のつなぎ始め。ログインしていなければつながない（N-13、機能定義書 4.1）
+			.requestMatchers("/ws")
+			.authenticated()
+			// /api・/ws 以外（/actuator/health と、あとで配る画面のファイル）は誰でも読める
 			.anyRequest()
 			.permitAll())
 			.sessionManagement((session) -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

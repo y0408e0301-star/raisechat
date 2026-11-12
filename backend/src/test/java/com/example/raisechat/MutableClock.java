@@ -26,6 +26,11 @@ public class MutableClock extends Clock {
 		return Instant.now().truncatedTo(ChronoUnit.MICROS);
 	}
 
+	// 決まった時刻にする（通知の JSON の見本など、毎回同じ中身にしたいとき）
+	public void set(Instant instant) {
+		this.now = instant;
+	}
+
 	public void advance(Duration duration) {
 		this.now = this.now.plus(duration);
 	}

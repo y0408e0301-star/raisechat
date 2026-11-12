@@ -25,6 +25,8 @@ import com.example.raisechat.conversation.Conversation;
 import com.example.raisechat.conversation.ConversationMember;
 import com.example.raisechat.conversation.ConversationMemberRepository;
 import com.example.raisechat.conversation.ConversationRepository;
+import com.example.raisechat.realtime.RealtimeEvent;
+import com.example.raisechat.realtime.RealtimeNotifier;
 import com.example.raisechat.user.User;
 import com.example.raisechat.user.UserRepository;
 import com.example.raisechat.user.UserSummary;
@@ -32,7 +34,8 @@ import com.example.raisechat.workspace.WorkspaceAccess;
 import com.example.raisechat.workspace.WorkspaceMember;
 
 // メッセージの一覧・送信・編集・削除（機能定義書 FN-07）。
-// リアルタイムの通知は 1-5、添付は 1-11、スレッドの返信は 1-12、メンションは 1-14 で足す
+// 送信・編集・削除は、コミットの後に会話を見ている人へリアルタイムの通知を送る（FN-07 6 章）。
+// 未読・メンションの通知（conversation.updated・notify）は 1-15、添付は 1-11、スレッドの返信は 1-12、メンションは 1-14 で足す
 @Service
 class MessageService {
 
@@ -56,9 +59,11 @@ class MessageService {
 
 	private final TransactionTemplate transaction;
 
+	private final RealtimeNotifier notifier;
+
 	MessageService(MessageRepository messages, ConversationRepository conversations,
 			ConversationMemberRepository conversationMembers, WorkspaceAccess workspaceAccess, UserRepository users,
-			Clock clock, TransactionTemplate transaction) {
+			Clock clock, TransactionTemplate transaction, RealtimeNotifier notifier) {
 		this.messages = messages;
 		this.conversations = conversations;
 		this.conversationMembers = conversationMembers;
@@ -66,6 +71,7 @@ class MessageService {
 		this.users = users;
 		this.clock = clock;
 		this.transaction = transaction;
+		this.notifier = notifier;
 	}
 
 	// 会話のメッセージの一覧（MS-1・MS-2）。before・after のどちらか、またはなし（最新）。古い順に返す
@@ -133,7 +139,9 @@ class MessageService {
 		requireCanPost(me, conversation);
 		Message message = this.messages
 			.saveAndFlush(new Message(conversationId, me, clientId, body, this.clock.instant()));
-		return view(me, conversation, message);
+		MessageView view = view(me, conversation, message);
+		notify(RealtimeEvent.Type.MESSAGE_CREATED, conversation, view.forEveryone());
+		return view;
 	}
 
 	// 同じ clientId で前に送ったもの。同じ送信のやり直しなので、それを返す（その後で「削除されました」にしていれば、その状態で返す）。
@@ -162,7 +170,9 @@ class MessageService {
 			throw new ApiException(ErrorCode.NOT_AUTHOR);
 		}
 		message.edit(body, this.clock.instant());
-		return view(me, conversation, message);
+		MessageView view = view(me, conversation, message);
+		notify(RealtimeEvent.Type.MESSAGE_UPDATED, conversation, view.forEveryone());
+		return view;
 	}
 
 	// 削除（MS-10・MS-11）。送った本人とオーナーだけ。
@@ -181,10 +191,18 @@ class MessageService {
 		}
 		if (message.getReplyCount() > 0) {
 			message.markDeleted(this.clock.instant());
-			return Optional.of(view(me, conversation, message));
+			MessageView view = view(me, conversation, message);
+			notify(RealtimeEvent.Type.MESSAGE_UPDATED, conversation, view.forEveryone());
+			return Optional.of(view);
 		}
 		this.messages.delete(message);
+		notify(RealtimeEvent.Type.MESSAGE_DELETED, conversation,
+				new RealtimeEvent.MessageDeleted(message.getId(), message.getParentId()));
 		return Optional.empty();
+	}
+
+	private void notify(RealtimeEvent.Type type, Conversation conversation, Object payload) {
+		this.notifier.toConversation(type, conversation.getWorkspaceId(), conversation.getId(), payload);
 	}
 
 	private Conversation requireVisible(long me, long conversationId) {

@@ -56,6 +56,16 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
 		</dependency>
+		<!-- リアルタイムの通知（WebSocket・STOMP。機能定義書 4 章）。配信は Spring の simple broker（メモリの中） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-websocket</artifactId>
+		</dependency>
+		<!-- WebSocket の購読（SUBSCRIBE）の権限を確かめる -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-messaging</artifactId>
+		</dependency>
 		<!-- 稼働の確認（/actuator/health）。公開した後、反映・起動のスクリプトが確かめる -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

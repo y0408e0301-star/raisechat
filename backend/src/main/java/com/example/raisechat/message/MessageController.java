@@ -36,7 +36,7 @@ class MessageController {
 
 	@Operation(summary = "会話のメッセージの一覧",
 			description = "親メッセージ（スレッドの返信でないもの）を古い順に返す。before（その ID より前）・after（その ID より後）のどちらか、"
-					+ "またはなし（最新）。limit は 1〜50（指定がなければ 50）。around は検索（1-16）で足す")
+					+ "またはなし（最新）。limit は 1〜50（指定がなければ 50）。around はメッセージの位置を開く（1-15）で足す")
 	@GetMapping("/api/conversations/{conversationId}/messages")
 	MessageService.MessagePage list(@AuthenticationPrincipal Jwt jwt, @PathVariable long conversationId,
 			@RequestParam(required = false) @Nullable Long before, @RequestParam(required = false) @Nullable Long after,
