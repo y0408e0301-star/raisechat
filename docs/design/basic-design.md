@@ -3,11 +3,11 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-BD |
-| 版数 | 0.3 |
+| 版数 | 0.4 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-11 |
+| 最終更新日 | 2026-11-12 |
 | 作成者 | （氏名） |
-| 元にした文書 | [要件定義書](../requirements/requirements.md)（RC-REQ）版数 0.6、[機能定義書](../functions/function-definition.md)（RC-FD）版数 0.4、[技術スタック定義書](../tech-stack.md)（RC-TECH）版数 0.2 |
+| 元にした文書 | [要件定義書](../requirements/requirements.md)（RC-REQ）版数 0.6、[機能定義書](../functions/function-definition.md)（RC-FD）版数 0.5、[技術スタック定義書](../tech-stack.md)（RC-TECH）版数 0.2 |
 | 状態 | 承認待ち |
 
 ## 改訂履歴
@@ -17,6 +17,7 @@
 | 0.1 | 2026-11-10 | 初版。構成は BookLog の基本設計書と同じにした。画面設計書 0.1 を作成。データ設計書・インフラ設計書は次の版で足す | （氏名） |
 | 0.2 | 2026-11-10 | データ設計書 0.1・インフラ設計書 0.1 を作成し、1.2 からリンクした。Q-2 を足した | （氏名） |
 | 0.3 | 2026-11-11 | 画面設計書を 0.2 にした（2.14 の残りの文字数を出し始めるところ）。元にした機能定義書を 0.4 にした | （氏名） |
+| 0.4 | 2026-11-12 | リアルタイムの通知を作ったので（開発計画書 1-5）、2.1 の通知の型の確かめ方と 2.3 の WebSocket のログの項目を具体的にした。元にした機能定義書を 0.5 にした | （氏名） |
 
 ## 承認
 
@@ -68,7 +69,7 @@ API の一覧（URL・メソッド・入力・出力・主なエラー）、エ�
 | 項目 | 内容 |
 | --- | --- |
 | 入力・出力の項目の一覧 | 手で表を書かず、API のコード（Controller と record）から OpenAPI の形式で自動で作る（springdoc-openapi）。docs/api/openapi.yaml に書き出してコミットし、画面の型もそこから作る（openapi-typescript）。テストで、コミットした仕様書とコードがずれていないかを確かめる。BookLog と同じやり方 |
-| リアルタイムの通知の型 | OpenAPI では書けないため、機能定義書 4.3 の表を正とし、サーバー（record）と画面（TypeScript の型）に同じ形を書く。通知の種類ごとに、サーバーが送った JSON を画面の型で読めることをテストで確かめる |
+| リアルタイムの通知の型 | OpenAPI では書けないため、機能定義書 4.3 の表を正とし、サーバー（record。realtime パッケージの RealtimeEvent）と画面（TypeScript の型。src/realtime/events.ts）に同じ形を書く。サーバーのテスト（WebSocketApiTests）が、本物の WebSocket で受け取った通知の JSON を docs/api/realtime-events.json に書き出し（コミットしたものと違えば書き直して失敗する。OpenAPI と同じ）、画面のテストがその JSON を画面の読み取り処理（parseEvent）で読めることを確かめる |
 | 処理の分け方 | Controller・Service・Repository の分け方と、1 つのトランザクションにまとめる範囲（ワークスペースの作成と general、メッセージの送信と添付・メンション、キック・退出など） |
 | 見られるかの確かめ | 「その人がその会話を見られるか」を求める処理を 1 つの部品にまとめ、API・WebSocket の購読・検索・メンションの一覧・未読の件数のすべてで使う（機能定義書 FN-13 の 5 章の 3） |
 | 通知を送る部品 | コミットの後に通知を送る部品（トランザクションの後に動く仕組みを使う）と、購読の取り消し（機能定義書 4.5） |
@@ -96,7 +97,7 @@ BookLog と同じく、公開先ではログを JSON（ECS 形式）で出し、
 | 項目 | 内容 |
 | --- | --- |
 | リクエストのログ | 1 つのリクエストに 1 行。メソッド・URL・ステータス・かかった時間・ログインした人の ID |
-| WebSocket のログ | つないだ・切れた（理由つき）・購読を断った・購読を取り消したときに 1 行。ログインした人の ID と会話の ID |
+| WebSocket のログ | つないだ・切れた（理由つき）・購読を断った・購読を取り消したときに 1 行。項目は event.action（websocket-connected・websocket-closed・websocket-subscribe-denied・websocket-subscription-revoked）、websocket.user_id（つないだ人の ID）、websocket.session_id、conversation.id、切れたときの websocket.close_code・websocket.close_reason。人の ID を user.id にしないのは、API のリクエストの中で出すログ（購読の取り消し）では、操作した人の ID が user.id に付くため |
 | 出さないもの | パスワード、JWT・リフレッシュトークン、Cookie、招待の文字列、署名付き URL、メッセージの本文・ファイル名・ステータスの文 |
 
 ### 2.4 性能テスト

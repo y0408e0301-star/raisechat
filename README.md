@@ -49,7 +49,8 @@ npm ci
 - API サーバーは http://localhost:8080/actuator/health で `{"status":"UP"}` が返れば起動済みです
 - API の仕様書は http://localhost:8080/swagger-ui.html （Swagger UI）で見られます（下の「API の仕様書」）
 - ポートは上の表のものだけを使います（[CLAUDE.md](CLAUDE.md) の「サーバーのポート」）。使われていたら、そのポートを使っているプロセスを止めてから起動し直します（別のポートでは起動しません）。ほかのアプリ（BookLog など）の PostgreSQL のコンテナが 5432 を使っていたら、`docker stop <コンテナ名>` で止めてから起動します
-- 開発では、データベースの接続先と JWT の秘密の値は `backend/src/main/resources/application.properties` の既定値（開発用）を使うので、設定は要りません。公開環境では環境変数（`DB_URL`・`DB_USERNAME`・`DB_PASSWORD`・`JWT_SECRET`・`COOKIE_SECURE=true`）で渡します
+- 開発では、データベースの接続先・JWT の秘密の値・画面の URL（WebSocket の Origin の確かめに使う）は `backend/src/main/resources/application.properties` の既定値（開発用）を使うので、設定は要りません。公開環境では環境変数（`DB_URL`・`DB_USERNAME`・`DB_PASSWORD`・`JWT_SECRET`・`COOKIE_SECURE=true`・`WEB_ORIGIN`）で渡します
+- 画面の dev サーバー（5173）は、`/api` と WebSocket の `/ws` を API サーバー（8080）へ転送します
 
 ### 止める
 
