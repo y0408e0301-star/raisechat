@@ -1,5 +1,6 @@
 package com.example.raisechat.conversation;
 
+import java.time.Instant;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,6 +13,16 @@ import com.example.raisechat.user.User;
 public interface ConversationMemberRepository extends JpaRepository<ConversationMember, ConversationMember.Key> {
 
 	long countByConversationId(long conversationId);
+
+	// 会話のメンバーに足す。もう入っていれば何もしない（同じ人の参加が同時に 2 回来ても失敗しない）。足したら 1 を返す
+	@Modifying
+	@Query(value = """
+			INSERT INTO conversation_members (conversation_id, user_id, last_read_message_id, joined_at)
+			VALUES (:conversationId, :userId, :lastReadMessageId, :joinedAt)
+			ON CONFLICT DO NOTHING
+			""", nativeQuery = true)
+	int insertIfAbsent(@Param("conversationId") long conversationId, @Param("userId") long userId,
+			@Param("lastReadMessageId") long lastReadMessageId, @Param("joinedAt") Instant joinedAt);
 
 	@Query("select m.userId from ConversationMember m where m.conversationId = :conversationId")
 	List<Long> findUserIds(@Param("conversationId") long conversationId);

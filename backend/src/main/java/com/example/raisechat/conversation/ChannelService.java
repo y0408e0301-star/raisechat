@@ -127,8 +127,7 @@ class ChannelService {
 				|| channel.getVisibility() != Conversation.Visibility.PUBLIC) {
 			throw new ApiException(ErrorCode.PRIVATE_CHANNEL);
 		}
-		if (!isMember(me, conversationId)) {
-			addMember(conversationId, me);
+		if (addMember(conversationId, me)) {
 			notifyJoined(me, channel);
 		}
 		return detail(channel);
@@ -173,12 +172,10 @@ class ChannelService {
 		Instant now = this.clock.instant();
 		List<UserSummary> added = new ArrayList<>();
 		for (User user : invitees.values()) {
-			if (isMember(user.getId(), conversationId)) {
-				continue;
+			if (addMember(conversationId, user.getId())) {
+				notifyJoined(user.getId(), channel);
+				added.add(UserSummary.of(user, now));
 			}
-			addMember(conversationId, user.getId());
-			notifyJoined(user.getId(), channel);
-			added.add(UserSummary.of(user, now));
 		}
 		return added;
 	}
@@ -249,14 +246,11 @@ class ChannelService {
 		return conversation;
 	}
 
-	private boolean isMember(long userId, long conversationId) {
-		return this.members.existsById(new ConversationMember.Key(conversationId, userId));
-	}
-
-	// 参加・招待したときは、最後に読んだメッセージをいまの最新にする（FN-06 5 章の 2）
-	private void addMember(long conversationId, long userId) {
+	// 参加・招待したときは、最後に読んだメッセージをいまの最新にする（FN-06 5 章の 2）。
+	// もう入っていれば何もせず false（同時に 2 回参加しても、2 回目は失敗にしない）
+	private boolean addMember(long conversationId, long userId) {
 		long latest = this.messages.findLatestId(conversationId);
-		this.members.save(new ConversationMember(conversationId, userId, latest, this.clock.instant()));
+		return this.members.insertIfAbsent(conversationId, userId, latest, this.clock.instant()) == 1;
 	}
 
 	// 入った人のサイドバーに足す（ほかのタブ・招待された人の画面のため）

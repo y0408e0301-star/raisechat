@@ -11,7 +11,10 @@ import static com.example.raisechat.ApiTestSupport.userId;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CyclicBarrier;
 import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -253,6 +256,28 @@ class ChannelApiTests {
 		assertThat(lastRead(chat, "hanako")).isEqualTo(latestBeforeJoin);
 		// もう一度参加しても何も変わらない
 		assertThat(post(this.mvc, this.hanako, "/api/conversations/%d/join".formatted(chat), "{}")).hasStatusOk();
+	}
+
+	@Test
+	void 同じ人の参加が同時に2回来ても両方成功し_1人だけ入る() {
+		long chat = channel(this.taro, "雑談", "PUBLIC");
+		CyclicBarrier barrier = new CyclicBarrier(2);
+		List<CompletableFuture<MvcTestResult>> calls = IntStream.range(0, 2)
+			.mapToObj((i) -> CompletableFuture.supplyAsync(() -> {
+				try {
+					barrier.await();
+				}
+				catch (Exception ex) {
+					throw new IllegalStateException(ex);
+				}
+				return post(this.mvc, this.hanako, "/api/conversations/%d/join".formatted(chat), "{}");
+			}))
+			.toList();
+
+		calls.stream().map(CompletableFuture::join).forEach((result) -> assertThat(result).hasStatusOk());
+		assertThat(this.jdbc.queryForObject("SELECT count(*) FROM conversation_members WHERE conversation_id = ?",
+				Long.class, chat))
+			.isEqualTo(2);
 	}
 
 	@Test
