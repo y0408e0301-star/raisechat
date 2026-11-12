@@ -102,7 +102,8 @@ public class WebSocketSessions {
 			.log("WebSocket が切れた code={} reason={}", status.getCode(), status.getReason());
 	}
 
-	// JWT の期限に切る。時刻はアプリの Clock で求め（テストで進められる）、その差だけ待つ
+	// JWT の期限に切る。残り時間はアプリの Clock で求める（JWT の確かめと同じ時計。テストでは進められる）。
+	// scheduler は本物の時刻で動くので、その残り時間を本物の今に足す（公開先ではどちらも同じ時刻）
 	private @Nullable ScheduledFuture<?> scheduleExpiry(WebSocketSession session) {
 		if (!(session.getPrincipal() instanceof JwtAuthenticationToken token)) {
 			return null;
