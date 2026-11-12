@@ -32,11 +32,12 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
 	@Query(value = """
 			SELECT u.* FROM users u JOIN conversation_members m ON m.user_id = u.id
 			WHERE m.conversation_id = :conversationId
-			  AND (lower(u.display_name) LIKE :pattern ESCAPE '\\' OR lower(u.username) LIKE :pattern ESCAPE '\\')
+			  AND (lower(u.display_name) LIKE lower(:pattern) ESCAPE '\\' OR lower(u.username) LIKE lower(:pattern) ESCAPE '\\')
 			  AND (lower(u.display_name), u.id) > (lower(:afterName), :afterId)
 			ORDER BY lower(u.display_name), u.id
 			LIMIT :limit
-			""", nativeQuery = true)
+			""",
+			nativeQuery = true)
 	List<User> findMembers(@Param("conversationId") long conversationId, @Param("pattern") String pattern,
 			@Param("afterName") String afterName, @Param("afterId") long afterId, @Param("limit") int limit);
 
@@ -46,10 +47,11 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
 			WHERE w.workspace_id = :workspaceId
 			  AND NOT EXISTS (SELECT 1 FROM conversation_members m
 			                  WHERE m.conversation_id = :conversationId AND m.user_id = u.id)
-			  AND (lower(u.display_name) LIKE :pattern ESCAPE '\\' OR lower(u.username) LIKE :pattern ESCAPE '\\')
+			  AND (lower(u.display_name) LIKE lower(:pattern) ESCAPE '\\' OR lower(u.username) LIKE lower(:pattern) ESCAPE '\\')
 			ORDER BY lower(u.display_name), u.id
 			LIMIT :limit
-			""", nativeQuery = true)
+			""",
+			nativeQuery = true)
 	List<User> findCandidates(@Param("workspaceId") long workspaceId, @Param("conversationId") long conversationId,
 			@Param("pattern") String pattern, @Param("limit") int limit);
 

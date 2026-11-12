@@ -1,7 +1,5 @@
 package com.example.raisechat.conversation;
 
-import java.util.Locale;
-
 import org.jspecify.annotations.Nullable;
 
 import com.example.raisechat.common.ApiException;
@@ -54,14 +52,15 @@ final class ChannelInputs {
 		throw new ApiException(ErrorCode.BAD_REQUEST, "visibility");
 	}
 
-	// 絞り込みの文字（トリム後 0〜80 文字）を、それを含むものに当たる LIKE の形（小文字）にする。
-	// %・_・\ は文字として探すよう逃がす（ESCAPE '\'）
+	// 絞り込みの文字（トリム後 0〜80 文字）を、それを含むものに当たる LIKE の形にする。
+	// %・_・\ は文字として探すよう逃がす（ESCAPE '\'）。大文字・小文字をそろえるのは SQL の lower() で行う
+	// （Java と PostgreSQL で小文字にする決まりが違う文字があるため、片方だけで行う）
 	static String pattern(@Nullable String rawQuery) {
 		String q = (rawQuery == null) ? "" : rawQuery.strip();
 		if (q.codePointCount(0, q.length()) > QUERY_MAX) {
 			throw new ApiException(ErrorCode.BAD_REQUEST, "q");
 		}
-		String escaped = q.toLowerCase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+		String escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
 		return "%" + escaped + "%";
 	}
 

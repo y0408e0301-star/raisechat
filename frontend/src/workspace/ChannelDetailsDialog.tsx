@@ -17,6 +17,9 @@ import styles from './ChannelDialogs.module.css'
 // 入力が止まってから探し直すまで
 const DEBOUNCE_MS = 300
 
+// 1 回に招待できる人数（FN-06 4 章）
+const INVITE_MAX = 50
+
 type Props = {
   channel: ConversationDetail
   // 見ている人がワークスペースのオーナーか（「チャンネルを削除」を出す）
@@ -87,7 +90,7 @@ export default function ChannelDetailsDialog({ channel, owner, onClose, onInvite
         action={channel.visibility === 'PRIVATE' && channel.joined
           ? <button type="button" className={ui.primary} onClick={() => setInviting(true)}>メンバーを招待</button>
           : null} />
-      {((channel.joined && !channel.general) || (owner && !channel.general)) && (
+      {!channel.general && (channel.joined || owner) && (
         <div className={styles.dangerActions}>
           {channel.joined && !channel.general && (
             <button type="button" className={`${ui.secondary} ${styles.dangerText}`} onClick={leave} disabled={leaving}>
@@ -256,12 +259,15 @@ function InvitePanel({ channel, onBack, onInvited }: {
         data-autofocus value={query} onChange={(e) => setQuery(limitChars(e.target.value, SEARCH_MAX))} />
       {candidates === 'failed' && <p className={styles.empty}>{M[48]}</p>}
       {Array.isArray(candidates) && candidates.length === 0 && <p className={styles.empty}>{M[47]}</p>}
+      {selected.size >= INVITE_MAX && <p className={styles.empty}>1 回に招待できるのは {INVITE_MAX} 人までです。</p>}
       {Array.isArray(candidates) && candidates.length > 0 && (
         <ul className={styles.people}>
           {candidates.map((u) => (
             <li key={u.username}>
               <label className={styles.person}>
+                {/* 50 人選んだら、ほかの人は選べない */}
                 <input type="checkbox" checked={selected.has(u.username)} onChange={() => toggle(u)}
+                  disabled={!selected.has(u.username) && selected.size >= INVITE_MAX}
                   aria-label={`${u.displayName}（@${u.username}）`} />
                 <Person user={u} />
               </label>

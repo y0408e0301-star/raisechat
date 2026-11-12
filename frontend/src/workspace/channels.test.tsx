@@ -250,6 +250,23 @@ describe('チャンネルの詳細（CH-6〜CH-9、G-14・G-18）', () => {
     expect(sentJson(fetch, fetch.keys().indexOf('POST /api/conversations/12/members'))).toEqual({ usernames: ['jiro'] })
   })
 
+  it('1 回に招待できるのは 50 人までで、50 人選んだらほかの人は選べない', async () => {
+    const many = Array.from({ length: 51 }, (_, i) =>
+      ({ ...hanako, username: `user${i}`, displayName: `ユーザー${String(i).padStart(2, '0')}` }))
+    open('/w/3/c/12', withChannel12({ visibility: 'PRIVATE' }, {
+      'GET /api/conversations/12/candidates': () => json(200, many),
+    }))
+    const user = userEvent.setup()
+    const dialog = await openDetails(user)
+    await user.click(within(dialog).getByRole('button', { name: 'メンバーを招待' }))
+    const boxes = await screen.findAllByRole('checkbox')
+    for (const box of boxes.slice(0, 50)) await user.click(box)
+
+    expect(screen.getByRole('button', { name: '招待する（50）' })).toBeEnabled()
+    expect(boxes[50]).toBeDisabled()
+    expect(screen.getByText('1 回に招待できるのは 50 人までです。')).toBeInTheDocument()
+  })
+
   it('招待の候補がいなければ M-47', async () => {
     open('/w/3/c/12', withChannel12({ visibility: 'PRIVATE' }, {
       'GET /api/conversations/12/candidates': () => json(200, []),

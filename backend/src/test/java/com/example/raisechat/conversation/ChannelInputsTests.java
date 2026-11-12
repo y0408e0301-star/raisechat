@@ -38,9 +38,9 @@ class ChannelInputsTests {
 	}
 
 	@Test
-	void 絞り込みの文字は小文字のLIKEの形にし_ワイルドカードを逃がす() {
+	void 絞り込みの文字はLIKEの形にし_ワイルドカードを逃がす() {
 		assertThat(ChannelInputs.pattern(null)).isEqualTo("%%");
-		assertThat(ChannelInputs.pattern(" Travel ")).isEqualTo("%travel%");
+		assertThat(ChannelInputs.pattern(" Travel ")).isEqualTo("%Travel%");
 		assertThat(ChannelInputs.pattern("100%_\\")).isEqualTo("%100\\%\\_\\\\%");
 		assertApiError(() -> ChannelInputs.pattern("a".repeat(81)), ErrorCode.BAD_REQUEST, "q");
 	}
