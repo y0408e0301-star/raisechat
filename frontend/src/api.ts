@@ -146,6 +146,12 @@ export async function fetchMe(): Promise<Me | null> {
   }
 }
 
+// WebSocket をつなぎ直す前に、ログインが続いているかを確かめる。JWT の期限が切れていれば取り直し、
+// 取り直せなければ（ログインの期限が切れていれば）M-8 を出して G-1 に移す（機能定義書 4.1）
+export async function checkSession(): Promise<void> {
+  await request('GET', '/api/auth/me')
+}
+
 // ユーザー ID が使えるか（入力欄から離れたとき）
 export async function isUsernameAvailable(username: string): Promise<boolean> {
   const res = await requestJson<Schemas['UsernameAvailability']>(

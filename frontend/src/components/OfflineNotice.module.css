@@ -1,2 +1,11 @@
 /* 画面設計書 2.4 お知らせ欄：ヘッダーのすぐ下、画面の横幅いっぱい。2.1 お知らせ（警告）の背景 */
 .notice { padding: 8px 16px; background: var(--warning-bg); color: var(--text); font-size: 14px; text-align: center; }
+
+/* 2.20 再接続しているあいだ、文の右に出す小さな回転する印 */
+.spinner {
+  display: inline-block; width: 12px; height: 12px; margin-left: 8px; vertical-align: -1px;
+  border: 2px solid var(--sub); border-top-color: transparent; border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

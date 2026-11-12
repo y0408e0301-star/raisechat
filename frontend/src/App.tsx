@@ -3,6 +3,7 @@ import { AuthProvider } from './auth/AuthProvider'
 import { GuestOnly, RequireAuth } from './auth/guards'
 import Layout from './components/Layout'
 import { ToastProvider } from './components/ToastProvider'
+import { RealtimeProvider } from './realtime/RealtimeProvider'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import WorkspacesPage from './pages/WorkspacesPage'
@@ -16,25 +17,28 @@ export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <Routes>
-          <Route element={<GuestOnly />}>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-          </Route>
-          <Route element={<RequireAuth />}>
-            {/* G-3・G-10 は簡単なヘッダーつき */}
-            <Route element={<Layout />}>
-              <Route path="/" element={<WorkspacesPage />} />
+        {/* ログインしている間、WebSocket でつなぐ（機能定義書 4 章） */}
+        <RealtimeProvider>
+          <Routes>
+            <Route element={<GuestOnly />}>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
             </Route>
-            {/* G-5 はワークスペース用のヘッダーとサイドバーつき */}
-            <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
-              <Route index element={<WorkspaceHome />} />
-              <Route path="c/:conversationId" element={<ConversationPage />} />
+            <Route element={<RequireAuth />}>
+              {/* G-3・G-10 は簡単なヘッダーつき */}
+              <Route element={<Layout />}>
+                <Route path="/" element={<WorkspacesPage />} />
+              </Route>
+              {/* G-5 はワークスペース用のヘッダーとサイドバーつき */}
+              <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
+                <Route index element={<WorkspaceHome />} />
+                <Route path="c/:conversationId" element={<ConversationPage />} />
+              </Route>
+              {/* ない画面は G-3 に移す。RequireAuth の中に置き、ログインしていないときは開こうとした URL を G-1 に渡す */}
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
-            {/* ない画面は G-3 に移す。RequireAuth の中に置き、ログインしていないときは開こうとした URL を G-1 に渡す */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
+          </Routes>
+        </RealtimeProvider>
       </ToastProvider>
     </AuthProvider>
   )

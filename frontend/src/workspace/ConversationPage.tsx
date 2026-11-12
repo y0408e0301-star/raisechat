@@ -8,15 +8,19 @@ import { useAuth } from '../auth/AuthContext'
 import { useToast } from '../components/ToastContext'
 import ui from '../components/ui.module.css'
 import { loadDraft, saveDraft } from '../drafts'
-import { M } from '../messages'
+import { M, M36 } from '../messages'
+import type { RealtimeEvent } from '../realtime/events'
+import { useRealtime } from '../realtime/RealtimeContext'
 import Composer from './Composer'
 import styles from './ConversationPage.module.css'
 import DeleteMessageDialog from './DeleteMessageDialog'
 import type { Entry } from './entries'
+import { addMessage, applyEvent, settlePending, type Viewer } from './liveMessages'
 import MessageList from './MessageList'
 import { useWorkspace } from './WorkspaceContext'
 
-// G-5 の会話（画面設計書 7.1）。会話を切り替えたら読み込み直すよう、ID ごとに作り直す
+// G-5 の会話（画面設計書 7.1）。会話を切り替えたら読み込み直すよう、ID ごとに作り直す。
+// 開いている間はその会話の通知を購読し、ほかの人の送信・編集・削除を開き直さずに出す（MS-5、機能定義書 4.2）
 export default function ConversationPage() {
   const { conversationId } = useParams()
   return <ConversationView key={conversationId} conversationId={Number(conversationId)} />
@@ -33,6 +37,7 @@ function ConversationView({ conversationId }: { conversationId: number }) {
   const { workspace, showSidebar } = useWorkspace()
   const { me } = useAuth()
   const toast = useToast()
+  const { subscribeConversation, onReconnect } = useRealtime()
   // undefined：読み込み中、'failed'：読み込みに失敗、'notFound'：見られない
   const [loaded, setLoaded] = useState<Loaded | 'failed' | 'notFound' | undefined>(undefined)
   const [pending, setPending] = useState<Pending[]>([])
@@ -87,12 +92,33 @@ function ConversationView({ conversationId }: { conversationId: number }) {
     setLoaded((current) => (typeof current === 'object' ? { ...current, items: change(current.items) } : current))
   }, [])
 
+  // 届いた通知を一覧に当てはめる。自分の操作の通知も届くが、ID で見分けて 2 つ出さない（FN-07 5 章の 7）
+  const owner = workspace.role === 'OWNER'
+  useEffect(() => {
+    if (!me) return
+    const viewer: Viewer = { me, owner }
+    return subscribeConversation(conversationId, (event: RealtimeEvent) => {
+      if (event.conversationId !== conversationId) return
+      setPending((list) => settlePending(list, event, viewer))
+      updateItems((items) => applyEvent(items, event, viewer))
+    })
+  }, [subscribeConversation, conversationId, me, owner, updateItems])
+
+  // つなぎ直したら、切れていた間の取りこぼしをなくすため、会話と最新の 50 件を取り直して置き換える（機能定義書 4.4）。
+  // 見られなくなっていたら、開いたときと同じく M-27 を出して general に移す
+  useEffect(() => onReconnect(async () => {
+    const result = await load()
+    if (result === 'failed') return
+    if (result === 'notFound') show(result)
+    else setLoaded(result)
+  }), [onReconnect, load, show])
+
   // 送る。返ってきたら「送信中」を普通の表示に替える。同じメッセージを 2 つ出さないよう ID で見分ける（FN-07 5 章の 7）
   const post = useCallback(async (clientId: string, body: string) => {
     try {
       const sent = await sendMessage(conversationId, body, clientId)
       setPending((list) => list.filter((p) => p.clientId !== clientId))
-      updateItems((items) => (items.some((m) => m.id === sent.id) ? items : [...items, sent]))
+      updateItems((items) => addMessage(items, sent))
       markRead(conversationId, sent.id).catch(() => {})
     } catch {
       // 送れなかったものは一覧に残し、M-34 と「もう一度送る」「取り消す」を出す（MS-13）
@@ -192,11 +218,19 @@ function ConversationView({ conversationId }: { conversationId: number }) {
             onEdited={(edited) => updateItems((items) => items.map((m) => (m.id === edited.id ? edited : m)))}
             onGone={(id) => updateItems((items) => items.filter((m) => m.id !== id))}
             onRetry={retry} onCancel={cancel} />
-          {/* 送れない会話（参加していない公開チャンネル）の M-30 と「参加する」は、チャンネル（開発計画書 1-6）で足す */}
-          {loaded.conversation.canPost && (
-            <Composer value={draft} onChange={setDraft} onSend={send}
-              placeholder={`# ${loaded.conversation.name} へのメッセージ`} />
-          )}
+          {loaded.conversation.canPost
+            ? (
+              <Composer value={draft} onChange={setDraft} onSend={send}
+                placeholder={`# ${loaded.conversation.name} へのメッセージ`} />
+            )
+            : (
+              // 送れない会話は、入力欄の代わりに理由を出す（MS-16）。M-30 の「参加する」はチャンネル（開発計画書 1-6）で足す
+              <p className={styles.cannotPost}>
+                {loaded.conversation.type === 'DM' && loaded.conversation.dmPartner
+                  ? M36(loaded.conversation.dmPartner.displayName)
+                  : M[30]}
+              </p>
+            )}
         </>
       )}
       {deleting && (

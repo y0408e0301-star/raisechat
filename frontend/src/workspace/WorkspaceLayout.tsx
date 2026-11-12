@@ -7,6 +7,7 @@ import AppHeader from '../components/AppHeader'
 import { useToast } from '../components/ToastContext'
 import ui from '../components/ui.module.css'
 import { M } from '../messages'
+import { useRealtime } from '../realtime/RealtimeContext'
 import Sidebar from './Sidebar'
 import type { WorkspaceContext } from './WorkspaceContext'
 import styles from './WorkspaceLayout.module.css'
@@ -26,6 +27,7 @@ function WorkspaceView({ workspaceId }: { workspaceId: number }) {
   const [loaded, setLoaded] = useState<Loaded | 'failed' | 'notFound' | undefined>(undefined)
   // 画面の横幅が 600px 未満のとき、サイドバーと会話のどちらを出すか（画面設計書 2.19）
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { onReconnect } = useRealtime()
 
   const load = useCallback(async () => {
     if (!Number.isSafeInteger(workspaceId) || workspaceId <= 0) return 'notFound' as const
@@ -51,6 +53,20 @@ function WorkspaceView({ workspaceId }: { workspaceId: number }) {
       active = false
     }
   }, [load, toast])
+
+  // つなぎ直したら、切れていた間の変化を反映するためサイドバーの会話を取り直す（機能定義書 4.4）。
+  // ワークスペースから外されていたら、開いたときと同じく M-13 を出して G-3 に移す
+  useEffect(() => onReconnect(async () => {
+    try {
+      const conversations = await fetchConversations(workspaceId)
+      setLoaded((current) => (typeof current === 'object' ? { ...current, conversations } : current))
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        toast(M[13])
+        setLoaded('notFound')
+      }
+    }
+  }), [onReconnect, workspaceId, toast])
 
   async function reload() {
     setLoaded(undefined)

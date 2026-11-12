@@ -1,5 +1,12 @@
 /* 画面設計書 7.1 メッセージの一覧。一覧の中だけをスクロールする */
+.wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .list { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 0 16px; }
+
+/* 上の方を見ているときに届いた「新しいメッセージ」（MS-5）。入力欄のすぐ上の中央 */
+.newArrived {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 2;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.2);
+}
 .loading { text-align: center; color: var(--sub); margin: 8px 0; }
 
 /* 会話の始まり（MS-2） */
