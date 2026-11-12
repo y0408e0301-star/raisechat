@@ -11,6 +11,8 @@
   background: none; cursor: pointer; font-size: 18px; color: var(--text);
 }
 .back:hover { background: var(--frame); }
+/* 送れない会話の、入力欄の代わりの文（MS-16） */
+.cannotPost { flex: none; margin: 0; padding: 16px; border-top: 1px solid var(--line); background: var(--frame); color: var(--sub); text-align: center; }
 .olderFailed { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 8px; color: var(--sub); }
 
 @media (max-width: 599px) {

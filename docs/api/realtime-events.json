@@ -1,0 +1,60 @@
+[ {
+  "type" : "message.created",
+  "workspaceId" : 1,
+  "conversationId" : 1,
+  "payload" : {
+    "id" : 1,
+    "conversationId" : 1,
+    "parentId" : null,
+    "author" : {
+      "username" : "taro_y",
+      "displayName" : "taro_yの名前",
+      "avatarUrl" : null,
+      "statusEmoji" : null,
+      "statusText" : null
+    },
+    "body" : "土曜の集合は駅前で",
+    "replyCount" : 0,
+    "lastReplyAt" : null,
+    "createdAt" : "2026-11-10T01:02:00Z",
+    "editedAt" : null,
+    "deleted" : false,
+    "mine" : false,
+    "canDelete" : false
+  },
+  "sentAt" : "2026-11-10T01:02:00Z"
+}, {
+  "type" : "message.updated",
+  "workspaceId" : 1,
+  "conversationId" : 1,
+  "payload" : {
+    "id" : 1,
+    "conversationId" : 1,
+    "parentId" : null,
+    "author" : {
+      "username" : "taro_y",
+      "displayName" : "taro_yの名前",
+      "avatarUrl" : null,
+      "statusEmoji" : null,
+      "statusText" : null
+    },
+    "body" : "土曜の集合は駅の北口で",
+    "replyCount" : 0,
+    "lastReplyAt" : null,
+    "createdAt" : "2026-11-10T01:02:00Z",
+    "editedAt" : "2026-11-10T01:03:00Z",
+    "deleted" : false,
+    "mine" : false,
+    "canDelete" : false
+  },
+  "sentAt" : "2026-11-10T01:03:00Z"
+}, {
+  "type" : "message.deleted",
+  "workspaceId" : 1,
+  "conversationId" : 1,
+  "payload" : {
+    "id" : 1,
+    "parentId" : null
+  },
+  "sentAt" : "2026-11-10T01:03:00Z"
+} ]

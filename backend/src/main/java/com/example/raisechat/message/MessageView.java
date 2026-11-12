@@ -22,4 +22,11 @@ record MessageView(long id, long conversationId, @Nullable Long parentId, UserSu
 				canDelete);
 	}
 
+	// リアルタイムの通知で会話を見ている人みんなに送る形。見る人によって変わる mine・canDelete は false にして送り、
+	// 受け取った画面で直す（機能定義書 4.3）
+	MessageView forEveryone() {
+		return new MessageView(this.id, this.conversationId, this.parentId, this.author, this.body, this.replyCount,
+				this.lastReplyAt, this.createdAt, this.editedAt, this.deleted, false, false);
+	}
+
 }

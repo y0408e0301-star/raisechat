@@ -88,11 +88,13 @@ public class RequestLogFilter extends OncePerRequestFilter {
 	}
 
 	// ログインした人の ID を MDC に入れる。JWT を確かめた後（BearerTokenAuthenticationFilter
-	// の後ろ）で動かす（SecurityConfig）
+	// の後ろ）で動かす（SecurityConfig）。MDC から消すのは上の doFilterInternal なので、/api のリクエストだけにする
+	// （/ws のつなぎ始めで入れると、そのスレッドに残ってほかのログに付いてしまう）
 	public static void recordUser(ServletRequest request, ServletResponse response, FilterChain chain)
 			throws IOException, ServletException {
 		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-		if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
+		if (request instanceof HttpServletRequest http && http.getRequestURI().startsWith("/api/")
+				&& authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
 			MDC.put(USER_ID, jwt.getSubject());
 		}
 		chain.doFilter(request, response);
