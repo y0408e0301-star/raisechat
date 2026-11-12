@@ -9,7 +9,7 @@ import OfflineNotice from './OfflineNotice'
 
 function renderWith(state: ConnectionState) {
   return render(
-    <RealtimeContext value={{ state, subscribeConversation: () => () => {}, onReconnect: () => () => {} }}>
+    <RealtimeContext value={{ state, subscribeConversation: () => () => {}, subscribeUser: () => () => {}, onReconnect: () => () => {} }}>
       <OfflineNotice />
     </RealtimeContext>,
   )
@@ -59,7 +59,7 @@ describe('OfflineNotice', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(M[37])
     for (const state of ['connected', 'connecting', 'idle'] as const) {
       rerender(
-        <RealtimeContext value={{ state, subscribeConversation: () => () => {}, onReconnect: () => () => {} }}>
+        <RealtimeContext value={{ state, subscribeConversation: () => () => {}, subscribeUser: () => () => {}, onReconnect: () => () => {} }}>
           <OfflineNotice />
         </RealtimeContext>,
       )

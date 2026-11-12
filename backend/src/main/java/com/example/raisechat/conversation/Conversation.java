@@ -89,6 +89,12 @@ public class Conversation {
 		return new Conversation(workspaceId, Type.CHANNEL, GENERAL_NAME, null, Visibility.PUBLIC, true, createdBy, now);
 	}
 
+	// チャンネル（CH-2）。名前・説明は確かめたもの（ChannelNames）
+	static Conversation channel(long workspaceId, String name, @Nullable String description, Visibility visibility,
+			long createdBy, Instant now) {
+		return new Conversation(workspaceId, Type.CHANNEL, name, description, visibility, false, createdBy, now);
+	}
+
 	public long getId() {
 		if (this.id == null) {
 			throw new IllegalStateException("まだ保存していない会話です");

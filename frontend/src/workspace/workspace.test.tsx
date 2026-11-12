@@ -104,11 +104,13 @@ describe('ヘッダーとサイドバー（W-9、画面設計書 2.6・2.8）', 
     expect(within(sidebar).getByRole('button', { name: '仲間うちのメニュー' })).toBeInTheDocument()
     const links = within(sidebar).getAllByRole('link')
     expect(links.map((l) => [l.textContent, l.getAttribute('href')])).toEqual([
+      ['🔍チャンネルを探す', '/w/3/channels'],
       ['#general', '/w/3/c/10'],
       ['🔒運営', '/w/3/c/11'],
     ])
+    expect(within(sidebar).getByRole('button', { name: 'チャンネルを作る' })).toBeInTheDocument()
     // 開いている会話
-    expect(links[0]).toHaveAttribute('aria-current', 'page')
+    expect(links[1]).toHaveAttribute('aria-current', 'page')
   })
 
   it('サイドバーのワークスペースの名前のメニューから G-3 に戻れる', async () => {

@@ -5,14 +5,30 @@
 .name { margin: 0; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 説明は 1 行。長いときは「…」 */
 .description { margin: 0; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.members { flex: none; color: var(--sub); }
+.titleButton {
+  max-width: 100%; padding: 0; border: none; background: none; cursor: pointer;
+  font: inherit; color: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.titleButton:hover { text-decoration: underline; }
+.members, .info {
+  flex: none; height: 32px; padding: 0 8px; border: none; border-radius: 8px; background: none; cursor: pointer;
+  color: var(--sub); font-size: 15px;
+}
+.members:hover, .info:hover { background: var(--frame); }
+@media (pointer: coarse) {
+  .members, .info { height: 44px; }
+}
 .back {
   display: none; flex: none; width: 32px; height: 32px; border: none; border-radius: 8px;
   background: none; cursor: pointer; font-size: 18px; color: var(--text);
 }
 .back:hover { background: var(--frame); }
 /* 送れない会話の、入力欄の代わりの文（MS-16） */
-.cannotPost { flex: none; margin: 0; padding: 16px; border-top: 1px solid var(--line); background: var(--frame); color: var(--sub); text-align: center; }
+.cannotPost {
+  flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px;
+  border-top: 1px solid var(--line); background: var(--frame); color: var(--sub); text-align: center;
+}
+.cannotPost p { margin: 0; }
 .olderFailed { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 8px; color: var(--sub); }
 
 @media (max-width: 599px) {

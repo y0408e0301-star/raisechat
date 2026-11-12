@@ -26,6 +26,26 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 	@Query(value = "SELECT c.* FROM conversations c WHERE c.id = :id AND " + VISIBLE_TO_ME, nativeQuery = true)
 	Optional<Conversation> findVisible(@Param("me") long me, @Param("id") long id);
 
+	// G-8 のチャンネルの一覧（CH-3）：ワークスペースの公開チャンネルと、自分が入っているプライベートチャンネル（8.1 の条件）。
+	// 名前の順（大文字・小文字を区別しない）。:pattern は LIKE の形（%…%。ワイルドカードは ChannelInputs で逃がす）。
+	// 続きは (lower(name), id) が :afterName・:afterId より後ろのもの（最初は ''・0）
+	@Query(value = """
+			SELECT c.id AS "id", c.name AS "name", c.description AS "description", c.visibility AS "visibility",
+			       (SELECT count(*) FROM conversation_members m WHERE m.conversation_id = c.id) AS "memberCount",
+			       EXISTS (SELECT 1 FROM conversation_members m
+			               WHERE m.conversation_id = c.id AND m.user_id = :me) AS "joined"
+			FROM conversations c
+			WHERE c.workspace_id = :workspaceId AND c.type = 'CHANNEL'
+			  AND lower(c.name) LIKE lower(:pattern) ESCAPE '\\'
+			  AND (lower(c.name), c.id) > (lower(:afterName), :afterId)
+			  AND\s""" + VISIBLE_TO_ME + """
+			ORDER BY lower(c.name), c.id
+			LIMIT :limit
+			""", nativeQuery = true)
+	List<ChannelRow> findChannels(@Param("me") long me, @Param("workspaceId") long workspaceId,
+			@Param("pattern") String pattern, @Param("afterName") String afterName, @Param("afterId") long afterId,
+			@Param("limit") int limit);
+
 	@Query("select c from Conversation c where c.workspaceId = :workspaceId and c.general")
 	Optional<Conversation> findGeneral(@Param("workspaceId") long workspaceId);
 

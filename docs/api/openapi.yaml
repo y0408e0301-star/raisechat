@@ -22,6 +22,14 @@ info:
     | WORKSPACE_LIMIT | 409 | 作れるワークスペースは 10 個までです。 |
     | WORKSPACE_NOT_FOUND | 404 | このワークスペースは見つからないか、参加していません。 |
     | CONVERSATION_NOT_FOUND | 404 | このチャンネルは見つからないか、参加していません。 |
+    | CHANNEL_NAME_INVALID | 400 | チャンネル名は空白を含まない 1〜80 文字で入力してください。 |
+    | CHANNEL_NAME_TAKEN | 409 | この名前のチャンネルはすでにあります。 |
+    | USER_NOT_FOUND | 404 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
+    | PRIVATE_CHANNEL | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
+    | NOT_PRIVATE_CHANNEL | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
+    | CANNOT_LEAVE_GENERAL | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
+    | CANNOT_DELETE_GENERAL | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
+    | NOT_OWNER | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
     | MESSAGE_EMPTY | 400 | メッセージを入力してください。 |
     | MESSAGE_TOO_LONG | 400 | メッセージは 4,000 文字までです。 |
     | NOT_CHANNEL_MEMBER | 403 | このチャンネルに参加すると、メッセージを送れます。 |
@@ -223,6 +231,34 @@ paths:
       tags:
       - FN-01 ユーザー登録・ログイン
   /api/conversations/{conversationId}:
+    delete:
+      description: オーナーだけ、general 以外。メッセージなども一緒に消える
+      operationId: delete_1
+      parameters:
+      - in: path
+        name: conversationId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: 削除した
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: チャンネルを削除する
+      tags:
+      - FN-06 チャンネル
     get:
       description: 見られないとき（入っていないワークスペース・プライベートチャンネルなど）は 404
       operationId: get_1
@@ -255,11 +291,196 @@ paths:
       summary: 会話の詳細
       tags:
       - FN-06 チャンネル
+  /api/conversations/{conversationId}/candidates:
+    get:
+      description: そのチャンネルにいないワークスペースのメンバーを表示名の順に 50 人まで。q は表示名かユーザー ID に含む文字
+      operationId: candidates
+      parameters:
+      - in: path
+        name: conversationId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserSummary"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: プライベートチャンネルに招待できる人
+      tags:
+      - FN-06 チャンネル
+  /api/conversations/{conversationId}/join:
+    post:
+      description: もう入っていれば何もしない。プライベートチャンネル・DM は 403
+      operationId: join
+      parameters:
+      - in: path
+        name: conversationId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationDetail"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 公開チャンネルに参加する
+      tags:
+      - FN-06 チャンネル
+  /api/conversations/{conversationId}/leave:
+    post:
+      description: general は 403。入っていなければ何もしない
+      operationId: leave
+      parameters:
+      - in: path
+        name: conversationId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: 退出した
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: チャンネルから退出する
+      tags:
+      - FN-06 チャンネル
+  /api/conversations/{conversationId}/members:
+    get:
+      description: 表示名の順に 50 人ずつ。q は表示名かユーザー ID に含む文字
+      operationId: members
+      parameters:
+      - in: path
+        name: conversationId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberPage"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 会話のメンバーの一覧
+      tags:
+      - FN-06 チャンネル
+    post:
+      description: 1 人でもワークスペースにいなければ 404 で誰も足さない。もう入っている人は飛ばし、足した人を返す
+      operationId: invite
+      parameters:
+      - in: path
+        name: conversationId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserSummary"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: プライベートチャンネルに招待する
+      tags:
+      - FN-06 チャンネル
   /api/conversations/{conversationId}/messages:
     get:
       description: 親メッセージ（スレッドの返信でないもの）を古い順に返す。before（その ID より前）・after（その ID より後）のどちらか、またはなし（最新）。limit
         は 1〜50（指定がなければ 50）。around はメッセージの位置を開く（1-15）で足す
-      operationId: list_1
+      operationId: list_2
       parameters:
       - in: path
         name: conversationId
@@ -549,10 +770,91 @@ paths:
       summary: ワークスペースの詳細
       tags:
       - FN-03 ワークスペース
+  /api/workspaces/{workspaceId}/channels:
+    get:
+      description: 公開チャンネルと、自分が入っているプライベートチャンネルを名前の順に 50 件ずつ。q は名前に含む文字（0〜80 文字）
+      operationId: list_1
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChannelPage"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: チャンネルの一覧（G-8）
+      tags:
+      - FN-06 チャンネル
+    post:
+      description: 自分をメンバーにする。同じ名前（大文字・小文字を区別しない）があれば 409
+      operationId: create_1
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChannelRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationDetail"
+          description: 作った
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: チャンネルを作る
+      tags:
+      - FN-06 チャンネル
   /api/workspaces/{workspaceId}/conversations:
     get:
       description: 自分が入っているチャンネル（general が先頭、あとは名前の順）。ページングしない
-      operationId: list_2
+      operationId: list_3
       parameters:
       - in: path
         name: workspaceId
@@ -586,6 +888,49 @@ paths:
       - FN-06 チャンネル
 components:
   schemas:
+    ChannelListItem:
+      type: object
+      properties:
+        description:
+          type:
+          - string
+          - "null"
+        id:
+          type: integer
+          format: int64
+        joined:
+          type: boolean
+        memberCount:
+          type: integer
+          format: int64
+        name:
+          type: string
+        visibility:
+          type: string
+          enum:
+          - PUBLIC
+          - PRIVATE
+      required:
+      - description
+      - id
+      - joined
+      - memberCount
+      - name
+      - visibility
+    ChannelPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChannelListItem"
+        nextCursor:
+          type:
+          - string
+          - "null"
+      required:
+      - items
+      - nextCursor
     ConversationDetail:
       type: object
       properties:
@@ -714,6 +1059,23 @@ components:
       - unreadCount
       - visibility
       - workspaceId
+    CreateChannelRequest:
+      type: object
+      properties:
+        description:
+          type: string
+          description: 前後の空白を除いて 0〜250 文字。改行を含まない
+        name:
+          type: string
+          description: 前後の空白を除いて 1〜80 文字。空白を含まない
+        visibility:
+          type: string
+          enum:
+          - PUBLIC
+          - PRIVATE
+      required:
+      - name
+      - visibility
     CreateWorkspaceRequest:
       type: object
       properties:
@@ -745,6 +1107,18 @@ components:
       - code
       - field
       - message
+    InviteRequest:
+      type: object
+      properties:
+        usernames:
+          type: array
+          items:
+            type: string
+            description: ユーザー ID
+          maxItems: 50
+          minItems: 1
+      required:
+      - usernames
     LoginRequest:
       type: object
       properties:
@@ -755,6 +1129,20 @@ components:
       required:
       - password
       - username
+    MemberPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserSummary"
+        nextCursor:
+          type:
+          - string
+          - "null"
+      required:
+      - items
+      - nextCursor
     MessagePage:
       type: object
       properties:

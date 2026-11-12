@@ -241,8 +241,10 @@ class WebSocketApiTests {
 		StompTestClient hanakoClient = connect(this.hanako);
 		StompTestClient taroClient = connect(this.taro);
 		hanakoClient.subscribe(topic(this.general));
+		hanakoClient.subscribe(WebSocketSecurityConfig.USER_EVENTS);
 		taroClient.subscribe(topic(this.general));
 		awaitSubscribers(topic(this.general), 2);
+		awaitSubscribers(WebSocketSecurityConfig.USER_EVENTS, 1);
 
 		long id = send(this.taro, "土曜の集合は駅前で");
 		String created = hanakoClient.next();
@@ -277,7 +279,70 @@ class WebSocketApiTests {
 		// 自分の操作の通知も、自分の画面に届く（4.3）
 		assertThat(taroClient.next()).isEqualTo(created);
 
-		writeSamples(List.of(createdJson, updatedJson, deletedJson));
+		// 招待されると本人に conversation.updated、退出すると conversation.removed（FN-06）
+		long secret = createChannel(this.taro, "運営", "PRIVATE");
+		assertThat(post(this.mvc, this.taro, "/api/conversations/%d/members".formatted(secret),
+				"{\"usernames\":[\"hanako\"]}"))
+			.hasStatusOk();
+		JsonNode joinedJson = JSON.readTree(hanakoClient.next());
+		assertThat(joinedJson.path("type").asString()).isEqualTo("conversation.updated");
+		assertThat(joinedJson.path("conversationId").asLong()).isEqualTo(secret);
+		assertThat(joinedJson.path("payload").path("name").asString()).isEqualTo("運営");
+		assertThat(joinedJson.path("payload").path("joined").asBoolean()).isTrue();
+		assertThat(post(this.mvc, this.hanako, "/api/conversations/%d/leave".formatted(secret), "{}"))
+			.hasStatus(HttpStatus.NO_CONTENT);
+		JsonNode removedJson = JSON.readTree(hanakoClient.next());
+		assertThat(removedJson.path("type").asString()).isEqualTo("conversation.removed");
+		assertThat(removedJson.path("payload").path("conversationId").asLong()).isEqualTo(secret);
+		assertThat(removedJson.path("payload").path("reason").asString()).isEqualTo("LEFT");
+
+		writeSamples(List.of(createdJson, updatedJson, deletedJson, joinedJson, removedJson));
+	}
+
+	private long createChannel(Cookie user, String name, String visibility) {
+		MvcTestResult result = post(this.mvc, user, "/api/workspaces/%d/channels".formatted(this.workspace),
+				"{\"name\":\"%s\",\"visibility\":\"%s\"}".formatted(name, visibility));
+		assertThat(result).hasStatus(HttpStatus.CREATED);
+		return readLong(result, "$.id");
+	}
+
+	// ----------------------------------------------------------------
+	// 見られなくなったとき（FN-06、機能定義書 4.5）
+
+	@Test
+	void プライベートチャンネルから退出すると購読が取り消され_通知が届かなくなる() throws Exception {
+		long secret = createChannel(this.taro, "運営", "PRIVATE");
+		post(this.mvc, this.taro, "/api/conversations/%d/members".formatted(secret), "{\"usernames\":[\"hanako\"]}");
+		StompTestClient client = connect(this.hanako);
+		client.subscribe(topic(secret));
+		awaitSubscribers(topic(secret), 1);
+
+		assertThat(post(this.mvc, this.hanako, "/api/conversations/%d/leave".formatted(secret), "{}"))
+			.hasStatus(HttpStatus.NO_CONTENT);
+		awaitSubscribers(topic(secret), 0);
+		assertThat(post(this.mvc, this.taro, "/api/conversations/%d/messages".formatted(secret),
+				"{\"body\":\"抜けた後\",\"clientId\":\"%s\"}".formatted(UUID.randomUUID())))
+			.hasStatus(HttpStatus.CREATED);
+
+		assertThat(client.nothingWithin(500)).isTrue();
+		assertThat(client.isConnected()).isTrue();
+	}
+
+	@Test
+	void 公開チャンネルを削除すると_参加していない人にも届き購読が取り消される() throws Exception {
+		long chat = createChannel(this.taro, "雑談", "PUBLIC");
+		StompTestClient client = connect(this.hanako);
+		client.subscribe(WebSocketSecurityConfig.USER_EVENTS);
+		client.subscribe(topic(chat));
+		awaitSubscribers(WebSocketSecurityConfig.USER_EVENTS, 1);
+		awaitSubscribers(topic(chat), 1);
+
+		assertThat(delete(this.mvc, this.taro, "/api/conversations/" + chat)).hasStatus(HttpStatus.NO_CONTENT);
+
+		JsonNode removed = JSON.readTree(client.next());
+		assertThat(removed.path("type").asString()).isEqualTo("conversation.removed");
+		assertThat(removed.path("payload").path("reason").asString()).isEqualTo("DELETED");
+		awaitSubscribers(topic(chat), 0);
 	}
 
 	@Test

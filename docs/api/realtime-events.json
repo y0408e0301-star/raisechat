@@ -57,4 +57,32 @@
     "parentId" : null
   },
   "sentAt" : "2026-11-10T01:03:00Z"
+}, {
+  "type" : "conversation.updated",
+  "workspaceId" : 1,
+  "conversationId" : 2,
+  "payload" : {
+    "id" : 2,
+    "workspaceId" : 1,
+    "type" : "CHANNEL",
+    "name" : "運営",
+    "visibility" : "PRIVATE",
+    "general" : false,
+    "dmPartner" : null,
+    "joined" : true,
+    "hasUnread" : false,
+    "unreadCount" : 0,
+    "mentionCount" : 0,
+    "canPost" : true
+  },
+  "sentAt" : "2026-11-10T01:03:00Z"
+}, {
+  "type" : "conversation.removed",
+  "workspaceId" : 1,
+  "conversationId" : 2,
+  "payload" : {
+    "conversationId" : 2,
+    "reason" : "LEFT"
+  },
+  "sentAt" : "2026-11-10T01:03:00Z"
 } ]

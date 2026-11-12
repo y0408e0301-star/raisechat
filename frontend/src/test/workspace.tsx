@@ -5,6 +5,7 @@ import { AuthContext } from '../auth/AuthContext'
 import { ToastProvider } from '../components/ToastProvider'
 import { M } from '../messages'
 import { RealtimeProvider } from '../realtime/RealtimeProvider'
+import ChannelsPage from '../workspace/ChannelsPage'
 import ConversationPage from '../workspace/ConversationPage'
 import WorkspaceHome from '../workspace/WorkspaceHome'
 import WorkspaceLayout from '../workspace/WorkspaceLayout'
@@ -43,6 +44,7 @@ export function renderAt(path: string) {
               <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
                 <Route index element={<WorkspaceHome />} />
                 <Route path="c/:conversationId" element={<ConversationPage />} />
+                <Route path="channels" element={<ChannelsPage />} />
               </Route>
             </Routes>
             <CurrentLocation />

@@ -58,6 +58,11 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 			""")
 	boolean isParentInConversation(@Param("id") long id, @Param("conversationId") long conversationId);
 
+	// 会話のいちばん新しいメッセージ（スレッドの返信を含む）の ID。なければ 0。
+	// 参加・招待したときの最後に読んだメッセージにする（参加前のメッセージを未読にしない。FN-06 5 章の 2）
+	@Query("select coalesce(max(m.id), 0) from Message m where m.conversationId = :conversationId")
+	long findLatestId(@Param("conversationId") long conversationId);
+
 	// 編集・削除で使う。返信の追加・削除と同時に起きても件数が食い違わないよう（BR-8）、
 	// また「削除されました」にした本文を同時の編集で戻さないよう、行をロックする
 	@Lock(LockModeType.PESSIMISTIC_WRITE)

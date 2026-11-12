@@ -32,6 +32,8 @@ export function applyEvent(items: MessageView[], event: RealtimeEvent, viewer: V
     }
     case 'message.deleted':
       return items.filter((m) => m.id !== event.payload.id)
+    default:
+      return items
   }
 }
 

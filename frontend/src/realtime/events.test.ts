@@ -17,9 +17,11 @@ describe('parseEvent', () => {
     }
   })
 
-  it('機能定義書 4.3 のメッセージの通知の種類が、見本にそろっている', () => {
+  it('画面で使う通知の種類（機能定義書 4.3）が、見本にそろっている', () => {
     const types = events.map((e) => (e as { type: string }).type)
-    expect(types).toEqual(expect.arrayContaining(['message.created', 'message.updated', 'message.deleted']))
+    expect(types).toEqual(expect.arrayContaining([
+      'message.created', 'message.updated', 'message.deleted', 'conversation.updated', 'conversation.removed',
+    ]))
   })
 
   it('JSON でない・知らない種類・形の違うものは読まない', () => {
