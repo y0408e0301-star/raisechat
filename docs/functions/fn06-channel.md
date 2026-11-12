@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-FD-06 |
-| 版数 | 0.1 |
+| 版数 | 0.2 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-10 |
+| 最終更新日 | 2026-11-13 |
 | 作成者 | （氏名） |
 | 上位文書 | [機能定義書](function-definition.md)（RC-FD） |
 | 状態 | 承認待ち |
@@ -15,6 +15,7 @@
 | 版数 | 日付 | 内容 | 作成者 |
 | --- | --- | --- | --- |
 | 0.1 | 2026-11-10 | 初版 | （氏名） |
+| 0.2 | 2026-11-13 | チャンネルを作るとき（開発計画書 1-6）に決めたことを足した：招待の候補を返す API（GET /api/conversations/{id}/candidates。ワークスペースのメンバーの一覧（FN-05）は 1-8 で作るため）、参加・退出をもう一度送ったときは何もしない、DM にチャンネルの操作を送ったときは 403 FORBIDDEN、一覧のカーソルの中身 | （氏名） |
 
 本書は機能定義書の一部である。承認は[機能定義書](function-definition.md)で一括して行う。API・リアルタイムの通知・メッセージの共通の決まりは機能定義書 3 章〜5 章のとおり。
 
@@ -135,10 +136,14 @@ sequenceDiagram
 | GET | /api/conversations/{id}/members?q=&cursor= | 絞り込みの文字 | 200 UserSummary の一覧（50 件ずつ） | 404 |
 | POST | /api/conversations/{id}/join | なし | 200 ConversationDetail | 403 PRIVATE_CHANNEL（プライベート・DM）、404 |
 | POST | /api/conversations/{id}/leave | なし | 204 | 403 CANNOT_LEAVE_GENERAL、404 |
+| GET | /api/conversations/{id}/candidates?q= | 絞り込みの文字 | 200 UserSummary の並び（そのチャンネルにいないワークスペースのメンバーを表示名の順に 50 人まで。ページングしない） | 403 NOT_PRIVATE_CHANNEL、404 |
 | POST | /api/conversations/{id}/members | `{"usernames":[…]}` | 200 UserSummary の並び | 400、403 NOT_PRIVATE_CHANNEL、404 |
 | DELETE | /api/conversations/{id} | なし | 204 | 403 NOT_OWNER・CANNOT_DELETE_GENERAL、404 |
 
 - ChannelListItem：`{"id","name","description","visibility","memberCount","joined"}`
+- チャンネルの一覧・会話のメンバーの一覧のカーソルは「最後に出した行の ID:名前（表示名）」（機能定義書 3.4）。名前・表示名・ユーザー ID の絞り込みは、大文字・小文字を区別せずに、その文字を含むもの（%・_ も文字として探す）
+- 参加（join）をもう入っているチャンネルに、退出（leave）を入っていないチャンネルに送ったときは、何もせずに成功を返す
+- DM に参加・退出・招待・削除を送ったときは 403 FORBIDDEN（DM の操作は FN-12）
 - ConversationDetail：ConversationSummary（機能定義書 3.5）に description・memberCount・createdBy（UserSummary）・createdAt を足したもの
 
 リアルタイムの通知：
