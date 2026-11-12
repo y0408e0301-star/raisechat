@@ -17,7 +17,7 @@ import com.example.raisechat.workspace.WorkspaceAccess;
 import com.example.raisechat.workspace.WorkspaceMember;
 
 // サイドバーの会話の一覧・会話の詳細（FN-06）と、会話を開いたときの記録（FN-14・FN-03 5 章の 4）。
-// チャンネルの作成・参加などはチャンネル（開発計画書 1-6）、DM は 1-9 で足す
+// チャンネルの作成・参加などは ChannelService、DM は 1-9 で足す
 @Service
 class ConversationService {
 

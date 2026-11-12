@@ -22,7 +22,13 @@ public record RealtimeEvent(Type type, long workspaceId, @Nullable Long conversa
 		MESSAGE_UPDATED("message.updated"),
 
 		// payload：{"id","parentId"}
-		MESSAGE_DELETED("message.deleted");
+		MESSAGE_DELETED("message.deleted"),
+
+		// 本人あて。payload：ConversationSummary（会話に参加した・招待された・作った。FN-06）
+		CONVERSATION_UPDATED("conversation.updated"),
+
+		// 本人あて。payload：{"conversationId","reason"}（会話から抜けた・チャンネルが削除された。FN-06）
+		CONVERSATION_REMOVED("conversation.removed");
 
 		private final String value;
 
@@ -39,6 +45,17 @@ public record RealtimeEvent(Type type, long workspaceId, @Nullable Long conversa
 
 	// message.deleted の payload
 	public record MessageDeleted(long id, @Nullable Long parentId) {
+	}
+
+	// conversation.removed の payload
+	public record ConversationRemoved(long conversationId, RemovedReason reason) {
+	}
+
+	// 会話を見られなくなった・サイドバーから消える理由（機能定義書 4.3）
+	public enum RemovedReason {
+
+		LEFT, DELETED
+
 	}
 
 }

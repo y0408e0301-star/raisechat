@@ -36,6 +36,26 @@ public enum ErrorCode {
 	// 会話（FN-06・FN-12 9 章。M-27）
 	CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "このチャンネルは見つからないか、参加していません。"),
 
+	// チャンネル（FN-06 9 章。M-24・M-25・M-49）
+	CHANNEL_NAME_INVALID(HttpStatus.BAD_REQUEST, "チャンネル名は空白を含まない 1〜80 文字で入力してください。"),
+
+	CHANNEL_NAME_TAKEN(HttpStatus.CONFLICT, "この名前のチャンネルはすでにあります。"),
+
+	// 招待しようとした人がワークスペースにいない
+	USER_NOT_FOUND(HttpStatus.NOT_FOUND, "操作に失敗しました。時間をおいてもう一度お試しください。"),
+
+	// プライベートチャンネル・DM に参加 API を送った
+	PRIVATE_CHANNEL(HttpStatus.FORBIDDEN, "操作に失敗しました。時間をおいてもう一度お試しください。"),
+
+	// 公開チャンネル・DM に招待 API を送った
+	NOT_PRIVATE_CHANNEL(HttpStatus.FORBIDDEN, "操作に失敗しました。時間をおいてもう一度お試しください。"),
+
+	CANNOT_LEAVE_GENERAL(HttpStatus.FORBIDDEN, "操作に失敗しました。時間をおいてもう一度お試しください。"),
+
+	CANNOT_DELETE_GENERAL(HttpStatus.FORBIDDEN, "操作に失敗しました。時間をおいてもう一度お試しください。"),
+
+	NOT_OWNER(HttpStatus.FORBIDDEN, "操作に失敗しました。時間をおいてもう一度お試しください。"),
+
 	// メッセージ（FN-07 9 章。M-30・M-35・M-49）。本文が空のときは画面では送れないので、画面には出さない
 	MESSAGE_EMPTY(HttpStatus.BAD_REQUEST, "メッセージを入力してください。"),
 
