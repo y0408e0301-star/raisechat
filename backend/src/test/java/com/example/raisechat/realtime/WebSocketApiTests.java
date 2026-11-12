@@ -367,8 +367,10 @@ class WebSocketApiTests {
 	// コミットしたファイルと違えば、書き直したうえで失敗させる（OpenApiExportTests と同じ）。
 	// 手元で失敗したら、書き直された realtime-events.json を確かめてコミットする（画面のテストもこれを読む）
 	private static void writeSamples(List<JsonNode> events) throws IOException {
-		String samples = JSON.writeValueAsString(events) + "\n";
-		String committed = Files.exists(SAMPLES) ? Files.readString(SAMPLES, StandardCharsets.UTF_8) : "";
+		// 改行は OS によらず LF にそろえる（整形の改行は Windows では CRLF になるため）
+		String samples = JSON.writeValueAsString(events).replace("\r\n", "\n") + "\n";
+		String committed = Files.exists(SAMPLES)
+				? Files.readString(SAMPLES, StandardCharsets.UTF_8).replace("\r\n", "\n") : "";
 		if (!samples.equals(committed)) {
 			Files.createDirectories(SAMPLES.getParent());
 			Files.writeString(SAMPLES, samples, StandardCharsets.UTF_8);
