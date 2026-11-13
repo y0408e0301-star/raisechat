@@ -35,6 +35,8 @@ info:
     | CANNOT_LEAVE_GENERAL | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
     | CANNOT_DELETE_GENERAL | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
     | NOT_OWNER | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
+    | CANNOT_DM_SELF | 400 | 入力が正しくありません。 |
+    | DM_PARTNER_LEFT | 403 | 相手がこのワークスペースにいないため、メッセージを送れません。 |
     | MESSAGE_EMPTY | 400 | メッセージを入力してください。 |
     | MESSAGE_TOO_LONG | 400 | メッセージは 4,000 文字までです。 |
     | NOT_CHANNEL_MEMBER | 403 | このチャンネルに参加すると、メッセージを送れます。 |
@@ -956,7 +958,7 @@ paths:
       - FN-06 チャンネル
   /api/workspaces/{workspaceId}/conversations:
     get:
-      description: 自分が入っているチャンネル（general が先頭、あとは名前の順）。ページングしない
+      description: 自分が入っているチャンネル（general が先頭、あとは名前の順）の後ろに、DM（作ったものかメッセージのあるもの。最後のメッセージの新しい順）。ページングしない
       operationId: list_5
       parameters:
       - in: path
@@ -989,6 +991,45 @@ paths:
       summary: サイドバーの会話の一覧
       tags:
       - FN-06 チャンネル
+  /api/workspaces/{workspaceId}/dms:
+    post:
+      description: 相手との DM を返す。なければ作る（201）。もうあれば 200。自分とは 400、相手がワークスペースにいなければ 404
+      operationId: start
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartDmRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationDetail"
+          description: 作った
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: DM を始める
+      tags:
+      - FN-12 DM
   /api/workspaces/{workspaceId}/invites:
     get:
       description: オーナーだけ。作った新しい順に 50 件ずつ。作ってから 30 日たったものは消える
@@ -1717,6 +1758,14 @@ components:
       required:
       - displayName
       - password
+      - username
+    StartDmRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          description: 相手のユーザー ID（大文字・小文字を区別しない）
+      required:
       - username
     UserSummary:
       type: object

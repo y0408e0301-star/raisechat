@@ -415,11 +415,31 @@ export interface paths {
         };
         /**
          * サイドバーの会話の一覧
-         * @description 自分が入っているチャンネル（general が先頭、あとは名前の順）。ページングしない
+         * @description 自分が入っているチャンネル（general が先頭、あとは名前の順）の後ろに、DM（作ったものかメッセージのあるもの。最後のメッセージの新しい順）。ページングしない
          */
         get: operations["list_5"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspaces/{workspaceId}/dms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * DM を始める
+         * @description 相手との DM を返す。なければ作る（201）。もうあれば 200。自分とは 400、相手がワークスペースにいなければ 404
+         */
+        post: operations["start"];
         delete?: never;
         options?: never;
         head?: never;
@@ -717,6 +737,10 @@ export interface components {
             /** @description 8〜64 文字の半角文字で、英字と数字を 1 文字以上ずつ含む（A-3） */
             password: string;
             /** @description 前後の空白を除いて 3〜15 文字の半角英数字と「_」（A-2） */
+            username: string;
+        };
+        StartDmRequest: {
+            /** @description 相手のユーザー ID（大文字・小文字を区別しない） */
             username: string;
         };
         UserSummary: {
@@ -1866,6 +1890,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationSummary"][];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartDmRequest"];
+            };
+        };
+        responses: {
+            /** @description 作った */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
                 };
             };
             /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */

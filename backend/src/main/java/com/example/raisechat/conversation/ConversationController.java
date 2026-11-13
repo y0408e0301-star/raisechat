@@ -31,7 +31,8 @@ class ConversationController {
 		this.conversationService = conversationService;
 	}
 
-	@Operation(summary = "サイドバーの会話の一覧", description = "自分が入っているチャンネル（general が先頭、あとは名前の順）。ページングしない")
+	@Operation(summary = "サイドバーの会話の一覧",
+			description = "自分が入っているチャンネル（general が先頭、あとは名前の順）の後ろに、DM（作ったものかメッセージのあるもの。最後のメッセージの新しい順）。ページングしない")
 	@GetMapping("/api/workspaces/{workspaceId}/conversations")
 	List<ConversationSummary> list(@AuthenticationPrincipal Jwt jwt, @PathVariable long workspaceId) {
 		return this.conversationService.listForSidebar(CurrentUser.id(jwt), workspaceId);

@@ -33,6 +33,12 @@
 .personName { font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .username { color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .empty { color: var(--sub); margin: 8px 0 0; }
+/* G-15 の行（押して選ぶ） */
+.pick {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px;
+  border: none; border-radius: 6px; background: none; color: var(--text); cursor: pointer; text-align: left;
+}
+.pick:hover:not(:disabled) { background: var(--frame); }
 .more { text-align: center; color: var(--sub); margin: 8px 0 0; }
 .dangerActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
 /* 危険色の文字の通常ボタン（画面設計書 16 章） */

@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router'
 import {
-  channelsUrl, conversationUrl, invitesUrl, membersUrl, type ConversationSummary, type WorkspaceDetail,
+  channelsUrl, conversationUrl, dmUrl, invitesUrl, membersUrl, type ConversationSummary, type WorkspaceDetail,
 } from '../api'
+import Avatar from '../components/Avatar'
 import Menu from '../components/Menu'
 import styles from './Sidebar.module.css'
 
@@ -12,14 +13,17 @@ type Props = {
   onSelect: () => void
   // 「チャンネル」の「＋」（G-13。CH-1）
   onCreateChannel: () => void
+  // 「ダイレクトメッセージ」の「＋」（G-15。DM-2）
+  onStartDm: () => void
 }
 
 const itemClass = ({ isActive }: { isActive: boolean }) => `${styles.item} ${isActive ? styles.active : ''}`
 
 // G-5 のサイドバー（画面設計書 2.8）。
-// 「メンション」と件数の丸は通知（開発計画書 1-15）、「ダイレクトメッセージ」は DM（1-9）で足す
-export default function Sidebar({ workspace, conversations, onSelect, onCreateChannel }: Props) {
+// 「メンション」と件数の丸は通知（開発計画書 1-15）で足す
+export default function Sidebar({ workspace, conversations, onSelect, onCreateChannel, onStartDm }: Props) {
   const channels = conversations.filter((c) => c.type === 'CHANNEL')
+  const dms = conversations.filter((c) => c.type === 'DM')
   // 「招待リンクの管理」はオーナーにだけ出す（MB-1・I-1・I-9）
   const menu = [
     { label: 'メンバー', to: membersUrl(workspace.id) },
@@ -54,6 +58,25 @@ export default function Sidebar({ workspace, conversations, onSelect, onCreateCh
               className={({ isActive }) => `${itemClass({ isActive })} ${c.hasUnread ? styles.unread : ''}`}>
               <span aria-hidden="true" className={styles.mark}>{c.visibility === 'PRIVATE' ? '🔒' : '#'}</span>
               <span className={styles.name}>{c.name}</span>
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+      <div className={styles.sectionHead}>
+        <h2 className={styles.section}>ダイレクトメッセージ</h2>
+        <button type="button" className={styles.add} aria-label="ダイレクトメッセージを始める"
+          title="ダイレクトメッセージを始める" onClick={onStartDm}>＋</button>
+      </div>
+      <ul className={styles.list}>
+        {dms.map((c) => c.dmPartner && (
+          <li key={c.id}>
+            {/* 相手のアバター・表示名・ステータスの絵文字（2.8） */}
+            <NavLink to={dmUrl(workspace.id, c.id)} onClick={onSelect}
+              className={({ isActive }) => `${itemClass({ isActive })} ${c.hasUnread ? styles.unread : ''}`}>
+              <Avatar displayName={c.dmPartner.displayName} size={32} />
+              <span className={styles.name}>
+                {c.dmPartner.displayName}{c.dmPartner.statusEmoji ? ` ${c.dmPartner.statusEmoji}` : ''}
+              </span>
             </NavLink>
           </li>
         ))}

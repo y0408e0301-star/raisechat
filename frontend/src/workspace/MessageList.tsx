@@ -1,5 +1,6 @@
 import { Fragment, useLayoutEffect, useRef, useState } from 'react'
 import type { ConversationDetail, MessageView } from '../api'
+import Avatar from '../components/Avatar'
 import ui from '../components/ui.module.css'
 import { dayKey, formatDayDivider } from '../dates'
 import { entryKey, type Entry } from './entries'
@@ -105,16 +106,27 @@ export default function MessageList({ conversation, entries, hasMoreBefore, load
     <div className={styles.wrap}>
       <div ref={list} className={styles.list} onScroll={handleScroll}>
         {loadingOlder && <p className={styles.loading}>読み込み中…</p>}
-        {!hasMoreBefore && (
-          // 会話の始まり（MS-2）
-          <div className={styles.start}>
-            <h2 className={styles.startTitle}>
-              <span aria-hidden="true">{conversation.visibility === 'PRIVATE' ? '🔒 ' : '# '}</span>{conversation.name}
-            </h2>
-            <p className={styles.startText}>このチャンネルはここから始まります。</p>
-            {conversation.description && <p className={styles.startText}>{conversation.description}</p>}
-          </div>
-        )}
+        {!hasMoreBefore && (conversation.dmPartner
+          ? (
+            // 会話の始まり（DM。相手のアバター・表示名。画面設計書 2.9）
+            <div className={styles.start}>
+              <Avatar displayName={conversation.dmPartner.displayName} size={96} />
+              <h2 className={styles.startTitle}>{conversation.dmPartner.displayName}</h2>
+              <p className={styles.startText}>
+                {conversation.dmPartner.displayName}さんとのダイレクトメッセージはここから始まります。
+              </p>
+            </div>
+          )
+          : (
+            // 会話の始まり（MS-2）
+            <div className={styles.start}>
+              <h2 className={styles.startTitle}>
+                <span aria-hidden="true">{conversation.visibility === 'PRIVATE' ? '🔒 ' : '# '}</span>{conversation.name}
+              </h2>
+              <p className={styles.startText}>このチャンネルはここから始まります。</p>
+              {conversation.description && <p className={styles.startText}>{conversation.description}</p>}
+            </div>
+          ))}
         {entries.map((entry, i) => {
           const prev = entries[i - 1]
           const createdAt = info(entry).createdAt

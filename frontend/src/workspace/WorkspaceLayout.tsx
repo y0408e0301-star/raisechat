@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, Outlet, useNavigate, useParams } from 'react-router'
 import {
-  ApiError, conversationUrl, fetchConversations, fetchWorkspace, type ConversationSummary, type WorkspaceDetail,
+  ApiError, conversationUrl, dmUrl, fetchConversations, fetchWorkspace, type ConversationSummary, type WorkspaceDetail,
 } from '../api'
 import AppHeader from '../components/AppHeader'
 import { useToast } from '../components/ToastContext'
@@ -11,6 +11,7 @@ import type { RealtimeEvent } from '../realtime/events'
 import { useRealtime } from '../realtime/RealtimeContext'
 import CreateChannelDialog from './CreateChannelDialog'
 import Sidebar from './Sidebar'
+import StartDmDialog from './StartDmDialog'
 import { removeConversation, upsertConversation } from './sidebarList'
 import type { WorkspaceContext } from './WorkspaceContext'
 import styles from './WorkspaceLayout.module.css'
@@ -32,6 +33,7 @@ function WorkspaceView({ workspaceId }: { workspaceId: number }) {
   // 画面の横幅が 600px 未満のとき、サイドバーと会話のどちらを出すか（画面設計書 2.19）
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [startingDm, setStartingDm] = useState(false)
   const { onReconnect, subscribeUser } = useRealtime()
   const navigate = useNavigate()
 
@@ -135,7 +137,8 @@ function WorkspaceView({ workspaceId }: { workspaceId: number }) {
       <AppHeader workspace={loaded.workspace} />
       <div className={`${styles.body} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
         <Sidebar workspace={loaded.workspace} conversations={loaded.conversations}
-          onSelect={() => setSidebarOpen(false)} onCreateChannel={() => setCreating(true)} />
+          onSelect={() => setSidebarOpen(false)} onCreateChannel={() => setCreating(true)}
+          onStartDm={() => setStartingDm(true)} />
         <main className={styles.main}>
           <Outlet context={context} />
         </main>
@@ -148,6 +151,16 @@ function WorkspaceView({ workspaceId }: { workspaceId: number }) {
             context.upsertConversation(created)
             setSidebarOpen(false)
             navigate(conversationUrl(workspaceId, created.id))
+          }} />
+      )}
+      {startingDm && (
+        // G-15。選んだ人との DM をサイドバーに足し、G-5 で開く（DM-2）
+        <StartDmDialog workspaceId={workspaceId} onClose={() => setStartingDm(false)}
+          onStarted={(dm) => {
+            setStartingDm(false)
+            context.upsertConversation(dm)
+            setSidebarOpen(false)
+            navigate(dmUrl(workspaceId, dm.id))
           }} />
       )}
     </div>

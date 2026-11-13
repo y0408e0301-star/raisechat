@@ -13,7 +13,11 @@ record ConversationDetail(long id, long workspaceId, Conversation.Type type, @Nu
 		long memberCount, UserSummary createdBy, Instant createdAt) {
 
 	static ConversationDetail of(Conversation c, boolean joined, long memberCount, UserSummary createdBy) {
-		ConversationSummary s = ConversationSummary.of(c, joined);
+		return of(ConversationSummary.of(c, joined), c, memberCount, createdBy);
+	}
+
+	// DM（FN-12）など、サイドバーの行を先に作ったもの
+	static ConversationDetail of(ConversationSummary s, Conversation c, long memberCount, UserSummary createdBy) {
 		return new ConversationDetail(s.id(), s.workspaceId(), s.type(), s.name(), s.visibility(), s.general(),
 				s.dmPartner(), s.joined(), s.hasUnread(), s.unreadCount(), s.mentionCount(), s.canPost(),
 				c.getDescription(), memberCount, createdBy, c.getCreatedAt());

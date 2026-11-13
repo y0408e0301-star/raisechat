@@ -421,13 +421,16 @@ class WebSocketApiTests {
 		Cookie jiro = signup(this.mvc, "jiro");
 		long jiroId = userId(this.jdbc, "jiro");
 		long taroId = userId(this.jdbc, "taro_y");
-		// 前に入っていて抜けた人の DM（1-9 の DM・1-8 の退出はまだないので SQL で作る。BR-6）
+		// 前に入っていて抜けた人の DM（抜けても DM の会話のメンバーの行は残る。BR-6）
 		Long dm = this.jdbc.queryForObject(
 				"INSERT INTO conversations (workspace_id, type, dm_user_low, dm_user_high, "
 						+ "created_by) VALUES (?, 'DM', ?, ?, ?) RETURNING id",
 				Long.class, this.workspace, Math.min(taroId, jiroId), Math.max(taroId, jiroId), taroId);
 		this.jdbc.update("INSERT INTO conversation_members (conversation_id, user_id, last_read_message_id) "
 				+ "VALUES (?, ?, 0), (?, ?, 0)", dm, taroId, dm, jiroId);
+		// メッセージのない DM は作った人のサイドバーにだけ出る（FN-12 5 章の 4）ので、やり取りがあったことにする
+		this.jdbc.update("INSERT INTO messages (conversation_id, user_id, client_id, body) VALUES (?, ?, ?, 'まえの話')",
+				dm, taroId, UUID.randomUUID());
 		MvcTestResult invite = post(this.mvc, this.taro, "/api/workspaces/%d/invites".formatted(this.workspace), "{}");
 		String url = JSON.readTree(invite.getResponse().getContentAsString(StandardCharsets.UTF_8))
 			.path("url")
@@ -451,6 +454,60 @@ class WebSocketApiTests {
 		assertThat(second.path("conversationId").asLong()).isEqualTo(dm);
 		assertThat(second.path("payload").path("type").asString()).isEqualTo("DM");
 		assertThat(hanakoClient.nothingWithin(500)).isTrue();
+	}
+
+	@Test
+	void DMのメッセージで2人にconversation_updatedが届き_相手がキックされると送れなくなったことが届く() throws Exception {
+		MvcTestResult started = post(this.mvc, this.taro, "/api/workspaces/%d/dms".formatted(this.workspace),
+				"{\"username\":\"hanako\"}");
+		long dm = readLong(started, "$.id");
+		Cookie jiro = signup(this.mvc, "jiro");
+		join(this.jdbc, this.workspace, "jiro");
+		StompTestClient taroClient = connect(this.taro);
+		StompTestClient hanakoClient = connect(this.hanako);
+		StompTestClient jiroClient = connect(jiro);
+		taroClient.subscribe(WebSocketSecurityConfig.USER_EVENTS);
+		hanakoClient.subscribe(WebSocketSecurityConfig.USER_EVENTS);
+		jiroClient.subscribe(WebSocketSecurityConfig.USER_EVENTS);
+		awaitSubscribers(WebSocketSecurityConfig.USER_EVENTS, 3);
+
+		assertThat(post(this.mvc, this.taro, "/api/conversations/%d/messages".formatted(dm),
+				"{\"body\":\"はじめまして\",\"clientId\":\"%s\"}".formatted(UUID.randomUUID())))
+			.hasStatus(HttpStatus.CREATED);
+
+		JsonNode toHanako = JSON.readTree(hanakoClient.next());
+		assertThat(toHanako.path("type").asString()).isEqualTo("conversation.updated");
+		assertThat(toHanako.path("conversationId").asLong()).isEqualTo(dm);
+		assertThat(toHanako.path("payload").path("dmPartner").path("username").asString()).isEqualTo("taro_y");
+		assertThat(toHanako.path("payload").path("canPost").asBoolean()).isTrue();
+		assertThat(JSON.readTree(taroClient.next()).path("payload").path("dmPartner").path("username").asString())
+			.isEqualTo("hanako");
+		// ほかの人には届かない
+		assertThat(jiroClient.nothingWithin(500)).isTrue();
+
+		assertThat(delete(this.mvc, this.taro, "/api/workspaces/%d/members/hanako".formatted(this.workspace)))
+			.hasStatus(HttpStatus.NO_CONTENT);
+
+		JsonNode toTaro = JSON.readTree(taroClient.next());
+		assertThat(toTaro.path("type").asString()).isEqualTo("conversation.updated");
+		assertThat(toTaro.path("conversationId").asLong()).isEqualTo(dm);
+		assertThat(toTaro.path("payload").path("canPost").asBoolean()).isFalse();
+		assertThat(JSON.readTree(hanakoClient.next()).path("type").asString()).isEqualTo("workspace.removed");
+
+		// 招待リンクでまた参加すると、相手にまた送れるようになったことが届く（FN-05 MB-8）
+		String url = JSON
+			.readTree(post(this.mvc, this.taro, "/api/workspaces/%d/invites".formatted(this.workspace), "{}")
+				.getResponse()
+				.getContentAsString(StandardCharsets.UTF_8))
+			.path("url")
+			.asString();
+		assertThat(post(this.mvc, this.hanako,
+				"/api/invites/%s/accept".formatted(url.substring(url.lastIndexOf('/') + 1)), "{}"))
+			.hasStatusOk();
+		JsonNode back = JSON.readTree(taroClient.next());
+		assertThat(back.path("type").asString()).isEqualTo("conversation.updated");
+		assertThat(back.path("conversationId").asLong()).isEqualTo(dm);
+		assertThat(back.path("payload").path("canPost").asBoolean()).isTrue();
 	}
 
 	// ---------------------------------------------------------------- 購読の取り消し（4.5）

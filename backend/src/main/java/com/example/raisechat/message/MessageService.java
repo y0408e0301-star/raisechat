@@ -25,6 +25,7 @@ import com.example.raisechat.conversation.Conversation;
 import com.example.raisechat.conversation.ConversationMember;
 import com.example.raisechat.conversation.ConversationMemberRepository;
 import com.example.raisechat.conversation.ConversationRepository;
+import com.example.raisechat.conversation.DirectMessages;
 import com.example.raisechat.realtime.RealtimeEvent;
 import com.example.raisechat.realtime.RealtimeNotifier;
 import com.example.raisechat.user.User;
@@ -61,9 +62,11 @@ class MessageService {
 
 	private final RealtimeNotifier notifier;
 
+	private final DirectMessages directMessages;
+
 	MessageService(MessageRepository messages, ConversationRepository conversations,
 			ConversationMemberRepository conversationMembers, WorkspaceAccess workspaceAccess, UserRepository users,
-			Clock clock, TransactionTemplate transaction, RealtimeNotifier notifier) {
+			Clock clock, TransactionTemplate transaction, RealtimeNotifier notifier, DirectMessages directMessages) {
 		this.messages = messages;
 		this.conversations = conversations;
 		this.conversationMembers = conversationMembers;
@@ -72,6 +75,7 @@ class MessageService {
 		this.clock = clock;
 		this.transaction = transaction;
 		this.notifier = notifier;
+		this.directMessages = directMessages;
 	}
 
 	// 会話のメッセージの一覧（MS-1・MS-2）。before・after のどちらか、またはなし（最新）。古い順に返す
@@ -141,6 +145,9 @@ class MessageService {
 			.saveAndFlush(new Message(conversationId, me, clientId, body, this.clock.instant()));
 		MessageView view = view(me, conversation, message);
 		notify(RealtimeEvent.Type.MESSAGE_CREATED, conversation, view.forEveryone());
+		if (conversation.getType() == Conversation.Type.DM) {
+			this.directMessages.messageSent(conversation);
+		}
 		return view;
 	}
 
@@ -211,17 +218,24 @@ class MessageService {
 	}
 
 	// 送れるか（ConversationSummary の canPost）。チャンネルはメンバーのときだけ。
-	// DM の相手がワークスペースを抜けたときの確かめ（DM_PARTNER_LEFT）は DM（開発計画書 1-9）で足す
+	// DM は相手がいまワークスペースのメンバーのときだけ（FN-12 DM-6）
 	private void requireCanPost(long me, Conversation conversation) {
-		if (conversation.getType() == Conversation.Type.CHANNEL
-				&& !this.conversationMembers.existsById(new ConversationMember.Key(conversation.getId(), me))) {
+		if (conversation.getType() == Conversation.Type.DM) {
+			if (!this.directMessages.canPost(conversation, me)) {
+				throw new ApiException(ErrorCode.DM_PARTNER_LEFT);
+			}
+			return;
+		}
+		if (!this.conversationMembers.existsById(new ConversationMember.Key(conversation.getId(), me))) {
 			throw new ApiException(ErrorCode.NOT_CHANNEL_MEMBER);
 		}
 	}
 
+	// ほかの人のメッセージを削除できるオーナーか。DM ではオーナーでも削除できない（オーナーは DM を見られない。FN-12 5 章の 6）
 	private boolean isOwner(long me, Conversation conversation) {
-		return this.workspaceAccess.requireMember(me, conversation.getWorkspaceId())
-			.getRole() == WorkspaceMember.Role.OWNER;
+		return conversation.getType() == Conversation.Type.CHANNEL
+				&& this.workspaceAccess.requireMember(me, conversation.getWorkspaceId())
+					.getRole() == WorkspaceMember.Role.OWNER;
 	}
 
 	private MessageView view(long me, Conversation conversation, Message message) {

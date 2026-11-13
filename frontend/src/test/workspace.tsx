@@ -46,6 +46,7 @@ export function renderAt(path: string) {
               <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
                 <Route index element={<WorkspaceHome />} />
                 <Route path="c/:conversationId" element={<ConversationPage />} />
+                <Route path="d/:conversationId" element={<ConversationPage />} />
                 <Route path="channels" element={<ChannelsPage />} />
                 <Route path="members" element={<MembersPage />} />
                 <Route path="invites" element={<InvitesPage />} />

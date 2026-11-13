@@ -58,6 +58,9 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 			""")
 	boolean isParentInConversation(@Param("id") long id, @Param("conversationId") long conversationId);
 
+	// メッセージのない DM は、作った人のサイドバーにだけ出す（FN-12 5 章の 4）
+	boolean existsByConversationId(long conversationId);
+
 	// 会話のいちばん新しいメッセージ（スレッドの返信を含む）の ID。なければ 0。
 	// 参加・招待したときの最後に読んだメッセージにする（参加前のメッセージを未読にしない。FN-06 5 章の 2）
 	@Query("select coalesce(max(m.id), 0) from Message m where m.conversationId = :conversationId")

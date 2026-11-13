@@ -1,9 +1,11 @@
 package com.example.raisechat.conversation;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -62,6 +64,37 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 	// ワークスペースのすべての会話の ID。キック・退出・削除で、その人の購読を取り消すのに使う（機能定義書 4.5）
 	@Query("select c.id from Conversation c where c.workspaceId = :workspaceId")
 	List<Long> findIdsByWorkspaceId(@Param("workspaceId") long workspaceId);
+
+	// サイドバーの DM（DM-1）：作った人か、メッセージのあるもの（5 章の 4）。
+	// 最後の親メッセージの日時の新しい順、メッセージがなければ作った日時（5 章の 5）
+	@Query(value = """
+			SELECT c.* FROM conversations c
+			JOIN conversation_members cm ON cm.conversation_id = c.id AND cm.user_id = :me
+			WHERE c.workspace_id = :workspaceId AND c.type = 'DM'
+			  AND (c.created_by = :me OR EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id))
+			ORDER BY COALESCE((SELECT max(m.created_at) FROM messages m
+			                   WHERE m.conversation_id = c.id AND m.parent_id IS NULL), c.created_at) DESC, c.id DESC
+			""", nativeQuery = true)
+	List<Conversation> findSidebarDms(@Param("me") long me, @Param("workspaceId") long workspaceId);
+
+	// 同じ 2 人の DM（5 章の 1）
+	@Query("""
+			select c from Conversation c
+			where c.workspaceId = :workspaceId and c.type = com.example.raisechat.conversation.Conversation.Type.DM
+			  and c.dmUserLow = :low and c.dmUserHigh = :high
+			""")
+	Optional<Conversation> findDm(@Param("workspaceId") long workspaceId, @Param("low") long low,
+			@Param("high") long high);
+
+	// DM を作る。同じ 2 人の DM が同時に作られても 1 つにする（一意の索引 conversations_dm_key）。作ったら 1 を返す
+	@Modifying
+	@Query(value = """
+			INSERT INTO conversations (workspace_id, type, dm_user_low, dm_user_high, created_by, created_at)
+			VALUES (:workspaceId, 'DM', :low, :high, :createdBy, :now)
+			ON CONFLICT (workspace_id, dm_user_low, dm_user_high) WHERE type = 'DM' DO NOTHING
+			""", nativeQuery = true)
+	int insertDmIfAbsent(@Param("workspaceId") long workspaceId, @Param("low") long low, @Param("high") long high,
+			@Param("createdBy") long createdBy, @Param("now") Instant now);
 
 	// 自分が入っている DM。キック・退出しても行は残るので、招待リンクでまた参加したときに戻す（BR-6、FN-05 MB-7）
 	@Query("""

@@ -24,6 +24,7 @@ import com.example.raisechat.conversation.Conversation;
 import com.example.raisechat.conversation.ConversationMember;
 import com.example.raisechat.conversation.ConversationMemberRepository;
 import com.example.raisechat.conversation.ConversationRepository;
+import com.example.raisechat.conversation.DirectMessages;
 import com.example.raisechat.realtime.RealtimeNotifier;
 import com.example.raisechat.user.UserRepository;
 import com.example.raisechat.workspace.WorkspaceAccess;
@@ -57,13 +58,16 @@ class MessageServiceTests {
 	@Mock
 	RealtimeNotifier notifier;
 
+	@Mock
+	DirectMessages directMessages;
+
 	private MessageService service;
 
 	@BeforeEach
 	void setUp() {
 		this.service = new MessageService(this.messages, this.conversations, this.conversationMembers,
 				this.workspaceAccess, this.users, TestEntities.fixedClock(), TestEntities.immediateTransaction(),
-				this.notifier);
+				this.notifier, this.directMessages);
 		when(this.conversations.findVisible(TARO, CONVERSATION)).thenReturn(
 				Optional.of(TestEntities.withId(Conversation.general(3, TARO, TestEntities.NOW), CONVERSATION)));
 		when(this.conversationMembers.existsById(new ConversationMember.Key(CONVERSATION, TARO))).thenReturn(true);
