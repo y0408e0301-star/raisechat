@@ -114,7 +114,7 @@ describe('G-11 招待リンクの管理画面（I-1〜I-3、TC-04-1）', () => {
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('button', { name: '取り消す' }))
-    const dialog = screen.getByRole('dialog', { name: '招待リンクを取り消す' })
+    const dialog = screen.getByRole('dialog', { name: '招待リンクの取り消し' })
     expect(dialog).toHaveTextContent(M[17])
     await user.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()

@@ -11,11 +11,12 @@ import WorkspacesPage from './pages/WorkspacesPage'
 import ChannelsPage from './workspace/ChannelsPage'
 import ConversationPage from './workspace/ConversationPage'
 import InvitesPage from './workspace/InvitesPage'
+import MembersPage from './workspace/MembersPage'
 import WorkspaceHome from './workspace/WorkspaceHome'
 import WorkspaceLayout from './workspace/WorkspaceLayout'
 
 // 画面と URL（画面一覧 1 章）。BrowserRouter（テストでは MemoryRouter）の中で使う。
-// G-6・G-7・G-9・G-10・G-5 の DM（/w/{ws}/d/{dm}）は、それぞれの機能を作るときに足す（開発計画書 3 章）
+// G-6・G-7・G-10・G-5 の DM（/w/{ws}/d/{dm}）は、それぞれの機能を作るときに足す（開発計画書 3 章）
 export default function App() {
   return (
     <AuthProvider>
@@ -39,6 +40,7 @@ export default function App() {
                 <Route index element={<WorkspaceHome />} />
                 <Route path="c/:conversationId" element={<ConversationPage />} />
                 <Route path="channels" element={<ChannelsPage />} />
+                <Route path="members" element={<MembersPage />} />
                 <Route path="invites" element={<InvitesPage />} />
               </Route>
               {/* ない画面は G-3 に移す。RequireAuth の中に置き、ログインしていないときは開こうとした URL を G-1 に渡す */}

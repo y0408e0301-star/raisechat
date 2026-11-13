@@ -20,6 +20,8 @@ export type ChannelPage = Schemas['ChannelPage']
 export type MemberPage = Schemas['MemberPage']
 export type Visibility = ChannelListItem['visibility']
 export type InviteView = Schemas['InviteView']
+export type MemberView = Schemas['MemberView']
+export type WorkspaceMemberPage = Schemas['WorkspaceMemberPage']
 export type InvitePage = Schemas['InvitePage']
 export type InvitePreview = Schemas['InvitePreview']
 
@@ -193,6 +195,26 @@ export function fetchWorkspace(workspaceId: number): Promise<WorkspaceDetail> {
   return requestJson<WorkspaceDetail>('GET', `/api/workspaces/${workspaceId}`)
 }
 
+// オーナーだけ。confirmName はワークスペースの名前と同じ文字（W-6）
+export async function deleteWorkspace(workspaceId: number, confirmName: string): Promise<void> {
+  await request('DELETE', `/api/workspaces/${workspaceId}`, { confirmName } satisfies Schemas['DeleteWorkspaceRequest'])
+}
+
+// ---------------------------------------------------------------- FN-05 メンバー管理
+
+// G-9 のメンバーの一覧（オーナーが先頭、表示名の順に 50 人ずつ）
+export function fetchMembers(workspaceId: number, q: string, cursor?: string | null): Promise<WorkspaceMemberPage> {
+  return requestJson<WorkspaceMemberPage>('GET', `/api/workspaces/${workspaceId}/members${queryString({ q, cursor })}`)
+}
+
+export async function kickMember(workspaceId: number, username: string): Promise<void> {
+  await request('DELETE', `/api/workspaces/${workspaceId}/members/${encodeURIComponent(username)}`)
+}
+
+export async function leaveWorkspace(workspaceId: number): Promise<void> {
+  await request('POST', `/api/workspaces/${workspaceId}/leave`)
+}
+
 // ---------------------------------------------------------------- FN-04 招待
 
 // G-11 の招待リンクの一覧（オーナーだけ。作った新しい順に 50 件ずつ）
@@ -316,5 +338,7 @@ export const conversationUrl = (workspaceId: number, conversationId: number) =>
   `/w/${workspaceId}/c/${conversationId}`
 // G-8 チャンネル一覧画面
 export const channelsUrl = (workspaceId: number) => `/w/${workspaceId}/channels`
+// G-9 メンバー一覧画面
+export const membersUrl = (workspaceId: number) => `/w/${workspaceId}/members`
 // G-11 招待リンクの管理画面
 export const invitesUrl = (workspaceId: number) => `/w/${workspaceId}/invites`

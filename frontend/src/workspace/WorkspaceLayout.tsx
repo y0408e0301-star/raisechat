@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, Outlet, useNavigate, useParams } from 'react-router'
 import {
   ApiError, conversationUrl, fetchConversations, fetchWorkspace, type ConversationSummary, type WorkspaceDetail,
@@ -6,7 +6,7 @@ import {
 import AppHeader from '../components/AppHeader'
 import { useToast } from '../components/ToastContext'
 import ui from '../components/ui.module.css'
-import { M } from '../messages'
+import { M, M15, M22 } from '../messages'
 import type { RealtimeEvent } from '../realtime/events'
 import { useRealtime } from '../realtime/RealtimeContext'
 import CreateChannelDialog from './CreateChannelDialog'
@@ -27,8 +27,8 @@ type Loaded = { workspace: WorkspaceDetail, conversations: ConversationSummary[]
 
 function WorkspaceView({ workspaceId }: { workspaceId: number }) {
   const toast = useToast()
-  // undefined：読み込み中、'failed'：読み込みに失敗、'notFound'：入っていない・存在しない
-  const [loaded, setLoaded] = useState<Loaded | 'failed' | 'notFound' | undefined>(undefined)
+  // undefined：読み込み中、'failed'：読み込みに失敗、'notFound'：入っていない・存在しない、'removed'：開いている間に外れた
+  const [loaded, setLoaded] = useState<Loaded | 'failed' | 'notFound' | 'removed' | undefined>(undefined)
   // 画面の横幅が 600px 未満のとき、サイドバーと会話のどちらを出すか（画面設計書 2.19）
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -74,26 +74,41 @@ function WorkspaceView({ workspaceId }: { workspaceId: number }) {
     }
   }), [onReconnect, workspaceId, toast])
 
+  // 自分がオーナーか（通知の受け取りで使う。effect の付け直しをしないよう ref に持つ）
+  const owner = useRef(false)
+  useEffect(() => {
+    if (typeof loaded === 'object') owner.current = loaded.workspace.role === 'OWNER'
+  }, [loaded])
+
   const changeConversations = useCallback((change: (list: ConversationSummary[]) => ConversationSummary[]) => {
     setLoaded((current) => (typeof current === 'object' ? { ...current, conversations: change(current.conversations) } : current))
   }, [])
 
-  // ほかのワークスペースの通知は、そのワークスペースを開いたときに読み直すので無視する
+  // ほかのワークスペースの通知は、そのワークスペースを開いたときに読み直すので無視する。
+  // このワークスペースから外れたら G-3 に移す。キックされたら M-22、削除されたら M-15 を出す（MB-4・W-7）。
+  // 削除したオーナー・退出した本人は自分の操作なので出さない
   useEffect(() => subscribeUser((event: RealtimeEvent) => {
     if (event.workspaceId !== workspaceId) return
+    if (event.type === 'workspace.removed') {
+      const { name, reason } = event.payload
+      if (reason === 'KICKED') toast(M22(name))
+      if (reason === 'DELETED' && !owner.current) toast(M15(name))
+      setLoaded('removed')
+      return
+    }
     if (event.type === 'conversation.updated') changeConversations((list) => upsertConversation(list, event.payload))
     if (event.type === 'conversation.removed') {
       const removedId = event.payload.conversationId
       changeConversations((list) => removeConversation(list, removedId))
     }
-  }), [subscribeUser, workspaceId, changeConversations])
+  }), [subscribeUser, workspaceId, changeConversations, toast])
 
   async function reload() {
     setLoaded(undefined)
     setLoaded(await load())
   }
 
-  if (loaded === 'notFound') return <Navigate to="/" replace />
+  if (loaded === 'notFound' || loaded === 'removed') return <Navigate to="/" replace />
   if (loaded === undefined || loaded === 'failed') {
     return (
       <>

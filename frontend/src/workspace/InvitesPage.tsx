@@ -180,7 +180,7 @@ function OwnerInvites({ workspaceId }: { workspaceId: number }) {
         {loadingMore && <p className={styles.loading}>読み込み中…</p>}
       </div>
       {revoking && (
-        <ConfirmDialog title="招待リンクを取り消す" message={M[17]} action="取り消す" busy="取り消し中…"
+        <ConfirmDialog title="招待リンクの取り消し" message={M[17]} action="取り消す" busy="取り消し中…"
           onConfirm={() => revoke(revoking)} onClose={() => setRevoking(null)} />
       )}
     </div>

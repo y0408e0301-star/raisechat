@@ -1,5 +1,7 @@
 import { NavLink } from 'react-router'
-import { channelsUrl, conversationUrl, invitesUrl, type ConversationSummary, type WorkspaceDetail } from '../api'
+import {
+  channelsUrl, conversationUrl, invitesUrl, membersUrl, type ConversationSummary, type WorkspaceDetail,
+} from '../api'
 import Menu from '../components/Menu'
 import styles from './Sidebar.module.css'
 
@@ -15,12 +17,12 @@ type Props = {
 const itemClass = ({ isActive }: { isActive: boolean }) => `${styles.item} ${isActive ? styles.active : ''}`
 
 // G-5 のサイドバー（画面設計書 2.8）。
-// 「メンション」と件数の丸は通知（開発計画書 1-15）、「ダイレクトメッセージ」は DM（1-9）、
-// メニューの「メンバー」は 1-8 で足す
+// 「メンション」と件数の丸は通知（開発計画書 1-15）、「ダイレクトメッセージ」は DM（1-9）で足す
 export default function Sidebar({ workspace, conversations, onSelect, onCreateChannel }: Props) {
   const channels = conversations.filter((c) => c.type === 'CHANNEL')
-  // 「招待リンクの管理」はオーナーにだけ出す（I-1・I-9）
+  // 「招待リンクの管理」はオーナーにだけ出す（MB-1・I-1・I-9）
   const menu = [
+    { label: 'メンバー', to: membersUrl(workspace.id) },
     ...(workspace.role === 'OWNER' ? [{ label: '招待リンクの管理', to: invitesUrl(workspace.id) }] : []),
     { label: 'ワークスペースの一覧', to: '/' },
   ]
