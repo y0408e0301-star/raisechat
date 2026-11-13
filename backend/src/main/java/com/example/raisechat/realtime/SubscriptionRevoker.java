@@ -2,6 +2,9 @@ package com.example.raisechat.realtime;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,31 +60,34 @@ public class SubscriptionRevoker {
 
 	// ワークスペースから外れたときなど、いくつもの会話をまとめて取り消す
 	public void revoke(long userId, Collection<Long> conversationIds) {
-		List<Long> ids = List.copyOf(conversationIds);
+		// 購読先（/topic/conversations/{id}）から会話の ID を引けるようにしておき、その人の購読を 1 回だけ見て回る
+		Map<String, Long> destinations = conversationIds.stream()
+			.distinct()
+			.collect(Collectors.toUnmodifiableMap((id) -> "/topic/conversations/" + id, Function.identity()));
 		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-			ids.forEach((id) -> revokeNow(userId, id));
+			revokeNow(userId, destinations);
 			return;
 		}
 		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
 
 			@Override
 			public void afterCommit() {
-				ids.forEach((id) -> revokeNow(userId, id));
+				revokeNow(userId, destinations);
 			}
 
 		});
 	}
 
-	private void revokeNow(long userId, long conversationId) {
+	private void revokeNow(long userId, Map<String, Long> destinations) {
 		try {
 			SimpUser user = this.users.getUser(String.valueOf(userId));
 			if (user == null) {
 				return;
 			}
-			String destination = "/topic/conversations/" + conversationId;
 			for (SimpSession session : user.getSessions()) {
 				for (SimpSubscription subscription : session.getSubscriptions()) {
-					if (destination.equals(subscription.getDestination())) {
+					Long conversationId = destinations.get(subscription.getDestination());
+					if (conversationId != null) {
 						unsubscribe(session.getId(), subscription.getId());
 						log.atInfo()
 							.addKeyValue("event.action", "websocket-subscription-revoked")
@@ -96,7 +102,8 @@ public class SubscriptionRevoker {
 		catch (RuntimeException ex) {
 			log.atWarn()
 				.addKeyValue(WebSocketSessions.USER_ID, String.valueOf(userId))
-				.addKeyValue("conversation.id", String.valueOf(conversationId))
+				.addKeyValue("conversation.id",
+						destinations.values().stream().map(String::valueOf).collect(Collectors.joining(",")))
 				.setCause(ex)
 				.log("WebSocket の購読を取り消せなかったので、接続をすべて切る");
 			this.sessions.closeAll(userId, ACCESS_REVOKED);

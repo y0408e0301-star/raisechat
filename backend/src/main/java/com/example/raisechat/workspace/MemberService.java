@@ -119,7 +119,9 @@ class MemberService {
 	}
 
 	// ワークスペースのメンバーとチャンネルから外す（DM の行は残す。5 章の 3）。
-	// 同時のキック・退出で、もういなければ何もしない（キックしようとした人がもういないのと同じ 404）
+	// 同時のキック・退出で、もういなければ何もしない（キックしようとした人がもういないのと同じ 404）。
+	// ワークスペースの行はロックしない。同時に削除されたときは、削除の ON DELETE CASCADE が先にメンバーを消すので、
+	// ここでは消す行がなくて 404 になる（削除の側が workspace.removed（DELETED）を送る）
 	private void remove(long workspaceId, long userId, RealtimeEvent.WorkspaceRemovedReason reason) {
 		if (this.members.deleteMember(workspaceId, userId) == 0) {
 			throw new ApiException(ErrorCode.USER_NOT_FOUND);
