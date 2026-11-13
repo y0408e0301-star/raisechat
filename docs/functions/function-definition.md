@@ -3,7 +3,7 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-FD |
-| 版数 | 0.8 |
+| 版数 | 0.9 |
 | 作成日 | 2026-11-10 |
 | 最終更新日 | 2026-11-13 |
 | 作成者 | （氏名） |
@@ -22,6 +22,7 @@
 | 0.6 | 2026-11-13 | FN-06 を 0.2 にした（招待の候補の API、もう一度の参加・退出、DM へのチャンネルの操作） | （氏名） |
 | 0.7 | 2026-11-13 | FN-04 を 0.2 にした（中身を見る API はログインしていればその人として扱う、一覧のカーソル、取り消しをもう一度送ったとき、参加したときの通知）。3.2 のログインがいらない API に、Cookie があるときの扱いを書き足した | （氏名） |
 | 0.8 | 2026-11-13 | FN-03 を 0.2、FN-05 を 0.2 にした（ワークスペースの削除とメンバー管理を作るときに決めたこと） | （氏名） |
+| 0.9 | 2026-11-13 | FN-12 を 0.2 にした（DM の通知と入力の誤り）。4.3 の conversation.updated を送るときに、DM のメッセージと相手が抜けた・戻ったときを足した | （氏名） |
 
 ## 承認
 
@@ -289,7 +290,7 @@ statusEmoji・statusText は、ステータスがないか、消す日時を過�
 | message.updated | 会話 | MessageView | 編集した、親メッセージの返信の件数が変わった、親メッセージを削除して「削除されました」にした | FN-07、FN-08 |
 | message.deleted | 会話 | `{"id","parentId"}` | メッセージ・返信をデータごと消した | FN-07、FN-08 |
 | reaction.updated | 会話 | `{"messageId","reactions"}`（reactions は MessageView と同じ形。reactedByMe は受け取った画面で直す） | リアクションを付けた・外した | FN-10 |
-| conversation.updated | 本人 | ConversationSummary | 未読・メンションの件数が変わった、会話に参加した・招待された、DM が始まった | FN-06、FN-12、FN-14 |
+| conversation.updated | 本人 | ConversationSummary | 未読・メンションの件数が変わった、会話に参加した・招待された、DM にメッセージが送られた、DM の相手がワークスペースを抜けた・戻った（canPost） | FN-05、FN-06、FN-12、FN-14 |
 | conversation.removed | 本人 | `{"conversationId","reason"}`（reason は LEFT・DELETED） | 会話から抜けた、チャンネルが削除された | FN-06 |
 | workspace.updated | 本人 | `{"workspaceId","hasUnread","mentionCount"}` | 自分のワークスペースの未読・メンションの有無が変わった（G-3 の印） | FN-14 |
 | workspace.removed | 本人 | `{"workspaceId","name","reason"}`（reason は KICKED・LEFT・DELETED） | キックされた、退出した、ワークスペースが削除された | FN-03、FN-05 |
