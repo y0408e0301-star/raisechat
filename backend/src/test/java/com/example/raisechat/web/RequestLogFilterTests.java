@@ -101,6 +101,17 @@ class RequestLogFilterTests {
 	}
 
 	@Test
+	void 招待の文字列はログに出さない() throws Exception {
+		String token = "a".repeat(43);
+		filter(Duration.ZERO).doFilter(request("POST", "/api/invites/" + token + "/accept"),
+				new MockHttpServletResponse(), new MockFilterChain());
+
+		ILoggingEvent event = onlyEvent();
+		assertThat(pairs(event)).containsEntry("url.path", "/api/invites/***/accept");
+		assertThat(event.getFormattedMessage()).doesNotContain(token);
+	}
+
+	@Test
 	void 失敗した4xxはINFOのまま出す() throws Exception {
 		filter(Duration.ofSeconds(1)).doFilter(request("GET", "/api/reviews/1"), new MockHttpServletResponse(),
 				respondWith(HttpServletResponse.SC_NOT_FOUND));
