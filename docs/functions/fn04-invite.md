@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-FD-04 |
-| 版数 | 0.1 |
+| 版数 | 0.2 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-10 |
+| 最終更新日 | 2026-11-13 |
 | 作成者 | （氏名） |
 | 上位文書 | [機能定義書](function-definition.md)（RC-FD） |
 | 状態 | 承認待ち |
@@ -15,6 +15,7 @@
 | 版数 | 日付 | 内容 | 作成者 |
 | --- | --- | --- | --- |
 | 0.1 | 2026-11-10 | 初版 | （氏名） |
+| 0.2 | 2026-11-13 | 招待リンクを作るとき（開発計画書 1-7）に決めたことを足した：中身を見る API はログインしていればその人として扱い、JWT の期限切れは 401、ログインしていないときの InvitePreview の項目は null、一覧のカーソル、取り消しをもう一度送ったときは 204、URL は画面の URL（WEB_ORIGIN）から作る、参加したときの DM の通知 | （氏名） |
 
 本書は機能定義書の一部である。承認は[機能定義書](function-definition.md)で一括して行う。API・リアルタイムの通知・メッセージの共通の決まりは機能定義書 3 章〜5 章のとおり。
 
@@ -115,17 +116,20 @@ sequenceDiagram
 | GET | /api/workspaces/{ws}/invites?cursor= | なし | 200 InviteView の一覧（50 件ずつ） | 403 NOT_OWNER、404 WORKSPACE_NOT_FOUND |
 | POST | /api/workspaces/{ws}/invites | なし | 201 InviteView | 403、404 |
 | DELETE | /api/workspaces/{ws}/invites/{id} | なし | 204（取り消し済みにする。行は消さない） | 403、404 INVITE_NOT_FOUND |
-| GET | /api/invites/{招待の文字列} | なし（ログインしていなくてもよい） | 200 InvitePreview | 410 INVITE_INVALID |
+| GET | /api/invites/{招待の文字列} | なし（ログインしていなくてもよい） | 200 InvitePreview | 401 TOKEN_EXPIRED、410 INVITE_INVALID |
 | POST | /api/invites/{招待の文字列}/accept | なし | 200 WorkspaceDetail（FN-03） | 401、410 INVITE_INVALID |
 
-- InviteView：`{"id","url","createdAt","expiresAt","revokedAt","status"}`（status は ACTIVE・EXPIRED・REVOKED）
-- InvitePreview：`{"workspaceName"}`。ログインしているときは `ownerDisplayName`・`memberCount`・`alreadyMember`・`workspaceId` も入れる
+- InviteView：`{"id","url","createdAt","expiresAt","revokedAt","status"}`（status は ACTIVE・EXPIRED・REVOKED）。url は画面の URL（環境変数 WEB_ORIGIN。インフラ設計書）に /invite/{招待の文字列} を付けたもの
+- InvitePreview：`{"workspaceName","workspaceId","ownerDisplayName","memberCount","alreadyMember"}`。ログインしていないときは workspaceName のほかは null
+- 一覧のカーソルは、前のページの最後のリンクの ID（機能定義書 3.4）。数でなければ 400 BAD_REQUEST
+- 取り消し済み・期限切れのリンクをもう一度取り消したときは、何もせずに 204（最初に取り消した日時を残す）
+- GET /api/invites/{招待の文字列} は、ログインがいらない API だが、access_token の Cookie があればその人として扱う（オーナー・人数・alreadyMember を返すため）。JWT の期限が切れていれば 401 TOKEN_EXPIRED を返し、画面が取り直してやり直す（機能定義書 3.2）
 
 リアルタイムの通知：
 
 | API | 通知 | 送る相手 |
 | --- | --- | --- |
-| POST /api/invites/{招待の文字列}/accept | conversation.updated（general と、戻った DM ごと） | 参加した本人 |
+| POST /api/invites/{招待の文字列}/accept | conversation.updated（general と、戻った DM ごと。この順に送る） | 参加した本人。すでにメンバーだったときは送らない |
 
 ## 7. 使うデータ
 

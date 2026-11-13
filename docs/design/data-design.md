@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-BD-DATA |
-| 版数 | 0.1 |
+| 版数 | 0.2 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-10 |
+| 最終更新日 | 2026-11-13 |
 | 作成者 | （氏名） |
 | 上位文書 | [基本設計書](basic-design.md)（RC-BD） |
 | 元にした文書 | [データ要件定義書](../requirements/data-requirements.md)（RC-REQ-DATA）版数 0.2、[機能定義書](../functions/function-definition.md)（RC-FD）版数 0.3、[技術スタック定義書](../tech-stack.md)（RC-TECH）版数 0.2 |
@@ -16,6 +16,7 @@
 | 版数 | 日付 | 内容 | 作成者 |
 | --- | --- | --- | --- |
 | 0.1 | 2026-11-10 | 初版。構成は BookLog のデータ設計書と同じにした | （氏名） |
+| 0.2 | 2026-11-13 | 招待リンクを作るとき（開発計画書 1-7）に、30 日たったものを消すための索引を (expires_at) から (created_at) にした（消す条件を「作ってから 30 日」で書くため。期限は 7 日なので、どれも期限切れか取り消し済み） | （氏名） |
 
 本書は基本設計書の一部である。承認は[基本設計書](basic-design.md)で一括して行う。表記のルールは基本設計書 1.3 のとおり。
 
@@ -366,7 +367,7 @@ DM の行は、ワークスペースを抜けても消さない（BR-9）。
 | workspace_members | (workspace_id) WHERE role = 'OWNER' の一意の索引 | オーナーは 1 人 |
 | workspaces | (owner_id) | 作れる数を数える（BR-5） |
 | invites | (workspace_id, id DESC) | 招待リンクの一覧（I-1） |
-| invites | (expires_at) | 30 日たったものをまとめて消す（BR-14） |
+| invites | (created_at) | 30 日たったものをまとめて消す（BR-14） |
 | conversations | (workspace_id, lower(name)) WHERE type = 'CHANNEL' の一意の索引 | 同じ名前のチャンネルを作らない（CH-2）、名前の順の一覧（CH-3） |
 | conversations | (workspace_id) WHERE is_general の一意の索引 | general は 1 つ |
 | conversations | (workspace_id, dm_user_low, dm_user_high) WHERE type = 'DM' の一意の索引 | 同じ 2 人の DM は 1 つ（FN-12）、自分が小さい方の DM を探す（8.1） |
