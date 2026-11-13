@@ -100,6 +100,18 @@ describe('ログインしている人（I-5〜I-7）', () => {
     expect(await screen.findByRole('heading', { level: 1, name: /general/ })).toBeInTheDocument()
   })
 
+  it('JWT の期限が切れていたら取り直して読み直す', async () => {
+    const fetch = open({
+      ...loggedIn,
+      [PREVIEW]: [() => json(401, { code: 'TOKEN_EXPIRED', message: '…' }), memberPreview()],
+      'POST /api/auth/refresh': () => json(204),
+    })
+
+    expect(await screen.findByRole('button', { name: '参加する' })).toBeInTheDocument()
+    expect(fetch.keys().filter((k) => k === PREVIEW)).toHaveLength(2)
+    expect(fetch.keys()).toContain('POST /api/auth/refresh')
+  })
+
   it('すでにメンバーなら M-19 を出して G-5 に移す（TC-04-6）', async () => {
     open({ ...loggedIn, [PREVIEW]: memberPreview({ alreadyMember: true }) })
 
