@@ -123,7 +123,7 @@ sequenceDiagram
 - InvitePreview：`{"workspaceName","workspaceId","ownerDisplayName","memberCount","alreadyMember"}`。ログインしていないときは workspaceName のほかは null
 - 一覧のカーソルは、前のページの最後のリンクの ID（機能定義書 3.4）。数でなければ 400 BAD_REQUEST
 - 取り消し済み・期限切れのリンクをもう一度取り消したときは、何もせずに 204（最初に取り消した日時を残す）
-- GET /api/invites/{招待の文字列} は、ログインがいらない API だが、access_token の Cookie があればその人として扱う（オーナー・人数・alreadyMember を返すため）。JWT の期限が切れていれば 401 TOKEN_EXPIRED を返し、画面が取り直してやり直す（機能定義書 3.2）
+- GET /api/invites/{招待の文字列} は、ログインがいらない API だが、access_token の Cookie があればその人として扱う（オーナー・人数・alreadyMember を返すため）。JWT の期限が切れていれば 401 TOKEN_EXPIRED を返し、画面が取り直してやり直す（機能定義書 3.2）。期限切れ以外で読めない JWT（秘密の値を替えた後の古い Cookie など）は、ログインしていない人として扱う
 
 リアルタイムの通知：
 

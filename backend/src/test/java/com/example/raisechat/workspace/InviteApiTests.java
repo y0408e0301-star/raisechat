@@ -299,6 +299,20 @@ class InviteApiTests {
 		assertError(preview(this.jiro, token), HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED");
 	}
 
+	@Test
+	void 期限切れ以外で読めないJWTではログインしていない人として名前だけを返す() {
+		String token = token();
+
+		MvcTestResult result = preview(new Cookie("access_token", "not-a-jwt"), token);
+
+		assertThat(result).hasStatusOk();
+		assertThat(result).bodyJson().extractingPath("$.workspaceName").isEqualTo("仲間うち");
+		assertThat(result).bodyJson().extractingPath("$.ownerDisplayName").isNull();
+		// ほかの API では今までどおり 401
+		assertError(get(this.mvc, new Cookie("access_token", "not-a-jwt"), "/api/workspaces"), HttpStatus.UNAUTHORIZED,
+				"UNAUTHENTICATED");
+	}
+
 	// ----------------------------------------------------------------
 	// 参加する（I-5・I-7・I-8、TC-04-3・TC-04-5〜TC-04-8）
 
