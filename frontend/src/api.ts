@@ -19,6 +19,9 @@ export type ChannelListItem = Schemas['ChannelListItem']
 export type ChannelPage = Schemas['ChannelPage']
 export type MemberPage = Schemas['MemberPage']
 export type Visibility = ChannelListItem['visibility']
+export type InviteView = Schemas['InviteView']
+export type InvitePage = Schemas['InvitePage']
+export type InvitePreview = Schemas['InvitePreview']
 
 // API がエラーを返したとき（機能定義書 3.3）。message は画面にそのまま出せる文、
 // field があればその入力欄の下に出す
@@ -190,6 +193,31 @@ export function fetchWorkspace(workspaceId: number): Promise<WorkspaceDetail> {
   return requestJson<WorkspaceDetail>('GET', `/api/workspaces/${workspaceId}`)
 }
 
+// ---------------------------------------------------------------- FN-04 招待
+
+// G-11 の招待リンクの一覧（オーナーだけ。作った新しい順に 50 件ずつ）
+export function fetchInvites(workspaceId: number, cursor?: string | null): Promise<InvitePage> {
+  return requestJson<InvitePage>('GET', `/api/workspaces/${workspaceId}/invites${queryString({ cursor })}`)
+}
+
+export function createInvite(workspaceId: number): Promise<InviteView> {
+  return requestJson<InviteView>('POST', `/api/workspaces/${workspaceId}/invites`)
+}
+
+export async function revokeInvite(workspaceId: number, inviteId: number): Promise<void> {
+  await request('DELETE', `/api/workspaces/${workspaceId}/invites/${inviteId}`)
+}
+
+// G-4 に出す中身。ログインしていなければワークスペースの名前だけ。
+// ログインしていない人も開くので、取り直しに失敗しても M-8 は出さない
+export function fetchInvitePreview(token: string, signedIn: boolean): Promise<InvitePreview> {
+  return requestJson<InvitePreview>('GET', `/api/invites/${encodeURIComponent(token)}`, undefined, signedIn)
+}
+
+export function acceptInvite(token: string): Promise<WorkspaceDetail> {
+  return requestJson<WorkspaceDetail>('POST', `/api/invites/${encodeURIComponent(token)}/accept`)
+}
+
 // ---------------------------------------------------------------- FN-06 会話・FN-14 既読
 
 // サイドバーに出す会話（自分が入っているチャンネル。DM は 1-9 で足す）
@@ -288,3 +316,5 @@ export const conversationUrl = (workspaceId: number, conversationId: number) =>
   `/w/${workspaceId}/c/${conversationId}`
 // G-8 チャンネル一覧画面
 export const channelsUrl = (workspaceId: number) => `/w/${workspaceId}/channels`
+// G-11 招待リンクの管理画面
+export const invitesUrl = (workspaceId: number) => `/w/${workspaceId}/invites`

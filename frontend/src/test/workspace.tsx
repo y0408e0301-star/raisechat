@@ -7,6 +7,7 @@ import { M } from '../messages'
 import { RealtimeProvider } from '../realtime/RealtimeProvider'
 import ChannelsPage from '../workspace/ChannelsPage'
 import ConversationPage from '../workspace/ConversationPage'
+import InvitesPage from '../workspace/InvitesPage'
 import WorkspaceHome from '../workspace/WorkspaceHome'
 import WorkspaceLayout from '../workspace/WorkspaceLayout'
 import CurrentLocation from './CurrentLocation'
@@ -45,6 +46,7 @@ export function renderAt(path: string) {
                 <Route index element={<WorkspaceHome />} />
                 <Route path="c/:conversationId" element={<ConversationPage />} />
                 <Route path="channels" element={<ChannelsPage />} />
+                <Route path="invites" element={<InvitesPage />} />
               </Route>
             </Routes>
             <CurrentLocation />

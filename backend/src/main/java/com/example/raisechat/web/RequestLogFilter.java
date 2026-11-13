@@ -3,6 +3,7 @@ package com.example.raisechat.web;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +40,9 @@ public class RequestLogFilter extends OncePerRequestFilter {
 	static final String USER_ID = "user.id";
 
 	private static final Logger log = LoggerFactory.getLogger(RequestLogFilter.class);
+
+	// /api/invites/{招待の文字列}（と、その後ろの /accept）
+	private static final Pattern INVITE_TOKEN = Pattern.compile("^(/api/invites/)[^/]+");
 
 	private final Duration slowThreshold;
 
@@ -77,8 +81,8 @@ public class RequestLogFilter extends OncePerRequestFilter {
 	private void log(HttpServletRequest request, int status, Duration duration) {
 		Level level = (status >= 500) ? Level.ERROR
 				: (duration.compareTo(this.slowThreshold) >= 0) ? Level.WARN : Level.INFO;
-		// クエリ文字列（検索語など）は出さない
-		String path = request.getRequestURI();
+		// クエリ文字列（検索語など）は出さない。招待の文字列は、知っていれば参加できるので伏せる（N-14）
+		String path = INVITE_TOKEN.matcher(request.getRequestURI()).replaceFirst("$1***");
 		log.atLevel(level)
 			.addKeyValue("http.request.method", request.getMethod())
 			.addKeyValue("url.path", path)

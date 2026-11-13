@@ -23,8 +23,8 @@ class RefreshTokenCleanup {
 		this.clock = clock;
 	}
 
-	// 毎日 4:00（日本時間）。使う人が少ない時間に動かす
-	@Scheduled(cron = "0 0 4 * * *", zone = "Asia/Tokyo")
+	// 毎日 4:30（日本時間）。使う人が少ない時間に、ほかの片付け（招待リンクなど）と同じ時刻に動かす（データ設計書 7 章・9 章）
+	@Scheduled(cron = "0 30 4 * * *", zone = "Asia/Tokyo")
 	@Transactional
 	public void deleteExpired() {
 		int deleted = this.refreshTokens.deleteExpired(this.clock.instant());

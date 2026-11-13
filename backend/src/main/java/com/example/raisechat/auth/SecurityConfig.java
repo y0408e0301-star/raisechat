@@ -14,6 +14,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.JwtValidationException;
 import org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthenticationToken;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider;
@@ -55,12 +56,18 @@ class SecurityConfig {
 			PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/auth/refresh"),
 			PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/api/auth/username-availability"));
 
+	// ログインしていなくても使えるが、ログインしていればその人として扱う API（G-4 の招待リンクの中身。FN-04 I-4・I-5）。
+	// JWT の期限が切れていれば 401 を返し、画面が取り直してやり直す。
+	// 期限切れ以外で読めない JWT（秘密の値を替えた後の古い Cookie など）は、ログインしていない人として扱う
+	private static final RequestMatcher OPTIONAL_AUTH_API = PathPatternRequestMatcher.pathPattern(HttpMethod.GET,
+			"/api/invites/{token}");
+
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http, JwtDecoder jwtDecoder, JsonMapper jsonMapper,
 			CsrfTokenRepository csrfTokenRepository) {
 		AuthenticationEntryPoint unauthorized = (request, response, ex) -> writeError(response, jsonMapper,
 				unauthorized(ex));
-		http.authorizeHttpRequests((authorize) -> authorize.requestMatchers(PUBLIC_API)
+		http.authorizeHttpRequests((authorize) -> authorize.requestMatchers(PUBLIC_API, OPTIONAL_AUTH_API)
 			.permitAll()
 			.requestMatchers("/api/**")
 			.authenticated()
@@ -116,32 +123,54 @@ class SecurityConfig {
 	private static BearerTokenAuthenticationFilter accessTokenFilter(JwtDecoder jwtDecoder,
 			AuthenticationEntryPoint unauthorized) {
 		BearerTokenAuthenticationFilter filter = new BearerTokenAuthenticationFilter(
-				new ProviderManager(new JwtAuthenticationProvider(jwtDecoder)), SecurityConfig::readAccessToken);
+				new ProviderManager(new JwtAuthenticationProvider(jwtDecoder)),
+				(request) -> readAccessToken(request, jwtDecoder));
 		filter.setAuthenticationFailureHandler(unauthorized::commence);
 		return filter;
 	}
 
 	// JWT は Authorization ヘッダーではなく Cookie の access_token から読む。
 	// ログインがいらない API では読まない（期限切れの Cookie が残っていても、ログイン・取り直しができるように）
-	private static @Nullable BearerTokenAuthenticationToken readAccessToken(HttpServletRequest request) {
+	private static @Nullable BearerTokenAuthenticationToken readAccessToken(HttpServletRequest request,
+			JwtDecoder jwtDecoder) {
 		if (PUBLIC_API.matches(request)) {
 			return null;
 		}
 		Cookie cookie = WebUtils.getCookie(request, AuthCookies.ACCESS_TOKEN);
-		return (cookie == null || cookie.getValue().isEmpty()) ? null
-				: new BearerTokenAuthenticationToken(cookie.getValue());
+		if (cookie == null || cookie.getValue().isEmpty()) {
+			return null;
+		}
+		if (OPTIONAL_AUTH_API.matches(request) && !usableOrExpired(cookie.getValue(), jwtDecoder)) {
+			return null;
+		}
+		return new BearerTokenAuthenticationToken(cookie.getValue());
+	}
+
+	// 確かめられる JWT か、期限だけが切れた JWT か（期限切れは 401 にして、画面に取り直させる）
+	private static boolean usableOrExpired(String token, JwtDecoder jwtDecoder) {
+		try {
+			jwtDecoder.decode(token);
+			return true;
+		}
+		catch (JwtException ex) {
+			return isExpired(ex);
+		}
 	}
 
 	// JWT の期限切れなら TOKEN_EXPIRED（画面が取り直してやり直す）、それ以外は UNAUTHENTICATED
 	private static ErrorCode unauthorized(AuthenticationException ex) {
+		return isExpired(ex) ? ErrorCode.TOKEN_EXPIRED : ErrorCode.UNAUTHENTICATED;
+	}
+
+	private static boolean isExpired(Throwable ex) {
 		for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
 			if (cause instanceof JwtValidationException invalid && invalid.getErrors()
 				.stream()
 				.anyMatch((error) -> JwtConfig.TOKEN_EXPIRED_ERROR.equals(error.getErrorCode()))) {
-				return ErrorCode.TOKEN_EXPIRED;
+				return true;
 			}
 		}
-		return ErrorCode.UNAUTHENTICATED;
+		return false;
 	}
 
 	private static void writeError(HttpServletResponse response, JsonMapper jsonMapper, ErrorCode code)

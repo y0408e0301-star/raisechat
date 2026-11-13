@@ -406,6 +406,43 @@ class WebSocketApiTests {
 		assertThat(hanakoClient.nothingWithin(500)).isTrue();
 	}
 
+	@Test
+	void 招待リンクで参加すると_本人にgeneralと戻ったDMのconversation_updatedが届き_ほかのメンバーには届かない() throws Exception {
+		Cookie jiro = signup(this.mvc, "jiro");
+		long jiroId = userId(this.jdbc, "jiro");
+		long taroId = userId(this.jdbc, "taro_y");
+		// 前に入っていて抜けた人の DM（1-9 の DM・1-8 の退出はまだないので SQL で作る。BR-6）
+		Long dm = this.jdbc.queryForObject(
+				"INSERT INTO conversations (workspace_id, type, dm_user_low, dm_user_high, "
+						+ "created_by) VALUES (?, 'DM', ?, ?, ?) RETURNING id",
+				Long.class, this.workspace, Math.min(taroId, jiroId), Math.max(taroId, jiroId), taroId);
+		this.jdbc.update("INSERT INTO conversation_members (conversation_id, user_id, last_read_message_id) "
+				+ "VALUES (?, ?, 0), (?, ?, 0)", dm, taroId, dm, jiroId);
+		MvcTestResult invite = post(this.mvc, this.taro, "/api/workspaces/%d/invites".formatted(this.workspace), "{}");
+		String url = JSON.readTree(invite.getResponse().getContentAsString(StandardCharsets.UTF_8))
+			.path("url")
+			.asString();
+		StompTestClient jiroClient = connect(jiro);
+		StompTestClient hanakoClient = connect(this.hanako);
+		jiroClient.subscribe(WebSocketSecurityConfig.USER_EVENTS);
+		hanakoClient.subscribe(WebSocketSecurityConfig.USER_EVENTS);
+		awaitSubscribers(WebSocketSecurityConfig.USER_EVENTS, 2);
+
+		assertThat(
+				post(this.mvc, jiro, "/api/invites/%s/accept".formatted(url.substring(url.lastIndexOf('/') + 1)), "{}"))
+			.hasStatusOk();
+
+		JsonNode first = JSON.readTree(jiroClient.next());
+		JsonNode second = JSON.readTree(jiroClient.next());
+		assertThat(first.path("type").asString()).isEqualTo("conversation.updated");
+		assertThat(first.path("conversationId").asLong()).isEqualTo(this.general);
+		assertThat(first.path("payload").path("general").asBoolean()).isTrue();
+		assertThat(second.path("type").asString()).isEqualTo("conversation.updated");
+		assertThat(second.path("conversationId").asLong()).isEqualTo(dm);
+		assertThat(second.path("payload").path("type").asString()).isEqualTo("DM");
+		assertThat(hanakoClient.nothingWithin(500)).isTrue();
+	}
+
 	// ---------------------------------------------------------------- 購読の取り消し（4.5）
 
 	@Test

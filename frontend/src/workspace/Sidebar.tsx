@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router'
-import { channelsUrl, conversationUrl, type ConversationSummary, type WorkspaceDetail } from '../api'
+import { channelsUrl, conversationUrl, invitesUrl, type ConversationSummary, type WorkspaceDetail } from '../api'
 import Menu from '../components/Menu'
 import styles from './Sidebar.module.css'
 
@@ -16,13 +16,18 @@ const itemClass = ({ isActive }: { isActive: boolean }) => `${styles.item} ${isA
 
 // G-5 のサイドバー（画面設計書 2.8）。
 // 「メンション」と件数の丸は通知（開発計画書 1-15）、「ダイレクトメッセージ」は DM（1-9）、
-// メニューの「メンバー」「招待リンクの管理」は 1-8・1-7 で足す
+// メニューの「メンバー」は 1-8 で足す
 export default function Sidebar({ workspace, conversations, onSelect, onCreateChannel }: Props) {
   const channels = conversations.filter((c) => c.type === 'CHANNEL')
+  // 「招待リンクの管理」はオーナーにだけ出す（I-1・I-9）
+  const menu = [
+    ...(workspace.role === 'OWNER' ? [{ label: '招待リンクの管理', to: invitesUrl(workspace.id) }] : []),
+    { label: 'ワークスペースの一覧', to: '/' },
+  ]
   return (
     <nav className={styles.sidebar} aria-label="会話">
       <Menu label={`${workspace.name}のメニュー`} buttonClassName={styles.workspace}
-        items={[{ label: 'ワークスペースの一覧', to: '/' }]}>
+        items={menu} onSelect={onSelect}>
         <span className={styles.workspaceName}>{workspace.name}</span>
         <span aria-hidden="true">▾</span>
       </Menu>
