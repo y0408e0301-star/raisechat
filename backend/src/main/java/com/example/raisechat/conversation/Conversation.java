@@ -55,7 +55,7 @@ public class Conversation {
 	@Column(name = "is_general", nullable = false, updatable = false)
 	private boolean general;
 
-	// DM の 2 人（ID の小さい方・大きい方）。DM（1-9）で使う
+	// DM の 2 人（ID の小さい方・大きい方）。チャンネルではなし
 	@Column(updatable = false)
 	private @Nullable Long dmUserLow;
 
@@ -93,6 +93,25 @@ public class Conversation {
 	static Conversation channel(long workspaceId, String name, @Nullable String description, Visibility visibility,
 			long createdBy, Instant now) {
 		return new Conversation(workspaceId, Type.CHANNEL, name, description, visibility, false, createdBy, now);
+	}
+
+	// DM の 2 人のうち、viewer でない方（FN-12）
+	public long partnerOf(long viewer) {
+		return (dmUserLow() == viewer) ? dmUserHigh() : dmUserLow();
+	}
+
+	long dmUserLow() {
+		if (this.dmUserLow == null) {
+			throw new IllegalStateException("DM ではありません");
+		}
+		return this.dmUserLow;
+	}
+
+	long dmUserHigh() {
+		if (this.dmUserHigh == null) {
+			throw new IllegalStateException("DM ではありません");
+		}
+		return this.dmUserHigh;
 	}
 
 	public long getId() {

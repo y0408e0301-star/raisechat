@@ -70,6 +70,12 @@ public enum ErrorCode {
 
 	NOT_OWNER(HttpStatus.FORBIDDEN, "操作に失敗しました。時間をおいてもう一度お試しください。"),
 
+	// DM（FN-12 9 章。M-36）。自分との DM は画面では始められないので、画面には出さない
+	CANNOT_DM_SELF(HttpStatus.BAD_REQUEST, "入力が正しくありません。"),
+
+	// 画面は入力欄の代わりに M-36（相手の表示名を入れる）を出す
+	DM_PARTNER_LEFT(HttpStatus.FORBIDDEN, "相手がこのワークスペースにいないため、メッセージを送れません。"),
+
 	// メッセージ（FN-07 9 章。M-30・M-35・M-49）。本文が空のときは画面では送れないので、画面には出さない
 	MESSAGE_EMPTY(HttpStatus.BAD_REQUEST, "メッセージを入力してください。"),
 

@@ -2,6 +2,7 @@ package com.example.raisechat.conversation;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.jspecify.annotations.Nullable;
@@ -17,7 +18,7 @@ import com.example.raisechat.workspace.WorkspaceAccess;
 import com.example.raisechat.workspace.WorkspaceMember;
 
 // サイドバーの会話の一覧・会話の詳細（FN-06）と、会話を開いたときの記録（FN-14・FN-03 5 章の 4）。
-// チャンネルの作成・参加などは ChannelService、DM は 1-9 で足す
+// チャンネルの作成・参加などは ChannelService、DM を始めるのは DirectMessageService
 @Service
 class ConversationService {
 
@@ -31,37 +32,46 @@ class ConversationService {
 
 	private final UserRepository users;
 
+	private final DirectMessages directMessages;
+
 	private final Clock clock;
 
 	ConversationService(ConversationRepository conversations, ConversationMemberRepository members,
-			MessageRepository messages, WorkspaceAccess workspaceAccess, UserRepository users, Clock clock) {
+			MessageRepository messages, WorkspaceAccess workspaceAccess, UserRepository users,
+			DirectMessages directMessages, Clock clock) {
 		this.conversations = conversations;
 		this.members = members;
 		this.messages = messages;
 		this.workspaceAccess = workspaceAccess;
 		this.users = users;
+		this.directMessages = directMessages;
 		this.clock = clock;
 	}
 
-	// サイドバーに出す会話（自分が入っているチャンネル。DM は 1-9 で足す）
+	// サイドバーに出す会話：自分が入っているチャンネル（general が先頭、名前の順）と、DM（DM-1。最後のメッセージの新しい順）
 	@Transactional(readOnly = true)
 	List<ConversationSummary> listForSidebar(long userId, long workspaceId) {
 		this.workspaceAccess.requireMember(userId, workspaceId);
-		return this.conversations.findJoinedChannels(userId, workspaceId)
-			.stream()
-			.map((c) -> ConversationSummary.of(c, true))
-			.toList();
+		List<ConversationSummary> list = new ArrayList<>();
+		this.conversations.findJoinedChannels(userId, workspaceId)
+			.forEach((c) -> list.add(ConversationSummary.of(c, true)));
+		list.addAll(this.directMessages.summaries(this.conversations.findSidebarDms(userId, workspaceId), userId));
+		return list;
 	}
 
 	// 会話の詳細。見られないときは 404（BR-2）
 	@Transactional(readOnly = true)
 	ConversationDetail get(long userId, long conversationId) {
 		Conversation conversation = requireVisible(userId, conversationId);
-		boolean joined = this.members.existsById(new ConversationMember.Key(conversationId, userId));
 		Instant now = this.clock.instant();
 		UserSummary createdBy = UserSummary.of(this.users.findById(conversation.getCreatedBy()).orElseThrow(), now);
-		return ConversationDetail.of(conversation, joined, this.members.countByConversationId(conversationId),
-				createdBy);
+		long memberCount = this.members.countByConversationId(conversationId);
+		if (conversation.getType() == Conversation.Type.DM) {
+			return ConversationDetail.of(this.directMessages.summary(conversation, userId), conversation, memberCount,
+					createdBy);
+		}
+		boolean joined = this.members.existsById(new ConversationMember.Key(conversationId, userId));
+		return ConversationDetail.of(conversation, joined, memberCount, createdBy);
 	}
 
 	// 会話を開いた・読んだ（FN-14 6 章の read）。最後に読んだメッセージを進め、最後に開いた会話（W-4）を記録する。

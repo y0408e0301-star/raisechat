@@ -12,7 +12,8 @@ import com.example.raisechat.realtime.RealtimeNotifier;
 
 // 招待リンクでワークスペースに参加した人の会話（FN-04 I-5・I-8、BR-6）。
 // general に入れ、前に入っていた DM（キック・退出しても行が残る。FN-05 MB-7）とあわせて、
-// コミットの後に本人に conversation.updated を送る（ほかのタブのサイドバーのため）
+// コミットの後に本人に conversation.updated を送る（ほかのタブのサイドバーのため）。
+// DM の相手には、また送れるようになったことを知らせる（FN-05 MB-8）
 @Component
 public class WorkspaceEntry {
 
@@ -24,14 +25,17 @@ public class WorkspaceEntry {
 
 	private final RealtimeNotifier notifier;
 
+	private final DirectMessages directMessages;
+
 	private final Clock clock;
 
 	WorkspaceEntry(ConversationRepository conversations, ConversationMemberRepository members,
-			MessageRepository messages, RealtimeNotifier notifier, Clock clock) {
+			MessageRepository messages, RealtimeNotifier notifier, DirectMessages directMessages, Clock clock) {
 		this.conversations = conversations;
 		this.members = members;
 		this.messages = messages;
 		this.notifier = notifier;
+		this.directMessages = directMessages;
 		this.clock = clock;
 	}
 
@@ -41,13 +45,18 @@ public class WorkspaceEntry {
 		// 参加する前のメッセージを未読にしない（BR-6）
 		long latest = this.messages.findLatestId(general.getId());
 		this.members.insertIfAbsent(general.getId(), userId, latest, this.clock.instant());
-		List<Conversation> joined = new ArrayList<>();
-		joined.add(general);
-		joined.addAll(this.conversations.findJoinedDms(userId, workspaceId));
-		for (Conversation conversation : joined) {
-			this.notifier.toUser(userId, RealtimeEvent.Type.CONVERSATION_UPDATED, workspaceId, conversation.getId(),
-					ConversationSummary.of(conversation, true));
+		List<ConversationSummary> joined = new ArrayList<>();
+		joined.add(ConversationSummary.of(general, true));
+		// サイドバーに出る DM だけ（メッセージがないものは、作った人のサイドバーにだけ出す）
+		List<Conversation> dms = this.conversations.findJoinedDms(userId, workspaceId)
+			.stream()
+			.filter((dm) -> this.directMessages.inSidebarOf(dm, userId))
+			.toList();
+		joined.addAll(this.directMessages.summaries(dms, userId));
+		for (ConversationSummary summary : joined) {
+			this.notifier.toUser(userId, RealtimeEvent.Type.CONVERSATION_UPDATED, workspaceId, summary.id(), summary);
 		}
+		this.directMessages.membershipChanged(userId, workspaceId);
 		return general.getId();
 	}
 

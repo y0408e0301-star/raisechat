@@ -15,6 +15,7 @@ import com.example.raisechat.common.ApiException;
 import com.example.raisechat.common.ErrorCode;
 import com.example.raisechat.conversation.ConversationMemberRepository;
 import com.example.raisechat.conversation.ConversationRepository;
+import com.example.raisechat.conversation.DirectMessages;
 import com.example.raisechat.realtime.RealtimeEvent;
 import com.example.raisechat.realtime.RealtimeNotifier;
 import com.example.raisechat.realtime.SubscriptionRevoker;
@@ -24,7 +25,7 @@ import com.example.raisechat.user.UserSummary;
 
 // メンバーの一覧・キック・退出（機能定義書 FN-05）。
 // キック・退出した人には、コミットの後に workspace.removed を送り、そのワークスペースの会話の購読を取り消す（機能定義書 4.5）。
-// DM の相手への通知（canPost: false）は DM（開発計画書 1-9）で足す
+// その人との DM の相手には、送れなくなったことを知らせる（MB-6・MB-8）
 @Service
 class MemberService {
 
@@ -47,11 +48,14 @@ class MemberService {
 
 	private final SubscriptionRevoker revoker;
 
+	private final DirectMessages directMessages;
+
 	private final Clock clock;
 
 	MemberService(WorkspaceMemberRepository members, WorkspaceRepository workspaces, WorkspaceAccess access,
 			ConversationRepository conversations, ConversationMemberRepository conversationMembers,
-			UserRepository users, RealtimeNotifier notifier, SubscriptionRevoker revoker, Clock clock) {
+			UserRepository users, RealtimeNotifier notifier, SubscriptionRevoker revoker, DirectMessages directMessages,
+			Clock clock) {
 		this.members = members;
 		this.workspaces = workspaces;
 		this.access = access;
@@ -60,6 +64,7 @@ class MemberService {
 		this.users = users;
 		this.notifier = notifier;
 		this.revoker = revoker;
+		this.directMessages = directMessages;
 		this.clock = clock;
 	}
 
@@ -131,6 +136,7 @@ class MemberService {
 		this.notifier.toUser(userId, RealtimeEvent.Type.WORKSPACE_REMOVED, workspaceId, null,
 				new RealtimeEvent.WorkspaceRemoved(workspaceId, workspace.getName(), reason));
 		this.revoker.revoke(userId, this.conversations.findIdsByWorkspaceId(workspaceId));
+		this.directMessages.membershipChanged(userId, workspaceId);
 	}
 
 	// G-9 の一覧（機能定義書 3.4 の形に、ワークスペースの人数を足したもの）
