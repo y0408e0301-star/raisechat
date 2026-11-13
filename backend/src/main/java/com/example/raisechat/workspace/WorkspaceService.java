@@ -14,11 +14,15 @@ import com.example.raisechat.conversation.Conversation;
 import com.example.raisechat.conversation.ConversationMember;
 import com.example.raisechat.conversation.ConversationMemberRepository;
 import com.example.raisechat.conversation.ConversationRepository;
+import com.example.raisechat.realtime.RealtimeEvent;
+import com.example.raisechat.realtime.RealtimeNotifier;
+import com.example.raisechat.realtime.SubscriptionRevoker;
 import com.example.raisechat.user.User;
 import com.example.raisechat.user.UserRepository;
 import com.example.raisechat.user.UserSummary;
 
-// ワークスペースの作成・一覧・詳細（機能定義書 FN-03）。削除はメンバー管理（開発計画書 1-8）で足す
+// ワークスペースの作成・一覧・詳細・削除（機能定義書 FN-03）。
+// 削除したワークスペースの添付・アバターのファイル（S3）を消すのは、プロフィール・添付（開発計画書 1-10・1-11）で足す
 @Service
 class WorkspaceService {
 
@@ -37,17 +41,23 @@ class WorkspaceService {
 
 	private final UserRepository users;
 
+	private final RealtimeNotifier notifier;
+
+	private final SubscriptionRevoker revoker;
+
 	private final Clock clock;
 
 	WorkspaceService(WorkspaceRepository workspaces, WorkspaceMemberRepository members, WorkspaceAccess access,
 			ConversationRepository conversations, ConversationMemberRepository conversationMembers,
-			UserRepository users, Clock clock) {
+			UserRepository users, RealtimeNotifier notifier, SubscriptionRevoker revoker, Clock clock) {
 		this.workspaces = workspaces;
 		this.members = members;
 		this.access = access;
 		this.conversations = conversations;
 		this.conversationMembers = conversationMembers;
 		this.users = users;
+		this.notifier = notifier;
+		this.revoker = revoker;
 		this.clock = clock;
 	}
 
@@ -94,6 +104,30 @@ class WorkspaceService {
 		}
 		return WorkspaceDetail.of(workspace, member.getRole(), UserSummary.of(owner, this.clock.instant()),
 				this.members.countByWorkspaceId(workspaceId), generalId, lastOpened);
+	}
+
+	// 削除する（W-6）。オーナーだけ。確認の名前がワークスペースの名前と同じときだけ。
+	// 中のデータは外部キーの ON DELETE CASCADE で消す（FN-03 5 章の 5）。
+	// 削除したときのメンバー全員（オーナーを含む）に、コミットの後で workspace.removed（DELETED）を送り、購読を取り消す（W-7）
+	@Transactional
+	void delete(long me, long workspaceId, @Nullable String confirmName) {
+		if (this.access.requireMember(me, workspaceId).getRole() != WorkspaceMember.Role.OWNER) {
+			throw new ApiException(ErrorCode.NOT_OWNER);
+		}
+		Workspace workspace = this.workspaces.findByIdForUpdate(workspaceId)
+			.orElseThrow(() -> new ApiException(ErrorCode.WORKSPACE_NOT_FOUND));
+		if (!workspace.getName().equals(confirmName)) {
+			throw new ApiException(ErrorCode.CONFIRM_NAME_MISMATCH, "confirmName");
+		}
+		List<Long> memberIds = this.members.findUserIds(workspaceId);
+		List<Long> conversationIds = this.conversations.findIdsByWorkspaceId(workspaceId);
+		this.workspaces.delete(workspace);
+		for (long memberId : memberIds) {
+			this.notifier.toUser(memberId, RealtimeEvent.Type.WORKSPACE_REMOVED, workspaceId, null,
+					new RealtimeEvent.WorkspaceRemoved(workspaceId, workspace.getName(),
+							RealtimeEvent.WorkspaceRemovedReason.DELETED));
+			this.revoker.revoke(memberId, conversationIds);
+		}
 	}
 
 }

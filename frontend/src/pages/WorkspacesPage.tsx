@@ -3,21 +3,30 @@ import { Link, useNavigate } from 'react-router'
 import { conversationUrl, fetchWorkspaces, workspaceUrl, type WorkspaceSummary } from '../api'
 import ui from '../components/ui.module.css'
 import { M } from '../messages'
+import { useRealtime } from '../realtime/RealtimeContext'
 import CreateWorkspaceDialog from './CreateWorkspaceDialog'
 import styles from './WorkspacesPage.module.css'
 
 // G-3 ワークスペースの一覧画面（W-1〜W-3、画面設計書 5 章）。
-// 未読の太字とメンションの件数は、API が数えるようになる通知（開発計画書 1-15）から出る
+// 未読の太字とメンションの件数は、API が数えるようになる通知（開発計画書 1-15）から出る。
+// 外れたワークスペースは通知（workspace.removed）で一覧から消す
 export default function WorkspacesPage() {
   const navigate = useNavigate()
   // undefined：読み込み中、null：読み込みに失敗
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[] | null | undefined>(undefined)
   const [creating, setCreating] = useState(false)
+  const { subscribeUser } = useRealtime()
 
   const load = useCallback(async () => {
     setWorkspaces(undefined)
     setWorkspaces(await fetchWorkspaces().catch(() => null))
   }, [])
+
+  // キック・退出・削除されたワークスペースは、開き直さずに一覧から消す（W-7）
+  useEffect(() => subscribeUser((event) => {
+    if (event.type !== 'workspace.removed') return
+    setWorkspaces((list) => list?.filter((w) => w.id !== event.workspaceId))
+  }), [subscribeUser])
 
   useEffect(() => {
     let active = true

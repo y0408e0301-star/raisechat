@@ -31,6 +31,12 @@ export const M = {
 } as const
 
 // （表示名）・（名前）を入れるメッセージ
+export const M14 = (name: string) =>
+  `ワークスペース「${name}」を削除しますか？すべてのチャンネル・メッセージ・ファイルが削除され、元に戻せません。確認のため、ワークスペースの名前を入力してください。`
+export const M15 = (name: string) => `ワークスペース「${name}」は削除されました。`
+export const M21 = (displayName: string) => `${displayName}さんをワークスペースから外しますか？`
+export const M22 = (name: string) => `ワークスペース「${name}」から外されました。`
+export const M23 = (name: string) => `ワークスペース「${name}」から退出しますか？もう一度参加するには招待リンクが必要です。`
 export const M26 = (name: string) => `チャンネル「#${name}」を削除しますか？すべてのメッセージとファイルが削除され、元に戻せません。`
 export const M28 = (name: string) => `チャンネル「#${name}」は削除されました。`
 export const M29 = (name: string) =>

@@ -39,6 +39,14 @@ public enum ErrorCode {
 	// 取り消そうとした招待リンクがない
 	INVITE_NOT_FOUND(HttpStatus.NOT_FOUND, "操作に失敗しました。時間をおいてもう一度お試しください。"),
 
+	// ワークスペースの削除で、確認の名前が違う（画面では同じになるまで押せないので、画面には出さない）
+	CONFIRM_NAME_MISMATCH(HttpStatus.BAD_REQUEST, "ワークスペースの名前が違います。"),
+
+	// メンバー管理（FN-05 9 章。M-49）
+	CANNOT_KICK_OWNER(HttpStatus.FORBIDDEN, "操作に失敗しました。時間をおいてもう一度お試しください。"),
+
+	OWNER_CANNOT_LEAVE(HttpStatus.FORBIDDEN, "操作に失敗しました。時間をおいてもう一度お試しください。"),
+
 	// 会話（FN-06・FN-12 9 章。M-27）
 	CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "このチャンネルは見つからないか、参加していません。"),
 

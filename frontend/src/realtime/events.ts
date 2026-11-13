@@ -10,6 +10,9 @@ export type MessageDeleted = { id: number, parentId: number | null }
 // conversation.removed の payload。LEFT：抜けた、DELETED：チャンネルが削除された
 export type ConversationRemoved = { conversationId: number, reason: 'LEFT' | 'DELETED' }
 
+// workspace.removed の payload。KICKED：キックされた、LEFT：退出した、DELETED：ワークスペースが削除された
+export type WorkspaceRemoved = { workspaceId: number, name: string, reason: 'KICKED' | 'LEFT' | 'DELETED' }
+
 type Event<Type extends string, Payload> = {
   type: Type
   workspaceId: number
@@ -26,6 +29,7 @@ export type RealtimeEvent =
   // 本人あて（/user/queue/events）
   | Event<'conversation.updated', ConversationSummary>
   | Event<'conversation.removed', ConversationRemoved>
+  | Event<'workspace.removed', WorkspaceRemoved>
 
 type Json = Record<string, unknown>
 
@@ -49,12 +53,17 @@ const isConversationSummary = (v: unknown): v is ConversationSummary =>
 const isConversationRemoved = (v: unknown): v is ConversationRemoved =>
   isObject(v) && isId(v.conversationId) && (v.reason === 'LEFT' || v.reason === 'DELETED')
 
+const isWorkspaceRemoved = (v: unknown): v is WorkspaceRemoved =>
+  isObject(v) && isId(v.workspaceId) && typeof v.name === 'string'
+  && (v.reason === 'KICKED' || v.reason === 'LEFT' || v.reason === 'DELETED')
+
 const payloadCheck: Record<RealtimeEvent['type'], (payload: unknown) => boolean> = {
   'message.created': isMessageView,
   'message.updated': isMessageView,
   'message.deleted': isMessageDeleted,
   'conversation.updated': isConversationSummary,
   'conversation.removed': isConversationRemoved,
+  'workspace.removed': isWorkspaceRemoved,
 }
 
 // 届いた本文（JSON の文字列）を読む。形が違う・知らない種類の通知は null（無視する）

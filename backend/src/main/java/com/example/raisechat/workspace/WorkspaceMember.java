@@ -69,6 +69,10 @@ public class WorkspaceMember {
 		return this.role;
 	}
 
+	public Instant getJoinedAt() {
+		return this.joinedAt;
+	}
+
 	public @Nullable Long getLastOpenedConversationId() {
 		return this.lastOpenedConversationId;
 	}

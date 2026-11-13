@@ -129,14 +129,14 @@ export interface paths {
          * 会話の詳細
          * @description 見られないとき（入っていないワークスペース・プライベートチャンネルなど）は 404
          */
-        get: operations["get_1"];
+        get: operations["get_2"];
         put?: never;
         post?: never;
         /**
          * チャンネルを削除する
          * @description オーナーだけ、general 以外。メッセージなども一緒に消える
          */
-        delete: operations["delete_1"];
+        delete: operations["delete_2"];
         options?: never;
         head?: never;
         patch?: never;
@@ -195,7 +195,7 @@ export interface paths {
          * チャンネルから退出する
          * @description general は 403。入っていなければ何もしない
          */
-        post: operations["leave"];
+        post: operations["leave_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -372,7 +372,11 @@ export interface paths {
         get: operations["get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * ワークスペースを削除する
+         * @description オーナーだけ。confirmName がワークスペースの名前と同じでなければ 400。中のチャンネル・メッセージ・招待リンク・メンバーもすべて消す
+         */
+        delete: operations["delete_1"];
         options?: never;
         head?: never;
         patch?: never;
@@ -413,7 +417,7 @@ export interface paths {
          * サイドバーの会話の一覧
          * @description 自分が入っているチャンネル（general が先頭、あとは名前の順）。ページングしない
          */
-        get: operations["list_4"];
+        get: operations["list_5"];
         put?: never;
         post?: never;
         delete?: never;
@@ -461,6 +465,70 @@ export interface paths {
          * @description オーナーだけ。行は消さずに取り消し済みにする。取り消し済み・期限切れでも 204
          */
         delete: operations["revoke"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspaces/{workspaceId}/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * ワークスペースから退出する
+         * @description オーナーは退出できない。ワークスペースとそのチャンネルから外れる（DM は残す）
+         */
+        post: operations["leave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspaces/{workspaceId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * メンバーの一覧（G-9）
+         * @description オーナーが先頭、表示名の順に 50 人ずつ。q は表示名かユーザー ID に含む文字（0〜30 文字）。memberCount はワークスペースの人数
+         */
+        get: operations["list_4"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspaces/{workspaceId}/members/{username}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 1 人のメンバー
+         * @description ワークスペースにいなければ 404
+         */
+        get: operations["get_1"];
+        put?: never;
+        post?: never;
+        /**
+         * キックする
+         * @description オーナーだけ。オーナーはキックできない。ワークスペースとそのチャンネルから外す（DM は残す）
+         */
+        delete: operations["kick"];
         options?: never;
         head?: never;
         patch?: never;
@@ -543,6 +611,10 @@ export interface components {
             /** @description 前後の空白を除いて 1〜50 文字。改行を含まない（FN-03 4 章） */
             name: string;
         };
+        DeleteWorkspaceRequest: {
+            /** @description 確認のために入れたワークスペースの名前。名前と同じ文字でなければ 400 CONFIRM_NAME_MISMATCH */
+            confirmName: string;
+        };
         EditMessageRequest: {
             /** @description 前後の空白を除き、改行を LF にそろえて 1〜4,000 文字（FN-07 4 章） */
             body: string;
@@ -588,6 +660,17 @@ export interface components {
         MemberPage: {
             items: components["schemas"]["UserSummary"][];
             nextCursor: string | null;
+        };
+        MemberView: {
+            avatarUrl: string | null;
+            displayName: string;
+            /** Format: date-time */
+            joinedAt: string;
+            /** @enum {string} */
+            role: "OWNER" | "MEMBER";
+            statusEmoji: string | null;
+            statusText: string | null;
+            username: string;
         };
         MessagePage: {
             hasMoreAfter: boolean;
@@ -662,6 +745,12 @@ export interface components {
             owner: components["schemas"]["UserSummary"];
             /** @enum {string} */
             role: "OWNER" | "MEMBER";
+        };
+        WorkspaceMemberPage: {
+            items: components["schemas"]["MemberView"][];
+            /** Format: int64 */
+            memberCount: number;
+            nextCursor: string | null;
         };
         WorkspaceSummary: {
             hasUnread: boolean;
@@ -922,7 +1011,7 @@ export interface operations {
             };
         };
     };
-    get_1: {
+    get_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -962,7 +1051,7 @@ export interface operations {
             };
         };
     };
-    delete_1: {
+    delete_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -1082,7 +1171,7 @@ export interface operations {
             };
         };
     };
-    leave: {
+    leave_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -1630,6 +1719,48 @@ export interface operations {
             };
         };
     };
+    delete_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteWorkspaceRequest"];
+            };
+        };
+        responses: {
+            /** @description 削除した */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_2: {
         parameters: {
             query?: {
@@ -1717,7 +1848,7 @@ export interface operations {
             };
         };
     };
-    list_4: {
+    list_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -1852,6 +1983,167 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description 取り消した */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    leave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 退出した */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_4: {
+        parameters: {
+            query?: {
+                q?: string;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                workspaceId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceMemberPage"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: number;
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberView"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    kick: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: number;
+                username: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description キックした */
             204: {
                 headers: {
                     [name: string]: unknown;

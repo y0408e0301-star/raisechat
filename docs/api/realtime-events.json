@@ -85,4 +85,14 @@
     "reason" : "LEFT"
   },
   "sentAt" : "2026-11-10T01:03:00Z"
+}, {
+  "type" : "workspace.removed",
+  "workspaceId" : 1,
+  "conversationId" : null,
+  "payload" : {
+    "workspaceId" : 1,
+    "name" : "仲間うち",
+    "reason" : "KICKED"
+  },
+  "sentAt" : "2026-11-10T01:03:00Z"
 } ]
