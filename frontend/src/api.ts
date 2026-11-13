@@ -242,7 +242,7 @@ export function acceptInvite(token: string): Promise<WorkspaceDetail> {
 
 // ---------------------------------------------------------------- FN-06 会話・FN-14 既読
 
-// サイドバーに出す会話（自分が入っているチャンネル。DM は 1-9 で足す）
+// サイドバーに出す会話（自分が入っているチャンネルと、DM）
 export function fetchConversations(workspaceId: number): Promise<ConversationSummary[]> {
   return requestJson<ConversationSummary[]>('GET', `/api/workspaces/${workspaceId}/conversations`)
 }
@@ -306,6 +306,14 @@ export async function deleteChannel(conversationId: number): Promise<void> {
   await request('DELETE', `/api/conversations/${conversationId}`)
 }
 
+// ---------------------------------------------------------------- FN-12 DM
+
+// 相手との DM を開く。なければ作る（DM-2）
+export function startDm(workspaceId: number, username: string): Promise<ConversationDetail> {
+  return requestJson<ConversationDetail>('POST', `/api/workspaces/${workspaceId}/dms`,
+    { username } satisfies Schemas['StartDmRequest'])
+}
+
 // ---------------------------------------------------------------- FN-07 メッセージ
 
 // 会話のメッセージ（親メッセージだけ）を古い順に。before（その ID より前）か、なし（最新）
@@ -336,6 +344,11 @@ export async function deleteMessage(messageId: number): Promise<MessageView | nu
 export const workspaceUrl = (workspaceId: number) => `/w/${workspaceId}`
 export const conversationUrl = (workspaceId: number, conversationId: number) =>
   `/w/${workspaceId}/c/${conversationId}`
+// G-5 の DM
+export const dmUrl = (workspaceId: number, conversationId: number) => `/w/${workspaceId}/d/${conversationId}`
+// 会話の種類で URL を分ける
+export const conversationPath = (c: { workspaceId: number, id: number, type: ConversationSummary['type'] }) =>
+  (c.type === 'DM' ? dmUrl(c.workspaceId, c.id) : conversationUrl(c.workspaceId, c.id))
 // G-8 チャンネル一覧画面
 export const channelsUrl = (workspaceId: number) => `/w/${workspaceId}/channels`
 // G-9 メンバー一覧画面

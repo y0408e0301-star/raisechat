@@ -5,6 +5,7 @@ import {
   type ConversationDetail, type MessageView,
 } from '../api'
 import { useAuth } from '../auth/AuthContext'
+import Avatar from '../components/Avatar'
 import { useToast } from '../components/ToastContext'
 import ui from '../components/ui.module.css'
 import { loadDraft, saveDraft } from '../drafts'
@@ -96,8 +97,10 @@ function ConversationView({ conversationId }: { conversationId: number }) {
     setLoaded((current) => (typeof current === 'object' ? { ...current, items: change(current.items) } : current))
   }, [])
 
-  // 届いた通知を一覧に当てはめる。自分の操作の通知も届くが、ID で見分けて 2 つ出さない（FN-07 5 章の 7）
-  const owner = workspace.role === 'OWNER'
+  // 届いた通知を一覧に当てはめる。自分の操作の通知も届くが、ID で見分けて 2 つ出さない（FN-07 5 章の 7）。
+  // DM ではオーナーでもほかの人のメッセージを削除できない（FN-12 5 章の 6）
+  const isDm = typeof loaded === 'object' && loaded.conversation.type === 'DM'
+  const owner = workspace.role === 'OWNER' && !isDm
   useEffect(() => {
     if (!me) return
     const viewer: Viewer = { me, owner }
@@ -115,6 +118,15 @@ function ConversationView({ conversationId }: { conversationId: number }) {
   useEffect(() => {
     name.current = loadedName
   }, [loadedName])
+  // 開いている会話の送れるか・DM の相手が変わったら（相手がキック・退出・また参加した。FN-05 MB-8）、入力欄をすぐ替える
+  useEffect(() => subscribeUser((event: RealtimeEvent) => {
+    if (event.type !== 'conversation.updated' || event.payload.id !== conversationId) return
+    const { canPost, joined, dmPartner } = event.payload
+    setLoaded((current) => (typeof current === 'object'
+      ? { ...current, conversation: { ...current.conversation, canPost, joined, dmPartner } }
+      : current))
+  }), [subscribeUser, conversationId])
+
   useEffect(() => subscribeUser((event: RealtimeEvent) => {
     if (event.type !== 'conversation.removed' || event.payload.conversationId !== conversationId) return
     if (event.payload.reason === 'DELETED') toast(M28(name.current))
@@ -222,7 +234,24 @@ function ConversationView({ conversationId }: { conversationId: number }) {
       <div className={styles.head}>
         {/* 画面の横幅が 600px 未満のときだけ出す（2.19） */}
         <button type="button" className={styles.back} aria-label="サイドバーに戻る" onClick={showSidebar}>←</button>
-        {conversation && (
+        {conversation?.type === 'DM' && conversation.dmPartner && (
+          // DM の見出し：相手のアバター・表示名・@ユーザー ID・ステータス（DM-5）。押して G-16 はプロフィール（1-10）で足す
+          <div className={styles.partner}>
+            <Avatar displayName={conversation.dmPartner.displayName} size={32} />
+            <div className={styles.titles}>
+              <h1 className={styles.name}>
+                {conversation.dmPartner.displayName}
+                <span className={styles.username}>@{conversation.dmPartner.username}</span>
+              </h1>
+              {(conversation.dmPartner.statusEmoji || conversation.dmPartner.statusText) && (
+                <p className={styles.description}>
+                  {[conversation.dmPartner.statusEmoji, conversation.dmPartner.statusText].filter(Boolean).join(' ')}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+        {conversation?.type === 'CHANNEL' && (
           <div className={styles.titles}>
             <h1 className={styles.name}>
               {/* 名前・人数・ⓘ を押すと G-14（CH-6） */}
@@ -234,7 +263,7 @@ function ConversationView({ conversationId }: { conversationId: number }) {
             {conversation.description && <p className={styles.description}>{conversation.description}</p>}
           </div>
         )}
-        {conversation && (
+        {conversation?.type === 'CHANNEL' && (
           <>
             <button type="button" className={styles.members} onClick={() => setDetailsOpen(true)}
               aria-label={`メンバー ${conversation.memberCount} 人`}>
@@ -267,7 +296,9 @@ function ConversationView({ conversationId }: { conversationId: number }) {
           {loaded.conversation.canPost
             ? (
               <Composer value={draft} onChange={setDraft} onSend={send}
-                placeholder={`# ${loaded.conversation.name} へのメッセージ`} />
+                placeholder={loaded.conversation.dmPartner
+                  ? `${loaded.conversation.dmPartner.displayName} へのメッセージ`
+                  : `# ${loaded.conversation.name} へのメッセージ`} />
             )
             : (
               // 送れない会話は、入力欄の代わりに理由を出す（MS-16）。参加していない公開チャンネルは「参加する」も出す（CH-5）
@@ -286,7 +317,7 @@ function ConversationView({ conversationId }: { conversationId: number }) {
             )}
         </>
       )}
-      {detailsOpen && typeof loaded === 'object' && (
+      {detailsOpen && typeof loaded === 'object' && loaded.conversation.type === 'CHANNEL' && (
         <ChannelDetailsDialog channel={loaded.conversation} owner={workspace.role === 'OWNER'}
           onClose={() => setDetailsOpen(false)}
           onInvited={(count) => setLoaded((current) => (typeof current === 'object'
