@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-FD-03 |
-| 版数 | 0.1 |
+| 版数 | 0.2 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-10 |
+| 最終更新日 | 2026-11-13 |
 | 作成者 | （氏名） |
 | 上位文書 | [機能定義書](function-definition.md)（RC-FD） |
 | 状態 | 承認待ち |
@@ -15,6 +15,7 @@
 | 版数 | 日付 | 内容 | 作成者 |
 | --- | --- | --- | --- |
 | 0.1 | 2026-11-10 | 初版 | （氏名） |
+| 0.2 | 2026-11-13 | ワークスペースの削除を作るとき（開発計画書 1-8）に決めたことを 6 章に足した：確認の名前の比べ方、削除の前に行をロックすること | （氏名） |
 
 本書は機能定義書の一部である。承認は[機能定義書](function-definition.md)で一括して行う。API・リアルタイムの通知・メッセージの共通の決まりは機能定義書 3 章〜5 章のとおり。
 
@@ -110,6 +111,8 @@ sequenceDiagram
 | GET | /api/workspaces/{ws} | なし | 200 WorkspaceDetail | 404 WORKSPACE_NOT_FOUND |
 | DELETE | /api/workspaces/{ws} | `{"confirmName"}` | 204 | 400 CONFIRM_NAME_MISMATCH、403 NOT_OWNER、404 |
 
+- 削除の confirmName は、ワークスペースの名前とまったく同じ文字のときだけ通す（前後の空白も取り除かない）
+- 削除は、ワークスペースの行をロックしてからメンバーを読む（同時に招待リンクで参加した人にも workspace.removed を送るため）
 - WorkspaceSummary：`{"id","name","role","hasUnread","mentionCount"}`（role は OWNER・MEMBER）
 - WorkspaceDetail：WorkspaceSummary に owner（UserSummary）・memberCount・generalConversationId・lastOpenedConversationId（なければ null）を足したもの
 
