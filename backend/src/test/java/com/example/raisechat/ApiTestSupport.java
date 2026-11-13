@@ -65,6 +65,17 @@ public final class ApiTestSupport {
 		return mvc.delete().uri(uri).cookie(user).with(csrf()).exchange();
 	}
 
+	// 本文つきの DELETE（ワークスペースの削除の確認の名前）
+	public static MvcTestResult delete(MockMvcTester mvc, Cookie user, String uri, String json) {
+		return mvc.delete()
+			.uri(uri)
+			.cookie(user)
+			.with(csrf())
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(json)
+			.exchange();
+	}
+
 	// 応答の JSON から 1 つの数値を読む
 	public static long readLong(MvcTestResult result, String path) {
 		try {
@@ -89,7 +100,7 @@ public final class ApiTestSupport {
 		return id;
 	}
 
-	// 招待（1-7）の代わりに、ワークスペースと general に入れる（BR-6）
+	// 招待リンクの API を通さずに、ワークスペースと general に入れる（BR-6）
 	public static void join(JdbcTemplate jdbc, long workspaceId, String username) {
 		long userId = userId(jdbc, username);
 		jdbc.update("INSERT INTO workspace_members (workspace_id, user_id, role) VALUES (?, ?, 'MEMBER')", workspaceId,

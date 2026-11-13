@@ -24,6 +24,15 @@ public interface ConversationMemberRepository extends JpaRepository<Conversation
 	int insertIfAbsent(@Param("conversationId") long conversationId, @Param("userId") long userId,
 			@Param("lastReadMessageId") long lastReadMessageId, @Param("joinedAt") Instant joinedAt);
 
+	// キック・退出した人を、そのワークスペースのチャンネルから外す。DM の行は残す（FN-05 5 章の 3、BR-6）
+	@Modifying
+	@Query(value = """
+			DELETE FROM conversation_members m USING conversations c
+			WHERE m.conversation_id = c.id AND c.workspace_id = :workspaceId AND c.type = 'CHANNEL' AND m.user_id = :userId
+			""",
+			nativeQuery = true)
+	int deleteChannelMemberships(@Param("workspaceId") long workspaceId, @Param("userId") long userId);
+
 	@Query("select m.userId from ConversationMember m where m.conversationId = :conversationId")
 	List<Long> findUserIds(@Param("conversationId") long conversationId);
 

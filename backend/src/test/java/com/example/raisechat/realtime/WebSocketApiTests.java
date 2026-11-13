@@ -296,7 +296,17 @@ class WebSocketApiTests {
 		assertThat(removedJson.path("payload").path("conversationId").asLong()).isEqualTo(secret);
 		assertThat(removedJson.path("payload").path("reason").asString()).isEqualTo("LEFT");
 
-		writeSamples(List.of(createdJson, updatedJson, deletedJson, joinedJson, removedJson));
+		// キックされると本人に workspace.removed（FN-05）
+		assertThat(delete(this.mvc, this.taro, "/api/workspaces/%d/members/hanako".formatted(this.workspace)))
+			.hasStatus(HttpStatus.NO_CONTENT);
+		JsonNode kickedJson = JSON.readTree(hanakoClient.next());
+		assertThat(kickedJson.path("type").asString()).isEqualTo("workspace.removed");
+		assertThat(kickedJson.path("workspaceId").asLong()).isEqualTo(this.workspace);
+		assertThat(kickedJson.path("conversationId").isNull()).isTrue();
+		assertThat(kickedJson.path("payload").path("name").asString()).isEqualTo("仲間うち");
+		assertThat(kickedJson.path("payload").path("reason").asString()).isEqualTo("KICKED");
+
+		writeSamples(List.of(createdJson, updatedJson, deletedJson, joinedJson, removedJson, kickedJson));
 	}
 
 	private long createChannel(Cookie user, String name, String visibility) {
@@ -444,6 +454,49 @@ class WebSocketApiTests {
 	}
 
 	// ---------------------------------------------------------------- 購読の取り消し（4.5）
+
+	@Test
+	void キックされるとそのワークスペースのすべての会話の購読が取り消され_通知が届かなくなる() throws Exception {
+		long chat = createChannel(this.taro, "雑談", "PUBLIC");
+		StompTestClient client = connect(this.hanako);
+		client.subscribe(topic(this.general));
+		client.subscribe(topic(chat));
+		client.subscribe(WebSocketSecurityConfig.USER_EVENTS);
+		awaitSubscribers(topic(this.general), 1);
+		awaitSubscribers(topic(chat), 1);
+		awaitSubscribers(WebSocketSecurityConfig.USER_EVENTS, 1);
+
+		assertThat(delete(this.mvc, this.taro, "/api/workspaces/%d/members/hanako".formatted(this.workspace)))
+			.hasStatus(HttpStatus.NO_CONTENT);
+
+		assertThat(JSON.readTree(client.next()).path("type").asString()).isEqualTo("workspace.removed");
+		awaitSubscribers(topic(this.general), 0);
+		awaitSubscribers(topic(chat), 0);
+		send(this.taro, "抜けた後");
+		assertThat(client.nothingWithin(500)).isTrue();
+		assertThat(client.isConnected()).isTrue();
+	}
+
+	@Test
+	void ワークスペースを削除するとオーナーを含むメンバー全員にDELETEDが届き購読が取り消される() throws Exception {
+		StompTestClient taroClient = connect(this.taro);
+		StompTestClient hanakoClient = connect(this.hanako);
+		taroClient.subscribe(WebSocketSecurityConfig.USER_EVENTS);
+		hanakoClient.subscribe(WebSocketSecurityConfig.USER_EVENTS);
+		hanakoClient.subscribe(topic(this.general));
+		awaitSubscribers(WebSocketSecurityConfig.USER_EVENTS, 2);
+		awaitSubscribers(topic(this.general), 1);
+
+		assertThat(delete(this.mvc, this.taro, "/api/workspaces/" + this.workspace, "{\"confirmName\":\"仲間うち\"}"))
+			.hasStatus(HttpStatus.NO_CONTENT);
+
+		for (StompTestClient client : List.of(taroClient, hanakoClient)) {
+			JsonNode event = JSON.readTree(client.next());
+			assertThat(event.path("type").asString()).isEqualTo("workspace.removed");
+			assertThat(event.path("payload").path("reason").asString()).isEqualTo("DELETED");
+		}
+		awaitSubscribers(topic(this.general), 0);
+	}
 
 	@Test
 	void 購読を取り消すとその会話の通知が届かなくなり_接続は続く() throws Exception {

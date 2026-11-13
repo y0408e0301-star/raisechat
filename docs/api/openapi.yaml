@@ -23,6 +23,9 @@ info:
     | WORKSPACE_NOT_FOUND | 404 | このワークスペースは見つからないか、参加していません。 |
     | INVITE_INVALID | 410 | この招待リンクは期限切れか、取り消されています。招待した人に新しいリンクをもらってください。 |
     | INVITE_NOT_FOUND | 404 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
+    | CONFIRM_NAME_MISMATCH | 400 | ワークスペースの名前が違います。 |
+    | CANNOT_KICK_OWNER | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
+    | OWNER_CANNOT_LEAVE | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
     | CONVERSATION_NOT_FOUND | 404 | このチャンネルは見つからないか、参加していません。 |
     | CHANNEL_NAME_INVALID | 400 | チャンネル名は空白を含まない 1〜80 文字で入力してください。 |
     | CHANNEL_NAME_TAKEN | 409 | この名前のチャンネルはすでにあります。 |
@@ -235,7 +238,7 @@ paths:
   /api/conversations/{conversationId}:
     delete:
       description: オーナーだけ、general 以外。メッセージなども一緒に消える
-      operationId: delete_1
+      operationId: delete_2
       parameters:
       - in: path
         name: conversationId
@@ -263,7 +266,7 @@ paths:
       - FN-06 チャンネル
     get:
       description: 見られないとき（入っていないワークスペース・プライベートチャンネルなど）は 404
-      operationId: get_1
+      operationId: get_2
       parameters:
       - in: path
         name: conversationId
@@ -369,7 +372,7 @@ paths:
   /api/conversations/{conversationId}/leave:
     post:
       description: general は 403。入っていなければ何もしない
-      operationId: leave
+      operationId: leave_1
       parameters:
       - in: path
         name: conversationId
@@ -804,6 +807,40 @@ paths:
       tags:
       - FN-03 ワークスペース
   /api/workspaces/{workspaceId}:
+    delete:
+      description: オーナーだけ。confirmName がワークスペースの名前と同じでなければ 400。中のチャンネル・メッセージ・招待リンク・メンバーもすべて消す
+      operationId: delete_1
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteWorkspaceRequest"
+        required: true
+      responses:
+        "204":
+          description: 削除した
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: ワークスペースを削除する
+      tags:
+      - FN-03 ワークスペース
     get:
       description: 入っていない・存在しないときは 404
       operationId: get
@@ -920,7 +957,7 @@ paths:
   /api/workspaces/{workspaceId}/conversations:
     get:
       description: 自分が入っているチャンネル（general が先頭、あとは名前の順）。ページングしない
-      operationId: list_4
+      operationId: list_5
       parameters:
       - in: path
         name: workspaceId
@@ -1057,6 +1094,150 @@ paths:
       summary: 招待リンクを取り消す
       tags:
       - FN-04 招待
+  /api/workspaces/{workspaceId}/leave:
+    post:
+      description: オーナーは退出できない。ワークスペースとそのチャンネルから外れる（DM は残す）
+      operationId: leave
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: 退出した
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: ワークスペースから退出する
+      tags:
+      - FN-05 メンバー管理
+  /api/workspaces/{workspaceId}/members:
+    get:
+      description: オーナーが先頭、表示名の順に 50 人ずつ。q は表示名かユーザー ID に含む文字（0〜30 文字）。memberCount
+        はワークスペースの人数
+      operationId: list_4
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceMemberPage"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: メンバーの一覧（G-9）
+      tags:
+      - FN-05 メンバー管理
+  /api/workspaces/{workspaceId}/members/{username}:
+    delete:
+      description: オーナーだけ。オーナーはキックできない。ワークスペースとそのチャンネルから外す（DM は残す）
+      operationId: kick
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: username
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: キックした
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: キックする
+      tags:
+      - FN-05 メンバー管理
+    get:
+      description: ワークスペースにいなければ 404
+      operationId: get_1
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: username
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberView"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 1 人のメンバー
+      tags:
+      - FN-05 メンバー管理
 components:
   schemas:
     ChannelListItem:
@@ -1255,6 +1436,14 @@ components:
           description: 前後の空白を除いて 1〜50 文字。改行を含まない（FN-03 4 章）
       required:
       - name
+    DeleteWorkspaceRequest:
+      type: object
+      properties:
+        confirmName:
+          type: string
+          description: 確認のために入れたワークスペースの名前。名前と同じ文字でなければ 400 CONFIRM_NAME_MISMATCH
+      required:
+      - confirmName
     EditMessageRequest:
       type: object
       properties:
@@ -1389,6 +1578,41 @@ components:
       required:
       - items
       - nextCursor
+    MemberView:
+      type: object
+      properties:
+        avatarUrl:
+          type:
+          - string
+          - "null"
+        displayName:
+          type: string
+        joinedAt:
+          type: string
+          format: date-time
+        role:
+          type: string
+          enum:
+          - OWNER
+          - MEMBER
+        statusEmoji:
+          type:
+          - string
+          - "null"
+        statusText:
+          type:
+          - string
+          - "null"
+        username:
+          type: string
+      required:
+      - avatarUrl
+      - displayName
+      - joinedAt
+      - role
+      - statusEmoji
+      - statusText
+      - username
     MessagePage:
       type: object
       properties:
@@ -1567,6 +1791,24 @@ components:
       - name
       - owner
       - role
+    WorkspaceMemberPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberView"
+        memberCount:
+          type: integer
+          format: int64
+        nextCursor:
+          type:
+          - string
+          - "null"
+      required:
+      - items
+      - memberCount
+      - nextCursor
     WorkspaceSummary:
       type: object
       properties:

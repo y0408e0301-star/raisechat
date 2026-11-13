@@ -6,6 +6,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,7 +22,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-// ワークスペースの API（機能定義書 FN-03 6 章）。削除はメンバー管理（開発計画書 1-8）で足す
+// ワークスペースの API（機能定義書 FN-03 6 章）
 @Tag(name = "FN-03 ワークスペース")
 @RestController
 @RequestMapping("/api/workspaces")
@@ -51,6 +52,20 @@ class WorkspaceController {
 	@GetMapping("/{workspaceId}")
 	WorkspaceDetail get(@AuthenticationPrincipal Jwt jwt, @PathVariable long workspaceId) {
 		return this.workspaceService.get(CurrentUser.id(jwt), workspaceId);
+	}
+
+	@Operation(summary = "ワークスペースを削除する",
+			description = "オーナーだけ。confirmName がワークスペースの名前と同じでなければ 400。中のチャンネル・メッセージ・招待リンク・メンバーもすべて消す")
+	@ApiResponse(responseCode = "204", description = "削除した")
+	@DeleteMapping("/{workspaceId}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable long workspaceId,
+			@RequestBody DeleteWorkspaceRequest request) {
+		this.workspaceService.delete(CurrentUser.id(jwt), workspaceId, request.confirmName());
+	}
+
+	record DeleteWorkspaceRequest(@Schema(requiredMode = Schema.RequiredMode.REQUIRED,
+			description = "確認のために入れたワークスペースの名前。名前と同じ文字でなければ 400 CONFIRM_NAME_MISMATCH") @Nullable String confirmName) {
 	}
 
 	record CreateWorkspaceRequest(@Schema(requiredMode = Schema.RequiredMode.REQUIRED,

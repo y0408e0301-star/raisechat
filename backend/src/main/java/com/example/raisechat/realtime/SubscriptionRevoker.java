@@ -1,5 +1,8 @@
 package com.example.raisechat.realtime;
 
+import java.util.Collection;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -49,15 +52,21 @@ public class SubscriptionRevoker {
 
 	// トランザクションの中で呼ばれたら、コミットの後に取り消す（見られなくなったことが確かになってから）
 	public void revoke(long userId, long conversationId) {
+		revoke(userId, List.of(conversationId));
+	}
+
+	// ワークスペースから外れたときなど、いくつもの会話をまとめて取り消す
+	public void revoke(long userId, Collection<Long> conversationIds) {
+		List<Long> ids = List.copyOf(conversationIds);
 		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-			revokeNow(userId, conversationId);
+			ids.forEach((id) -> revokeNow(userId, id));
 			return;
 		}
 		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
 
 			@Override
 			public void afterCommit() {
-				revokeNow(userId, conversationId);
+				ids.forEach((id) -> revokeNow(userId, id));
 			}
 
 		});

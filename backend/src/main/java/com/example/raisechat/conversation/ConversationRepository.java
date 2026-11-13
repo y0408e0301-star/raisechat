@@ -59,6 +59,10 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 			""")
 	List<Conversation> findJoinedChannels(@Param("me") long me, @Param("workspaceId") long workspaceId);
 
+	// ワークスペースのすべての会話の ID。キック・退出・削除で、その人の購読を取り消すのに使う（機能定義書 4.5）
+	@Query("select c.id from Conversation c where c.workspaceId = :workspaceId")
+	List<Long> findIdsByWorkspaceId(@Param("workspaceId") long workspaceId);
+
 	// 自分が入っている DM。キック・退出しても行は残るので、招待リンクでまた参加したときに戻す（BR-6、FN-05 MB-7）
 	@Query("""
 			select c from Conversation c join ConversationMember cm on cm.conversationId = c.id
