@@ -39,3 +39,10 @@ export function formatDayDivider(iso: string, now: Date = new Date()): string {
   const year = p.year === parts(now).year ? '' : `${p.year}年`
   return `${year}${p.month}月${p.day}日（${p.weekday}）`
 }
+
+// 期限・作った日時（画面設計書 13 章）。例：「11月17日 10:15」、前の年以前・次の年以後は「2025年11月17日 10:15」
+export function formatDateTime(iso: string, now: Date = new Date()): string {
+  const p = parts(new Date(iso))
+  const year = p.year === parts(now).year ? '' : `${p.year}年`
+  return `${year}${p.month}月${p.day}日 ${p.hour}:${p.minute}`
+}

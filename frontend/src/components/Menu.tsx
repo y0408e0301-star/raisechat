@@ -11,11 +11,13 @@ type Props = {
   items: { label: string, to: string }[]
   // メニューを右端にそろえる（ヘッダーの右のボタン）
   alignRight?: boolean
+  // 項目を選んだとき（サイドバーでは、画面の横幅が 600px 未満のときに中身に切り替える）
+  onSelect?: () => void
 }
 
 // ボタンを押すと出るメニュー（ヘッダーの自分のアバター、サイドバーのワークスペースの名前。画面設計書 2.6・2.8）。
 // 項目を選ぶ・Esc キー・メニューの外を押すと閉じる
-export default function Menu({ label, children, buttonClassName, items, alignRight = false }: Props) {
+export default function Menu({ label, children, buttonClassName, items, alignRight = false, onSelect }: Props) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
@@ -48,7 +50,7 @@ export default function Menu({ label, children, buttonClassName, items, alignRig
         <ul className={`${styles.menu} ${alignRight ? styles.right : ''}`}>
           {items.map((item) => (
             <li key={item.to}>
-              <Link to={item.to} className={styles.item} onClick={() => setOpen(false)}>{item.label}</Link>
+              <Link to={item.to} className={styles.item} onClick={() => { setOpen(false); onSelect?.() }}>{item.label}</Link>
             </li>
           ))}
         </ul>

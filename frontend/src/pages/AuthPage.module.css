@@ -22,3 +22,7 @@
 .primary { composes: primary from '../components/ui.module.css'; width: 100%; }
 
 .link { text-align: center; margin-top: 20px; }
+
+/* G-4（画面設計書 6 章）。通常ボタンも横幅いっぱいにし、主ボタンの下に置く */
+.wide { display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 12px; }
+.center { text-align: center; color: var(--sub); margin: 0 0 24px; }
