@@ -1,4 +1,4 @@
-import { act, screen, within } from '@testing-library/react'
+import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { M, M36 } from '../messages'
@@ -26,6 +26,10 @@ const dmDetail = (id: number, partner: object, extra: object = {}) => ({
 })
 const member = (user: object, extra: object = {}) =>
   ({ ...user, role: 'MEMBER', joinedAt: '2026-11-10T01:00:00Z', ...extra })
+
+// from 番目から count 人のメンバー
+const people = (from: number, count: number) => Array.from({ length: count }, (_, i) =>
+  member({ ...jiro, username: `user${from + i}`, displayName: `ユーザー${from + i}` }))
 
 const withDms = [...conversations, dmSummary(50, hanako), dmSummary(51, jiro)]
 
@@ -100,6 +104,22 @@ describe('G-15 DM の相手の選択（DM-2、TC-12-1）', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(sentJson(fetch, fetch.keys().indexOf('POST /api/workspaces/3/dms'))).toEqual({ username: 'saburo' })
     expect(within(sidebar()).getByRole('link', { name: /さぶろう/ })).toHaveAttribute('href', '/w/3/d/52')
+  })
+
+  it('下までスクロールしたら続きの 50 人を読む', async () => {
+    const fetch = open('/w/3/c/10', {
+      'GET /api/workspaces/3/members': () => json(200, { items: people(0, 50), nextCursor: 'next', memberCount: 60 }),
+      'GET /api/workspaces/3/members?cursor=next': () => json(200, { items: people(50, 10), nextCursor: null, memberCount: 60 }),
+    })
+    const user = userEvent.setup()
+    await screen.findByRole('heading', { level: 1, name: /general/ })
+    await user.click(within(sidebar()).getByRole('button', { name: 'ダイレクトメッセージを始める' }))
+    const list = (await screen.findByRole('button', { name: /@user0$/ })).closest('ul')!
+
+    fireEvent.scroll(list)
+
+    expect(await screen.findByRole('button', { name: /@user59$/ })).toBeInTheDocument()
+    expect(fetch.keys()).toContain('GET /api/workspaces/3/members?cursor=next')
   })
 
   it('名前で探して、いなければ M-47 を出す', async () => {

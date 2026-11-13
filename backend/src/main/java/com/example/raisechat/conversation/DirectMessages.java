@@ -51,7 +51,8 @@ public class DirectMessages {
 		return isMember(dm.getWorkspaceId(), dm.partnerOf(viewer));
 	}
 
-	// viewer から見たサイドバーの行（相手と送れるか）。DM はまとめて相手を読む
+	// viewer から見たサイドバーの行（相手と送れるか）。DM はまとめて相手を読む。
+	// 相手のユーザーは必ずある（退会の機能はなく、users の行は消さない。要件定義書 U-4）
 	List<ConversationSummary> summaries(List<Conversation> dms, long viewer) {
 		if (dms.isEmpty()) {
 			return List.of();

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type UIEvent } from 'react'
 import { ApiError, fetchMembers, startDm, type ConversationDetail, type MemberView } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import Avatar from '../components/Avatar'
@@ -13,6 +13,11 @@ import styles from './ChannelDialogs.module.css'
 // 入力が止まってから探すまで（画面設計書 17 章）
 const DEBOUNCE_MS = 300
 
+// いちばん下からこの距離まで来たら続きを読む
+const LOAD_MORE_AT = 40
+
+type Page = { items: MemberView[], nextCursor: string | null }
+
 type Props = {
   workspaceId: number
   onClose: () => void
@@ -21,13 +26,15 @@ type Props = {
 }
 
 // G-15 DM の相手の選択ダイアログ（DM-2、画面設計書 17 章）。
-// 自分以外のワークスペースのメンバーを名前で探し（FN-05 のメンバーの一覧の API）、選ぶとその人との DM を開く
+// 自分以外のワークスペースのメンバーを名前で探し（FN-05 のメンバーの一覧の API）、選ぶとその人との DM を開く。
+// 一覧は 50 人ずつ読み、下までスクロールしたら続きを読む
 export default function StartDmDialog({ workspaceId, onClose, onStarted }: Props) {
   const { me } = useAuth()
   const toast = useToast()
   const [query, setQuery] = useState('')
   // undefined：読み込み中、null：読み込みに失敗
-  const [members, setMembers] = useState<MemberView[] | null | undefined>(undefined)
+  const [page, setPage] = useState<Page | null | undefined>(undefined)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [starting, setStarting] = useState<string | null>(null)
   // 探す文字を変えたら、前の結果が後から届いても使わない
   const latest = useRef(0)
@@ -36,14 +43,38 @@ export default function StartDmDialog({ workspaceId, onClose, onStarted }: Props
     const ticket = ++latest.current
     const timer = setTimeout(async () => {
       try {
-        const page = await fetchMembers(workspaceId, query.trim())
-        if (ticket === latest.current) setMembers(page.items.filter((m) => m.username !== me?.username))
+        const first = await fetchMembers(workspaceId, query.trim())
+        if (ticket === latest.current) setPage(first)
       } catch {
-        if (ticket === latest.current) setMembers(null)
+        if (ticket === latest.current) setPage(null)
       }
     }, query ? DEBOUNCE_MS : 0)
     return () => clearTimeout(timer)
-  }, [workspaceId, query, me])
+  }, [workspaceId, query])
+
+  async function loadMore() {
+    if (!page?.nextCursor || loadingMore) return
+    const ticket = latest.current
+    setLoadingMore(true)
+    try {
+      const more = await fetchMembers(workspaceId, query.trim(), page.nextCursor)
+      if (ticket === latest.current) {
+        setPage((current) => (current ? { items: [...current.items, ...more.items], nextCursor: more.nextCursor } : current))
+      }
+    } catch {
+      toast(M[48])
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  function handleScroll(e: UIEvent<HTMLUListElement>) {
+    const el = e.currentTarget
+    if (el.scrollHeight - el.scrollTop - el.clientHeight <= LOAD_MORE_AT) void loadMore()
+  }
+
+  // 自分は選べないので出さない
+  const members = page && page.items.filter((m) => m.username !== me?.username)
 
   async function choose(member: MemberView) {
     setStarting(member.username)
@@ -62,7 +93,7 @@ export default function StartDmDialog({ workspaceId, onClose, onStarted }: Props
       {members === null && <p className={styles.empty}>{M[48]}</p>}
       {members?.length === 0 && <p className={styles.empty}>{M[47]}</p>}
       {members && members.length > 0 && (
-        <ul className={styles.people}>
+        <ul className={styles.people} onScroll={handleScroll}>
           {members.map((m) => (
             <li key={m.username}>
               {/* 2.17 ユーザーの行。右のボタンは出さず、行を押して選ぶ */}
@@ -75,6 +106,7 @@ export default function StartDmDialog({ workspaceId, onClose, onStarted }: Props
           ))}
         </ul>
       )}
+      {loadingMore && <p className={styles.more}>読み込み中…</p>}
       <div className={dialog.actions}>
         <button type="button" className={ui.secondary} onClick={onClose}>キャンセル</button>
       </div>

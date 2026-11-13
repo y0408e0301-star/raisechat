@@ -493,6 +493,21 @@ class WebSocketApiTests {
 		assertThat(toTaro.path("conversationId").asLong()).isEqualTo(dm);
 		assertThat(toTaro.path("payload").path("canPost").asBoolean()).isFalse();
 		assertThat(JSON.readTree(hanakoClient.next()).path("type").asString()).isEqualTo("workspace.removed");
+
+		// 招待リンクでまた参加すると、相手にまた送れるようになったことが届く（FN-05 MB-8）
+		String url = JSON
+			.readTree(post(this.mvc, this.taro, "/api/workspaces/%d/invites".formatted(this.workspace), "{}")
+				.getResponse()
+				.getContentAsString(StandardCharsets.UTF_8))
+			.path("url")
+			.asString();
+		assertThat(post(this.mvc, this.hanako,
+				"/api/invites/%s/accept".formatted(url.substring(url.lastIndexOf('/') + 1)), "{}"))
+			.hasStatusOk();
+		JsonNode back = JSON.readTree(taroClient.next());
+		assertThat(back.path("type").asString()).isEqualTo("conversation.updated");
+		assertThat(back.path("conversationId").asLong()).isEqualTo(dm);
+		assertThat(back.path("payload").path("canPost").asBoolean()).isTrue();
 	}
 
 	// ---------------------------------------------------------------- 購読の取り消し（4.5）
