@@ -21,6 +21,8 @@ info:
     | WORKSPACE_NAME_REQUIRED | 400 | ワークスペースの名前を入力してください。 |
     | WORKSPACE_LIMIT | 409 | 作れるワークスペースは 10 個までです。 |
     | WORKSPACE_NOT_FOUND | 404 | このワークスペースは見つからないか、参加していません。 |
+    | INVITE_INVALID | 410 | この招待リンクは期限切れか、取り消されています。招待した人に新しいリンクをもらってください。 |
+    | INVITE_NOT_FOUND | 404 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
     | CONVERSATION_NOT_FOUND | 404 | このチャンネルは見つからないか、参加していません。 |
     | CHANNEL_NAME_INVALID | 400 | チャンネル名は空白を含まない 1〜80 文字で入力してください。 |
     | CHANNEL_NAME_TAKEN | 409 | この名前のチャンネルはすでにあります。 |
@@ -480,7 +482,7 @@ paths:
     get:
       description: 親メッセージ（スレッドの返信でないもの）を古い順に返す。before（その ID より前）・after（その ID より後）のどちらか、またはなし（最新）。limit
         は 1〜50（指定がなければ 50）。around はメッセージの位置を開く（1-15）で足す
-      operationId: list_2
+      operationId: list_3
       parameters:
       - in: path
         name: conversationId
@@ -601,6 +603,70 @@ paths:
       summary: 会話を開いた・読んだ（FN-14）
       tags:
       - FN-06 チャンネル
+  /api/invites/{token}:
+    get:
+      description: ログインしていなくてもよい。ログインしていなければワークスペースの名前だけを返す。使えないリンクは 410
+      operationId: preview
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvitePreview"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 招待リンクの中身（G-4）
+      tags:
+      - FN-04 招待
+  /api/invites/{token}/accept:
+    post:
+      description: ワークスペースのメンバーになり general に入る。すでにメンバーなら何もしない。使えないリンクは 410
+      operationId: accept
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceDetail"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 招待リンクから参加する
+      tags:
+      - FN-04 招待
   /api/messages/{messageId}:
     delete:
       description: 送った本人とオーナーだけ。返信のある親メッセージは「削除されました」にして 200 で返し、それ以外は消して 204
@@ -773,7 +839,7 @@ paths:
   /api/workspaces/{workspaceId}/channels:
     get:
       description: 公開チャンネルと、自分が入っているプライベートチャンネルを名前の順に 50 件ずつ。q は名前に含む文字（0〜80 文字）
-      operationId: list_1
+      operationId: list_2
       parameters:
       - in: path
         name: workspaceId
@@ -815,7 +881,7 @@ paths:
       - FN-06 チャンネル
     post:
       description: 自分をメンバーにする。同じ名前（大文字・小文字を区別しない）があれば 409
-      operationId: create_1
+      operationId: create_2
       parameters:
       - in: path
         name: workspaceId
@@ -854,7 +920,7 @@ paths:
   /api/workspaces/{workspaceId}/conversations:
     get:
       description: 自分が入っているチャンネル（general が先頭、あとは名前の順）。ページングしない
-      operationId: list_3
+      operationId: list_4
       parameters:
       - in: path
         name: workspaceId
@@ -886,6 +952,111 @@ paths:
       summary: サイドバーの会話の一覧
       tags:
       - FN-06 チャンネル
+  /api/workspaces/{workspaceId}/invites:
+    get:
+      description: オーナーだけ。作った新しい順に 50 件ずつ。作ってから 30 日たったものは消える
+      operationId: list_1
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvitePage"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 招待リンクの一覧（G-11）
+      tags:
+      - FN-04 招待
+    post:
+      description: オーナーだけ。期限は 7 日後
+      operationId: create_1
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteView"
+          description: 作った
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 招待リンクを作る
+      tags:
+      - FN-04 招待
+  /api/workspaces/{workspaceId}/invites/{inviteId}:
+    delete:
+      description: オーナーだけ。行は消さずに取り消し済みにする。取り消し済み・期限切れでも 204
+      operationId: revoke
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: inviteId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: 取り消した
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 招待リンクを取り消す
+      tags:
+      - FN-04 招待
 components:
   schemas:
     ChannelListItem:
@@ -1107,6 +1278,49 @@ components:
       - code
       - field
       - message
+    InvitePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InviteView"
+        nextCursor:
+          type:
+          - string
+          - "null"
+      required:
+      - items
+      - nextCursor
+    InvitePreview:
+      type: object
+      properties:
+        alreadyMember:
+          type:
+          - boolean
+          - "null"
+        memberCount:
+          type:
+          - integer
+          - "null"
+          format: int64
+        ownerDisplayName:
+          type:
+          - string
+          - "null"
+        workspaceId:
+          type:
+          - integer
+          - "null"
+          format: int64
+        workspaceName:
+          type: string
+      required:
+      - alreadyMember
+      - memberCount
+      - ownerDisplayName
+      - workspaceId
+      - workspaceName
     InviteRequest:
       type: object
       properties:
@@ -1119,6 +1333,38 @@ components:
           minItems: 1
       required:
       - usernames
+    InviteView:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        revokedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - EXPIRED
+          - REVOKED
+        url:
+          type: string
+      required:
+      - createdAt
+      - expiresAt
+      - id
+      - revokedAt
+      - status
+      - url
     LoginRequest:
       type: object
       properties:

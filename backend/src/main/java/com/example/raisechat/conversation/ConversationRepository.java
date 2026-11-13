@@ -59,4 +59,13 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 			""")
 	List<Conversation> findJoinedChannels(@Param("me") long me, @Param("workspaceId") long workspaceId);
 
+	// 自分が入っている DM。キック・退出しても行は残るので、招待リンクでまた参加したときに戻す（BR-6、FN-05 MB-7）
+	@Query("""
+			select c from Conversation c join ConversationMember cm on cm.conversationId = c.id
+			where c.workspaceId = :workspaceId and cm.userId = :me
+			  and c.type = com.example.raisechat.conversation.Conversation.Type.DM
+			order by c.id
+			""")
+	List<Conversation> findJoinedDms(@Param("me") long me, @Param("workspaceId") long workspaceId);
+
 }

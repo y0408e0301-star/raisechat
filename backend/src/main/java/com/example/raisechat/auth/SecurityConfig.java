@@ -55,12 +55,17 @@ class SecurityConfig {
 			PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/auth/refresh"),
 			PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/api/auth/username-availability"));
 
+	// ログインしていなくても使えるが、ログインしていればその人として扱う API（G-4 の招待リンクの中身。FN-04 I-4・I-5）。
+	// JWT の期限が切れていれば 401 を返し、画面が取り直してやり直す
+	private static final RequestMatcher OPTIONAL_AUTH_API = PathPatternRequestMatcher.pathPattern(HttpMethod.GET,
+			"/api/invites/{token}");
+
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http, JwtDecoder jwtDecoder, JsonMapper jsonMapper,
 			CsrfTokenRepository csrfTokenRepository) {
 		AuthenticationEntryPoint unauthorized = (request, response, ex) -> writeError(response, jsonMapper,
 				unauthorized(ex));
-		http.authorizeHttpRequests((authorize) -> authorize.requestMatchers(PUBLIC_API)
+		http.authorizeHttpRequests((authorize) -> authorize.requestMatchers(PUBLIC_API, OPTIONAL_AUTH_API)
 			.permitAll()
 			.requestMatchers("/api/**")
 			.authenticated()

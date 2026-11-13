@@ -33,6 +33,12 @@ public enum ErrorCode {
 
 	WORKSPACE_NOT_FOUND(HttpStatus.NOT_FOUND, "このワークスペースは見つからないか、参加していません。"),
 
+	// 招待リンク（FN-04 9 章。M-18・M-49）。期限切れ・取り消し済み・存在しない・形が違うリンクを見分けない
+	INVITE_INVALID(HttpStatus.GONE, "この招待リンクは期限切れか、取り消されています。招待した人に新しいリンクをもらってください。"),
+
+	// 取り消そうとした招待リンクがない
+	INVITE_NOT_FOUND(HttpStatus.NOT_FOUND, "操作に失敗しました。時間をおいてもう一度お試しください。"),
+
 	// 会話（FN-06・FN-12 9 章。M-27）
 	CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "このチャンネルは見つからないか、参加していません。"),
 
