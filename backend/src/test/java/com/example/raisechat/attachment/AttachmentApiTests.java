@@ -192,8 +192,32 @@ class AttachmentApiTests {
 	@Test
 	void 申告と違うContentTypeではPUTできない() throws Exception {
 		Map<String, Object> ticket = ticket(createUpload(this.taro, this.general, "a.png", "image/png", 10));
-		HttpResponse<String> put = put((String) ticket.get("putUrl"), "text/html", new byte[10]);
+		HttpResponse<String> put = put((String) ticket.get("putUrl"),
+				Map.of("Content-Type", "text/html", "If-None-Match", "*"), new byte[10]);
 		assertThat(put.statusCode()).isEqualTo(403);
+	}
+
+	// FN-09 5 章の 2：complete で確かめた後に、同じ URL で中身を差し替えられない
+	@Test
+	void 一度置いたファイルは同じURLで置き換えられない() throws Exception {
+		byte[] png = TestImages.png(10, 10);
+		Map<String, Object> ticket = ticket(createUpload(this.taro, this.general, "a.png", "image/png", png.length));
+		@SuppressWarnings("unchecked")
+		Map<String, String> headers = (Map<String, String>) ticket.get("headers");
+		assertThat(headers).containsEntry("If-None-Match", "*");
+		assertThat(put((String) ticket.get("putUrl"), headers, png).statusCode()).isEqualTo(200);
+		assertThat(complete(this.taro, ((Number) ticket.get("uploadId")).longValue())).hasStatusOk();
+
+		byte[] html = new byte[png.length];
+		HttpResponse<String> again = put((String) ticket.get("putUrl"), headers, html);
+
+		assertThat(again.statusCode()).isEqualTo(412);
+		HttpResponse<byte[]> stored = httpGet(
+				this.minio.getS3URL() + "/" + TestcontainersConfiguration.BUCKET + "/" + keys().getFirst());
+		// 署名なしでは読めないので、置いてあるものは S3 の API で確かめる
+		assertThat(stored.statusCode()).isEqualTo(403);
+		assertThat(this.s3.getObjectAsBytes((r) -> r.bucket(TestcontainersConfiguration.BUCKET).key(keys().getFirst()))
+			.asByteArray()).isEqualTo(png);
 	}
 
 	@Test
@@ -435,7 +459,7 @@ class AttachmentApiTests {
 		Map<String, Object> ticket = ticket(created);
 		@SuppressWarnings("unchecked")
 		Map<String, String> headers = (Map<String, String>) ticket.get("headers");
-		HttpResponse<String> put = put((String) ticket.get("putUrl"), headers.get("Content-Type"), data);
+		HttpResponse<String> put = put((String) ticket.get("putUrl"), headers, data);
 		assertThat(put.statusCode()).as(put.body()).isEqualTo(200);
 		return ((Number) ticket.get("uploadId")).longValue();
 	}
@@ -502,13 +526,13 @@ class AttachmentApiTests {
 		return data;
 	}
 
-	private static HttpResponse<String> put(String url, String contentType, byte[] data)
+	private static HttpResponse<String> put(String url, Map<String, String> headers, byte[] data)
 			throws IOException, InterruptedException {
+		HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(url))
+			.PUT(HttpRequest.BodyPublishers.ofByteArray(data));
+		headers.forEach(request::header);
 		try (HttpClient client = HttpClient.newHttpClient()) {
-			return client.send(HttpRequest.newBuilder(URI.create(url))
-				.header("Content-Type", contentType)
-				.PUT(HttpRequest.BodyPublishers.ofByteArray(data))
-				.build(), HttpResponse.BodyHandlers.ofString());
+			return client.send(request.build(), HttpResponse.BodyHandlers.ofString());
 		}
 	}
 

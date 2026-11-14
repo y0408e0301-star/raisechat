@@ -113,7 +113,8 @@ public class FileStorage {
 	}
 
 	// 画面から直接置くための署名付きの PUT の URL。Content-Type と Content-Length を署名に含め、
-	// 申告と違うファイルを置けないようにする（FN-09 5 章の 2）
+	// 申告と違うファイルを置けないようにする（FN-09 5 章の 2）。If-None-Match: * も署名に含め、
+	// 一度置いたファイルを同じ URL で置き換えられないようにする（complete で確かめた後に中身を差し替えられないため）
 	public PutUrl signedPutUrl(String key, String contentType, long contentLength) {
 		PresignedPutObjectRequest presigned = this.presigner.presignPutObject(PutObjectPresignRequest.builder()
 			.signatureDuration(PUT_URL_TTL)
@@ -122,9 +123,11 @@ public class FileStorage {
 				.key(key)
 				.contentType(contentType)
 				.contentLength(contentLength)
+				.ifNoneMatch("*")
 				.build())
 			.build());
-		return new PutUrl(presigned.url().toString(), Map.of("Content-Type", contentType), presigned.expiration());
+		return new PutUrl(presigned.url().toString(), Map.of("Content-Type", contentType, "If-None-Match", "*"),
+				presigned.expiration());
 	}
 
 	// 日本語のファイル名も崩れないよう、RFC 6266 の filename*（UTF-8）で書く。filename は ASCII だけの代わりの名前
