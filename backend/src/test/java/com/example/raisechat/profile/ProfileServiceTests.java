@@ -99,14 +99,16 @@ class ProfileServiceTests {
 
 	// S3 に置けなければ 500 にし、データベースは変えない
 	@Test
-	void S3に置けなければアバターは変わらない() {
+	void S3に置けなければアバターは変わらず置いたかもしれないファイルを消す() {
 		doThrow(SdkClientException.create("S3 につながらない")).when(this.storage).put(anyString(), anyString(), any());
 
 		assertThatThrownBy(() -> this.service.changeAvatar(TARO, TestImages.png(300, 200)))
 			.isInstanceOf(SdkClientException.class);
 
 		verify(this.users, never()).findByIdForUpdate(TARO);
-		verify(this.deleter, never()).deleteOrRecord(any());
+		ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
+		verify(this.storage).put(key.capture(), anyString(), any());
+		verify(this.deleter).deleteOrRecord(List.of(key.getValue()));
 	}
 
 	// TC-02-1

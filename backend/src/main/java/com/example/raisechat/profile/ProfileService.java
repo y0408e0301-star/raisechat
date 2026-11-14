@@ -98,13 +98,15 @@ class ProfileService {
 		BufferedImage image = Images.read(data, AVATAR_SIZE)
 			.orElseThrow(() -> new ApiException(ErrorCode.AVATAR_INVALID, "file"));
 		String key = "avatars/" + UUID.randomUUID() + ".png";
-		this.storage.put(key, ImageFormat.PNG.contentType(), Images.png(Images.squareCrop(image, AVATAR_SIZE)));
+		byte[] png = Images.png(Images.squareCrop(image, AVATAR_SIZE));
 		Changed changed = null;
 		try {
+			this.storage.put(key, ImageFormat.PNG.contentType(), png);
 			changed = replaceAvatar(me, key);
 		}
 		finally {
-			// データベースに記録できなかったので、置いたファイルは使われない
+			// データベースに記録できなかったので、置いたファイルは使われない。S3 に置くのに失敗したときも、
+			// 置けたのに応答だけ届かなかったことがあるので消す（ないファイルを消しても失敗にはならない）
 			if (changed == null) {
 				this.deleter.deleteOrRecord(List.of(key));
 			}
