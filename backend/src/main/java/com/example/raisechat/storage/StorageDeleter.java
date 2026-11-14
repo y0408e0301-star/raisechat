@@ -42,11 +42,10 @@ public class StorageDeleter {
 
 	// 同じキーを同時に記録したときは、一意の制約で片方が失敗するが、記録は 1 つあれば足りる
 	private void record(String key) {
-		if (this.deletions.existsByStorageKey(key)) {
-			return;
-		}
 		try {
-			this.deletions.save(new StorageDeletion(key, this.clock.instant()));
+			if (!this.deletions.existsByStorageKey(key)) {
+				this.deletions.save(new StorageDeletion(key, this.clock.instant()));
+			}
 		}
 		catch (DataIntegrityViolationException ex) {
 			log.atDebug().addKeyValue("storage.key", key).log("S3 から消せなかったファイル {} はもう記録してあります", key);

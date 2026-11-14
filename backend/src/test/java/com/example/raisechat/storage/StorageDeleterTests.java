@@ -73,6 +73,17 @@ class StorageDeleterTests {
 	}
 
 	@Test
+	void 記録があるかを確かめられなくても例外を出さない() {
+		doThrow(SdkClientException.create("S3 につながらない")).when(this.storage).delete("avatars/a.png");
+		when(this.deletions.existsByStorageKey("avatars/a.png"))
+			.thenThrow(new DataAccessResourceFailureException("DB が止まっている"));
+
+		this.deleter.deleteOrRecord(List.of("avatars/a.png"));
+
+		verify(this.deletions, never()).save(any());
+	}
+
+	@Test
 	void すでに記録してあるキーは重ねて記録しない() {
 		doThrow(SdkClientException.create("S3 につながらない")).when(this.storage).delete("avatars/a.png");
 		when(this.deletions.existsByStorageKey("avatars/a.png")).thenReturn(true);
