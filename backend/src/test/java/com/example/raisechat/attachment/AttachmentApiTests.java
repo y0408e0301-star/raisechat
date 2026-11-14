@@ -307,6 +307,10 @@ class AttachmentApiTests {
 		}
 		assertError(send(this.taro, this.general, "本文", List.of(hanakos, hanakos)), ErrorCode.BAD_REQUEST,
 				"attachmentIds");
+		assertError(
+				post(this.mvc, this.taro, "/api/conversations/%d/messages".formatted(this.general),
+						"{\"body\":\"本文\",\"clientId\":\"%s\",\"attachmentIds\":[null]}".formatted(UUID.randomUUID())),
+				ErrorCode.BAD_REQUEST, "attachmentIds");
 		// 送れなかったものは何も付いていない
 		assertThat(
 				this.jdbc.queryForObject("SELECT count(*) FROM attachments WHERE message_id IS NOT NULL", Long.class))

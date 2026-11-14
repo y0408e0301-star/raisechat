@@ -2,7 +2,9 @@ package com.example.raisechat.attachment;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
 
@@ -114,18 +116,21 @@ class AttachmentService {
 		Integer w = width;
 		Integer h = height;
 		String thumbnail = thumbnailKey;
-		AttachmentView view = this.transaction.execute((status) -> {
-			Attachment locked = this.attachments.findByIdForUpdate(uploadId)
-				.orElseThrow(() -> new ApiException(ErrorCode.UPLOAD_NOT_FOUND));
-			if (locked.getStatus() == Attachment.Status.UPLOADING) {
-				locked.markReady(w, h, thumbnail);
+		Optional<AttachmentView> view = this.transaction
+			.execute((status) -> this.attachments.findByIdForUpdate(uploadId).map((locked) -> {
+				if (locked.getStatus() == Attachment.Status.UPLOADING) {
+					locked.markReady(w, h, thumbnail);
+				}
+				return AttachmentView.of(locked, this.storage);
+			}));
+		if (view == null || view.isEmpty()) {
+			// 読み書きしている間に外された（DELETE・1 日 1 回の片付け）。外した側は縮小した画像を知らないので、ここで消す
+			if (thumbnail != null) {
+				this.deleter.deleteOrRecord(List.of(thumbnail));
 			}
-			return AttachmentView.of(locked, this.storage);
-		});
-		if (view == null) {
-			throw new IllegalStateException("トランザクションの結果がありません");
+			throw new ApiException(ErrorCode.UPLOAD_NOT_FOUND);
 		}
-		return view;
+		return view.get();
 	}
 
 	// 送る前に外す（AT-1）。行を消し、コミットの後で S3 のファイルを消す

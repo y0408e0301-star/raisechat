@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import org.jspecify.annotations.Nullable;
@@ -40,7 +41,7 @@ public class Attachments {
 	// まだどのメッセージにも付いていないものだけ（9 章）。並び順は送られた順
 	public List<AttachmentView> attach(long me, long conversationId, long messageId, List<Long> ids) {
 		requireAtMostFour(ids);
-		if (new HashSet<>(ids).size() != ids.size()) {
+		if (ids.stream().anyMatch(Objects::isNull) || new HashSet<>(ids).size() != ids.size()) {
 			throw new ApiException(ErrorCode.BAD_REQUEST, "attachmentIds");
 		}
 		if (ids.isEmpty()) {
@@ -87,6 +88,9 @@ public class Attachments {
 		List<Attachment> current = this.attachments.findByMessageId(messageId);
 		if (keep == null) {
 			return current.size();
+		}
+		if (keep.stream().anyMatch(Objects::isNull)) {
+			throw new ApiException(ErrorCode.BAD_REQUEST, "keepAttachmentIds");
 		}
 		Set<Long> keepIds = new HashSet<>(keep);
 		Set<Long> currentIds = new HashSet<>(current.stream().map(Attachment::getId).toList());

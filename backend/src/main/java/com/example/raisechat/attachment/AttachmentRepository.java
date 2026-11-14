@@ -36,7 +36,9 @@ interface AttachmentRepository extends JpaRepository<Attachment, Long> {
 			where a.conversationId in (select c.id from Conversation c where c.workspaceId = :workspaceId)""")
 	List<Attachment> findByWorkspaceId(@Param("workspaceId") long workspaceId);
 
-	// 送らずに 24 時間たったもの（BR-13）
+	// 送らずに 24 時間たったもの（BR-13）。同じときに送信で結びつけているもの（行をロックしている）は、
+	// ロックが外れるのを待ち、message_id が入っていれば読まない（PostgreSQL は待った後で条件を確かめ直す）
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select a from Attachment a where a.messageId is null and a.createdAt < :before")
 	List<Attachment> findUnsentBefore(@Param("before") Instant before);
 
