@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -240,42 +241,49 @@ class MessageService {
 	// 添付（AT-3）があれば本文は空でもよい
 	MessageView post(long me, long conversationId, @Nullable String rawBody, @Nullable String rawClientId,
 			@Nullable List<Long> rawAttachmentIds) {
-		UUID clientId = parseClientId(rawClientId);
-		List<Long> attachmentIds = (rawAttachmentIds == null) ? List.of() : rawAttachmentIds;
-		Attachments.requireAtMostFour(attachmentIds);
-		String body = MessageBodies.valid(rawBody, !attachmentIds.isEmpty());
-		try {
-			return run(() -> insert(me, conversationId, body, clientId, attachmentIds));
-		}
-		catch (DataIntegrityViolationException ex) {
-			// 同じ clientId が同時に送られ、もう一方が先に追加した（一意の制約）。それ以外の失敗はそのまま投げる
-			if (!isDuplicateClientId(ex)) {
-				throw ex;
-			}
-			return run(() -> this.messages.findByUserIdAndClientId(me, clientId)
-				.map((m) -> sameSend(me, conversationId, m))
-				.orElseThrow(() -> ex));
-		}
+		Sending sending = Sending.of(rawBody, rawClientId, rawAttachmentIds);
+		return send(me, sending,
+				() -> insert(me, conversationId, sending.body(), sending.clientId(), sending.attachmentIds()),
+				(sent) -> sameSend(me, conversationId, sent));
 	}
 
 	// スレッドに返信する（TH-3）。送り方・clientId・添付は会話への送信と同じ。返信への返信はできない（TH-5）
 	MessageView postReply(long me, long parentId, @Nullable String rawBody, @Nullable String rawClientId,
 			@Nullable List<Long> rawAttachmentIds) {
-		UUID clientId = parseClientId(rawClientId);
-		List<Long> attachmentIds = (rawAttachmentIds == null) ? List.of() : rawAttachmentIds;
-		Attachments.requireAtMostFour(attachmentIds);
-		String body = MessageBodies.valid(rawBody, !attachmentIds.isEmpty());
+		Sending sending = Sending.of(rawBody, rawClientId, rawAttachmentIds);
+		return send(me, sending,
+				() -> insertReply(me, parentId, sending.body(), sending.clientId(), sending.attachmentIds()),
+				(sent) -> sameReply(me, parentId, sent));
+	}
+
+	// 1 つのトランザクションで追加する。同じ clientId が同時に送られ、もう一方が先に追加した（一意の制約）ときは、
+	// 先に追加したものを読み直して same で確かめて返す。それ以外の失敗はそのまま投げる
+	private MessageView send(long me, Sending sending, Supplier<MessageView> insert,
+			Function<Message, MessageView> same) {
 		try {
-			return run(() -> insertReply(me, parentId, body, clientId, attachmentIds));
+			return run(insert);
 		}
 		catch (DataIntegrityViolationException ex) {
 			if (!isDuplicateClientId(ex)) {
 				throw ex;
 			}
-			return run(() -> this.messages.findByUserIdAndClientId(me, clientId)
-				.map((m) -> sameReply(me, parentId, m))
+			return run(() -> this.messages.findByUserIdAndClientId(me, sending.clientId())
+				.map(same)
 				.orElseThrow(() -> ex));
 		}
+	}
+
+	// 送るときの入力（FN-07 4 章）。添付があれば本文は空でもよい
+	private record Sending(String body, UUID clientId, List<Long> attachmentIds) {
+
+		static Sending of(@Nullable String rawBody, @Nullable String rawClientId,
+				@Nullable List<Long> rawAttachmentIds) {
+			UUID clientId = parseClientId(rawClientId);
+			List<Long> attachmentIds = (rawAttachmentIds == null) ? List.of() : rawAttachmentIds;
+			Attachments.requireAtMostFour(attachmentIds);
+			return new Sending(MessageBodies.valid(rawBody, !attachmentIds.isEmpty()), clientId, attachmentIds);
+		}
+
 	}
 
 	// 返信の追加と親の件数の直しが、ほかの返信・削除と同時に起きても食い違わないよう、親の行をロックする（BR-8）
