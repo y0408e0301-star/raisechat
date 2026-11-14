@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -236,6 +237,41 @@ class WebSocketApiTests {
 	// ---------------------------------------------------------------- メッセージの通知（FN-07 6
 	// 章、TC-07-3）
 
+	// TC-08-1（TH-3）：返信と親の件数の変化が、会話を購読している人に届く。返信を消すと、返信の削除と親の件数の変化が届く
+	@Test
+	void スレッドの返信と親の件数の変化が会話を購読している人に届く() throws Exception {
+		StompTestClient hanakoClient = connect(this.hanako);
+		hanakoClient.subscribe(topic(this.general));
+		awaitSubscribers(topic(this.general), 1);
+		long parent = send(this.taro, "旅行の計画");
+		hanakoClient.next();
+
+		MvcTestResult sent = post(this.mvc, this.taro, "/api/messages/%d/replies".formatted(parent),
+				"{\"body\":\"行きたい\",\"clientId\":\"%s\"}".formatted(UUID.randomUUID()));
+		assertThat(sent).hasStatus(HttpStatus.CREATED);
+		long reply = readLong(sent, "$.id");
+
+		JsonNode created = JSON.readTree(hanakoClient.next());
+		assertThat(created.path("type").asString()).isEqualTo("message.created");
+		assertThat(created.path("payload").path("id").asLong()).isEqualTo(reply);
+		assertThat(created.path("payload").path("parentId").asLong()).isEqualTo(parent);
+		JsonNode parentUpdated = JSON.readTree(hanakoClient.next());
+		assertThat(parentUpdated.path("type").asString()).isEqualTo("message.updated");
+		assertThat(parentUpdated.path("payload").path("id").asLong()).isEqualTo(parent);
+		assertThat(parentUpdated.path("payload").path("replyCount").asInt()).isEqualTo(1);
+		assertThat(parentUpdated.path("payload").path("replyUsers").get(0).path("username").asString())
+			.isEqualTo("taro_y");
+
+		assertThat(delete(this.mvc, this.taro, "/api/messages/" + reply)).hasStatus(HttpStatus.NO_CONTENT);
+
+		JsonNode deleted = JSON.readTree(hanakoClient.next());
+		assertThat(deleted.path("type").asString()).isEqualTo("message.deleted");
+		assertThat(deleted.path("payload").path("parentId").asLong()).isEqualTo(parent);
+		JsonNode parentAgain = JSON.readTree(hanakoClient.next());
+		assertThat(parentAgain.path("type").asString()).isEqualTo("message.updated");
+		assertThat(parentAgain.path("payload").path("replyCount").asInt()).isZero();
+	}
+
 	@Test
 	void 送信_編集_削除が会話を購読している人に届き_JSONの見本を書き出す() throws Exception {
 		StompTestClient hanakoClient = connect(this.hanako);
@@ -445,8 +481,12 @@ class WebSocketApiTests {
 				post(this.mvc, jiro, "/api/invites/%s/accept".formatted(url.substring(url.lastIndexOf('/') + 1)), "{}"))
 			.hasStatusOk();
 
-		JsonNode first = JSON.readTree(jiroClient.next());
-		JsonNode second = JSON.readTree(jiroClient.next());
+		// 2 つの通知は別のスレッドで送られるので、届く順は決まっていない。会話の ID の順に並べて確かめる
+		List<JsonNode> received = new ArrayList<>(
+				List.of(JSON.readTree(jiroClient.next()), JSON.readTree(jiroClient.next())));
+		received.sort(Comparator.comparingLong((JsonNode n) -> n.path("conversationId").asLong()));
+		JsonNode first = received.get(0);
+		JsonNode second = received.get(1);
 		assertThat(first.path("type").asString()).isEqualTo("conversation.updated");
 		assertThat(first.path("conversationId").asLong()).isEqualTo(this.general);
 		assertThat(first.path("payload").path("general").asBoolean()).isTrue();

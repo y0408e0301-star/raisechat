@@ -27,7 +27,7 @@ public class Message {
 	@Column(nullable = false, updatable = false)
 	private long userId;
 
-	// スレッドの返信のときだけ。返信はスレッド（開発計画書 1-12）で作る
+	// スレッドの返信のときだけ（FN-08）
 	@Column(updatable = false)
 	private @Nullable Long parentId;
 
@@ -61,16 +61,33 @@ public class Message {
 		this.createdAt = now;
 	}
 
+	// スレッドの返信（FN-08 5 章の 1）。親と同じ会話のメッセージにする
+	static Message reply(Message parent, long userId, UUID clientId, String body, Instant now) {
+		Message reply = new Message(parent.conversationId, userId, clientId, body, now);
+		reply.parentId = parent.getId();
+		return reply;
+	}
+
+	boolean isReply() {
+		return this.parentId != null;
+	}
+
 	// 本文を直す（MS-9）
 	void edit(String body, Instant now) {
 		this.body = body;
 		this.editedAt = now;
 	}
 
-	// 返信を足したときに、親メッセージの件数と最後の返信の日時を直す（BR-7。スレッド（開発計画書 1-12）で使う）
+	// 返信を足したときに、親メッセージの件数と最後の返信の日時を直す（BR-7）
 	void replyAdded(Instant at) {
 		this.replyCount++;
 		this.lastReplyAt = at;
+	}
+
+	// 返信を消したときに、親メッセージの件数と最後の返信の日時を直す（BR-8）。lastReplyAt は残った返信の最後のもの
+	void replyRemoved(@Nullable Instant lastReplyAt) {
+		this.replyCount = Math.max(0, this.replyCount - 1);
+		this.lastReplyAt = lastReplyAt;
 	}
 
 	// 返信のある親メッセージを「削除されました」にする。本文を空にし、スレッドは残す（MS-11、BR-8）

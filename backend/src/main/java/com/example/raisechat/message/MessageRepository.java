@@ -1,9 +1,12 @@
 package com.example.raisechat.message;
 
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -47,6 +50,36 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 			where m.conversationId = :conversationId and m.parentId is null and m.id < :before
 			""")
 	boolean existsBefore(@Param("conversationId") long conversationId, @Param("before") long before);
+
+	// スレッドの返信（FN-08 5 章の 5）。会話の一覧と同じく、最新から古い順に読み、画面には古い順に並べ直して返す
+	@Query("select m from Message m where m.parentId = :parentId order by m.id desc")
+	List<Message> findLatestReplies(@Param("parentId") long parentId, Limit limit);
+
+	@Query("select m from Message m where m.parentId = :parentId and m.id < :before order by m.id desc")
+	List<Message> findRepliesBefore(@Param("parentId") long parentId, @Param("before") long before, Limit limit);
+
+	@Query("select m from Message m where m.parentId = :parentId and m.id > :after order by m.id")
+	List<Message> findRepliesAfter(@Param("parentId") long parentId, @Param("after") long after, Limit limit);
+
+	@Query("select count(m) > 0 from Message m where m.parentId = :parentId and m.id < :before")
+	boolean existsReplyBefore(@Param("parentId") long parentId, @Param("before") long before);
+
+	@Query("select count(m) > 0 from Message m where m.parentId = :parentId and m.id > :after")
+	boolean existsReplyAfter(@Param("parentId") long parentId, @Param("after") long after);
+
+	// 返信を消した後の、残った返信の最後の日時（BR-8）。なければ null
+	@Query("select max(m.createdAt) from Message m where m.parentId = :parentId")
+	@Nullable Instant findLastReplyAt(@Param("parentId") long parentId);
+
+	// 親メッセージごとの、返信した人とその人の最後の返信の ID（画面設計書 2.9 の返信した人のアバター）
+	@Query("""
+			select new com.example.raisechat.message.MessageRepository$Replier(m.parentId, m.userId, max(m.id))
+			from Message m where m.parentId in :parentIds group by m.parentId, m.userId
+			""")
+	List<Replier> findRepliers(@Param("parentIds") Collection<Long> parentIds);
+
+	record Replier(long parentId, long userId, long lastReplyId) {
+	}
 
 	// 同じ人が同じ clientId で送ったもの（FN-07 5 章の 8）
 	Optional<Message> findByUserIdAndClientId(long userId, UUID clientId);

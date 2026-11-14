@@ -406,6 +406,30 @@ export interface paths {
         patch: operations["edit"];
         trace?: never;
     };
+    "/api/messages/{parentId}/replies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * スレッドの返信の一覧（FN-08）
+         * @description 親メッセージと、返信を古い順に返す。before・after・limit は会話の一覧と同じ。「削除されました」の親のスレッドも読める
+         */
+        get: operations["replies"];
+        put?: never;
+        /**
+         * スレッドに返信する（FN-08）
+         * @description 送り方・clientId・添付は会話への送信と同じ。返信への返信は 400 CANNOT_REPLY_TO_REPLY
+         */
+        post: operations["reply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/uploads/{uploadId}": {
         parameters: {
             query?: never;
@@ -864,6 +888,7 @@ export interface components {
             parentId: number | null;
             /** Format: int32 */
             replyCount: number;
+            replyUsers: components["schemas"]["UserSummary"][];
         };
         MyProfile: {
             avatarUrl: string | null;
@@ -888,6 +913,12 @@ export interface components {
              * @description 画面に出したいちばん新しい親メッセージの ID。メッセージがまだない会話では 0（FN-14 4 章）
              */
             lastMessageId: number;
+        };
+        ReplyPage: {
+            hasMoreAfter: boolean;
+            hasMoreBefore: boolean;
+            items: components["schemas"]["MessageView"][];
+            parent: components["schemas"]["MessageView"];
         };
         SignupRequest: {
             /** @description 前後の空白を除いて 1〜30 文字（A-4） */
@@ -2024,6 +2055,94 @@ export interface operations {
         responses: {
             /** @description OK */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageView"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    replies: {
+        parameters: {
+            query?: {
+                before?: number;
+                after?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                parentId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplyPage"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                parentId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description 送った */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

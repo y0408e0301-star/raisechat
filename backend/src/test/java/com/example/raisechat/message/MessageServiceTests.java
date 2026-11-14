@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.hibernate.exception.ConstraintViolationException;
@@ -88,7 +89,7 @@ class MessageServiceTests {
 		when(this.messages.saveAndFlush(any())).thenThrow(violation("messages_user_client_key"));
 		when(this.workspaceAccess.requireMember(TARO, 3))
 			.thenReturn(new WorkspaceMember(3, TARO, WorkspaceMember.Role.MEMBER, TestEntities.NOW));
-		when(this.users.findAllById(List.of(TARO))).thenReturn(List.of(TestEntities.user(TARO, "taro_y")));
+		when(this.users.findAllById(Set.of(TARO))).thenReturn(List.of(TestEntities.user(TARO, "taro_y")));
 
 		MessageView view = this.service.post(TARO, CONVERSATION, "本文", CLIENT_ID.toString(), null);
 

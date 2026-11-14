@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-FD-08 |
-| 版数 | 0.2 |
+| 版数 | 0.3 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-10 |
+| 最終更新日 | 2026-11-14 |
 | 作成者 | （氏名） |
 | 上位文書 | [機能定義書](function-definition.md)（RC-FD） |
 | 状態 | 承認待ち |
@@ -16,6 +16,7 @@
 | --- | --- | --- | --- |
 | 0.1 | 2026-11-10 | 初版 | （氏名） |
 | 0.2 | 2026-11-10 | データ設計書を作るときのレビューで、「削除されました」の親メッセージにも返信できることを TH-7 に足した | （氏名） |
+| 0.3 | 2026-11-14 | スレッドを作るとき（開発計画書 1-12）に決めたことを 5 章に足した：行をロックする順、clientId、DM の通知、返信した人（replyUsers）。返信の ID でスレッドを開くと 404 | （氏名） |
 
 本書は機能定義書の一部である。承認は[機能定義書](function-definition.md)で一括して行う。API・リアルタイムの通知・メッセージの共通の決まりは機能定義書 3 章〜5 章のとおり。
 
@@ -82,12 +83,16 @@ FN-07 の 4 章と同じ。ほかに入力はない。
 | 4 | スレッドのパネルを開いているときも、購読するのはその会話の /topic/conversations/{id} だけ（返信の通知は同じ宛先に届く。機能定義書 4.2） |
 | 5 | 返信の一覧は 50 件ずつ。開いたときは最新の 50 件を出し、上に戻るとその前を読む |
 | 6 | 検索・メンションから返信を開いたとき（FN-07 MS-14）は、会話の一覧で親メッセージの位置を開き、パネルでその返信の位置を開く |
+| 7 | 返信の送信と削除は、どちらも親 → 返信の順に行をロックする（同時に起きても行き詰まらない） |
+| 8 | 同じ clientId での送り直しは FN-07 5 章の 8 と同じ。ほかの親への返信や、会話へのメッセージとして前に送ったものと同じ clientId は 400 にする |
+| 9 | DM で返信したときも、DM のメッセージと同じく 2 人に conversation.updated を送る（FN-12。サイドバーの並べ直し） |
+| 10 | 親メッセージの MessageView の replyUsers に、最後に返信した人から 3 人を入れる（画面設計書 2.9 の返信した人のアバター）。返信の replyUsers は空 |
 
 ## 6. API（案）
 
 | メソッド | URL | 入力 | 出力（成功） | 主なエラー |
 | --- | --- | --- | --- | --- |
-| GET | /api/messages/{親の ID}/replies?before=&after=&around=&limit= | FN-07 の一覧と同じ | 200 `{"parent": MessageView, "items": MessageView の並び（古い順）, "hasMoreBefore", "hasMoreAfter"}` | 404 MESSAGE_NOT_FOUND |
+| GET | /api/messages/{親の ID}/replies?before=&after=&around=&limit= | FN-07 の一覧と同じ（around は 1-15 で足す） | 200 `{"parent": MessageView, "items": MessageView の並び（古い順）, "hasMoreBefore", "hasMoreAfter"}` | 404 MESSAGE_NOT_FOUND（返信の ID を渡したときも） |
 | POST | /api/messages/{親の ID}/replies | `{"body","attachmentIds","clientId"}` | 201 MessageView | 400 CANNOT_REPLY_TO_REPLY ほか FN-07 と同じ、403、404 |
 
 返信の編集・削除は FN-07 の PATCH・DELETE /api/messages/{id} を使う。

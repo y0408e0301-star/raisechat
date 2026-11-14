@@ -1,0 +1,33 @@
+/* 画面設計書 7.2 スレッドのパネル。並べ方は 2.19（1024px 以上は横に 400px、600px 以上は右から重ねる、600px 未満は画面いっぱい） */
+.panel {
+  flex: none; width: 400px; min-height: 0; display: flex; flex-direction: column;
+  border-left: 1px solid var(--line); background: var(--bg);
+}
+.head { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); min-height: 56px; }
+/* 2.2 見出しは 18px・太字。会話の名前は補足文字 */
+.title { flex: 1; min-width: 0; margin: 0; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.where { font-size: 14px; font-weight: normal; color: var(--sub); }
+.close, .back {
+  flex: none; width: 32px; height: 32px; border: none; border-radius: 8px; background: none;
+  color: var(--text); font-size: 16px; cursor: pointer;
+}
+.close:hover, .back:hover { background: var(--frame); }
+.back { display: none; }
+.list { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 0 16px; }
+.loading { text-align: center; color: var(--sub); margin: 8px 0; }
+/* 「（件数）件の返信」の区切り。区切り線の中央に補足文字 */
+.divider { display: flex; align-items: center; gap: 8px; margin: 8px 16px; color: var(--sub); font-size: 13px; }
+.divider::before, .divider::after { content: ''; flex: 1; border-top: 1px solid var(--line); }
+.cannotPost { margin: 0 16px 16px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--sub); }
+
+/* 600px 以上 1024px 未満：メッセージの一覧の上に右から重ねる */
+@media (max-width: 1023px) {
+  .panel { position: absolute; top: 0; right: 0; bottom: 0; z-index: 20; box-shadow: -4px 0 16px rgba(0, 0, 0, 0.12); }
+}
+
+/* 600px 未満：画面いっぱい。「←」で会話に戻る（TH-6） */
+@media (max-width: 599px) {
+  .panel { left: 0; width: 100%; border-left: none; box-shadow: none; }
+  .back { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; }
+  .close { display: none; }
+}

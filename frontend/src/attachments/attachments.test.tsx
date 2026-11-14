@@ -77,7 +77,7 @@ const attachment = (id: number, extra: Partial<AttachmentView> = {}): Attachment
 })
 
 const message = (id: number, attachments: AttachmentView[], extra: Partial<MessageView> = {}): MessageView => ({
-  id, conversationId: 10, parentId: null, author: me, body: '', attachments, replyCount: 0, lastReplyAt: null,
+  id, conversationId: 10, parentId: null, author: me, body: '', attachments, replyCount: 0, lastReplyAt: null, replyUsers: [],
   createdAt: '2026-11-11T01:00:00Z', editedAt: null, deleted: false, mine: true, canDelete: true, ...extra,
 })
 
@@ -270,7 +270,8 @@ describe('入力欄の添付（AT-1・AT-3・AT-4）', () => {
     fireEvent.paste(textbox, { clipboardData: { files: [png('pasted.png')] } })
     expect(within(previews()).getByRole('img', { name: 'pasted.png' })).toBeInTheDocument()
 
-    const area = textbox.closest('main')!.firstElementChild!
+    // 会話とスレッドのパネルを並べる枠の中の、会話の画面
+    const area = textbox.closest('main')!.firstElementChild!.firstElementChild!
     fireEvent.dragOver(area, { dataTransfer: { types: ['Files'], files: [] } })
     expect(screen.getByText('ドロップして添付')).toBeInTheDocument()
     fireEvent.drop(area, { dataTransfer: { types: ['Files'], files: [png('dropped.png')] } })

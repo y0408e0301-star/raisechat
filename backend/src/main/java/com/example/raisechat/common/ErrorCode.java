@@ -90,6 +90,9 @@ public enum ErrorCode {
 
 	NOT_AUTHOR(HttpStatus.FORBIDDEN, "操作に失敗しました。時間をおいてもう一度お試しください。"),
 
+	// スレッド（FN-08 9 章）。画面では返信に返信できないので、画面には出さない
+	CANNOT_REPLY_TO_REPLY(HttpStatus.BAD_REQUEST, "入力が正しくありません。"),
+
 	MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "操作に失敗しました。時間をおいてもう一度お試しください。"),
 
 	// 添付（FN-09 9 章。M-38〜M-40）

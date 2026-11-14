@@ -7,7 +7,7 @@ import Avatar from '../components/Avatar'
 import ProfileButton from '../profile/ProfileButton'
 import { useToast } from '../components/ToastContext'
 import ui from '../components/ui.module.css'
-import { formatFull, formatTime } from '../dates'
+import { formatFull, formatTime, formatUntil } from '../dates'
 import MessageBody from '../markdown/MessageBody'
 import { M } from '../messages'
 import styles from './MessageItem.module.css'
@@ -27,10 +27,16 @@ type Props = {
   onCancel: (clientId: string) => void
   // 添付が表示できなかった（署名付き URL の期限切れ。AT-10）
   onExpired: (messageId: number) => void
+  // スレッドを開く（TH-1・TH-2）。スレッドのパネルの中では渡さない（返信への返信はできない。TH-5）
+  onOpenThread?: (messageId: number) => void
+  // 送れる会話か。送れない会話では「スレッドで返信」を出さない（画面設計書 2.9）
+  canPost?: boolean
 }
 
 // メッセージ（画面設計書 2.9）と添付（2.12）。リアクション・スレッドは、それぞれの段階（1-12・1-13）で足す
-export default function MessageItem({ entry, compact, onDelete, onEdited, onGone, onRetry, onCancel, onExpired }: Props) {
+export default function MessageItem({
+  entry, compact, onDelete, onEdited, onGone, onRetry, onCancel, onExpired, onOpenThread, canPost = true,
+}: Props) {
   const toast = useToast()
   const [editing, setEditing] = useState<string | null>(null)
   // 編集で残す添付の ID（AT-9。外すことだけができる）
@@ -150,6 +156,18 @@ export default function MessageItem({ entry, compact, onDelete, onEdited, onGone
               </>
             )}
         {compact && editing === null && edited}
+        {message && onOpenThread && message.replyCount > 0 && (
+          // 返信の件数（TH-2）：返信した人のアバター（最大 3 人）・「（件数）件の返信」・最後の返信の時刻
+          <button type="button" className={styles.replies} onClick={() => onOpenThread(message.id)}>
+            <span className={styles.replyUsers} aria-hidden="true">
+              {message.replyUsers.map((u) => (
+                <Avatar key={u.username} displayName={u.displayName} avatarUrl={u.avatarUrl} size={20} />
+              ))}
+            </span>
+            <span className={styles.replyCount}>{message.replyCount} 件の返信</span>
+            {message.lastReplyAt && <span className={styles.replyLast}>最終 {formatUntil(message.lastReplyAt)}</span>}
+          </button>
+        )}
         {entry.kind === 'pending' && entry.failed && (
           // 送れなかったとき（MS-13）
           <p className={styles.failed} role="alert">
@@ -159,9 +177,13 @@ export default function MessageItem({ entry, compact, onDelete, onEdited, onGone
           </p>
         )}
       </div>
-      {message && !deleted && editing === null && (message.mine || message.canDelete) && (
+      {message && !deleted && editing === null && (message.mine || message.canDelete || (onOpenThread && canPost)) && (
         // メッセージに重ねたときに出す操作（MS-9・MS-10）
         <div className={styles.actions}>
+          {onOpenThread && canPost && (
+            <button type="button" className={styles.action} aria-label="スレッドで返信" title="スレッドで返信"
+              onClick={() => onOpenThread(message.id)}>💬</button>
+          )}
           {message.mine && (
             <button type="button" className={styles.action} aria-label="編集" title="編集"
               onClick={startEditing}>✎</button>

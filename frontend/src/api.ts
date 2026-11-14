@@ -15,6 +15,7 @@ export type ConversationSummary = Schemas['ConversationSummary']
 export type ConversationDetail = Schemas['ConversationDetail']
 export type MessageView = Schemas['MessageView']
 export type MessagePage = Schemas['MessagePage']
+export type ReplyPage = Schemas['ReplyPage']
 export type ChannelListItem = Schemas['ChannelListItem']
 export type ChannelPage = Schemas['ChannelPage']
 export type MemberPage = Schemas['MemberPage']
@@ -414,6 +415,21 @@ export function fetchMessage(messageId: number): Promise<MessageView> {
 export async function deleteMessage(messageId: number): Promise<MessageView | null> {
   const res = await request('DELETE', `/api/messages/${messageId}`)
   return res.status === 204 ? null : res.json() as Promise<MessageView>
+}
+
+// ---------------------------------------------------------------- FN-08 スレッド
+
+// 親メッセージと返信（古い順に 50 件ずつ）。before（その ID より前）か、なし（最新）
+export function fetchReplies(parentId: number, before?: number): Promise<ReplyPage> {
+  const query = before === undefined ? '' : `?before=${before}`
+  return requestJson<ReplyPage>('GET', `/api/messages/${parentId}/replies${query}`)
+}
+
+// 送り方・clientId・添付はメッセージの送信と同じ（TH-3）
+export function sendReply(parentId: number, body: string, clientId: string,
+  attachmentIds: number[] = []): Promise<MessageView> {
+  return requestJson<MessageView>('POST', `/api/messages/${parentId}/replies`,
+    { body, clientId, attachmentIds } satisfies Schemas['PostMessageRequest'])
 }
 
 // ---------------------------------------------------------------- 画面の URL（画面一覧 1 章）

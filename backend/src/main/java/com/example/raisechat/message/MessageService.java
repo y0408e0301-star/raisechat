@@ -4,9 +4,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -45,6 +49,9 @@ class MessageService {
 
 	// 1 回に読み込む件数の上限と、指定がないときの件数（FN-07 6 章）
 	static final int MAX_LIMIT = 50;
+
+	// 親メッセージの返信の件数の行に出す、返信した人の数（画面設計書 2.9）
+	static final int MAX_REPLY_USERS = 3;
 
 	// 同じ人が同じ clientId で 2 回追加しないための一意の制約の名前（V3__create_messages.sql）
 	private static final String CLIENT_ID_CONSTRAINT = "messages_user_client_key";
@@ -91,6 +98,78 @@ class MessageService {
 	@Transactional(readOnly = true)
 	MessagePage list(long me, long conversationId, @Nullable Long before, @Nullable Long after,
 			@Nullable Integer rawLimit) {
+		int limit = validLimit(before, after, rawLimit);
+		Conversation conversation = requireVisible(me, conversationId);
+		Paged paged = page(before, after, limit, new PageQueries() {
+			@Override
+			public List<Message> latest(Limit plusOne) {
+				return MessageService.this.messages.findLatest(conversationId, plusOne);
+			}
+
+			@Override
+			public List<Message> before(long id, Limit plusOne) {
+				return MessageService.this.messages.findBefore(conversationId, id, plusOne);
+			}
+
+			@Override
+			public List<Message> after(long id, Limit plusOne) {
+				return MessageService.this.messages.findAfter(conversationId, id, plusOne);
+			}
+
+			@Override
+			public boolean existsBefore(long id) {
+				return MessageService.this.messages.existsBefore(conversationId, id);
+			}
+
+			@Override
+			public boolean existsAfter(long id) {
+				return MessageService.this.messages.existsAfter(conversationId, id);
+			}
+		});
+		return new MessagePage(views(me, conversation, paged.items()), paged.hasMoreBefore(), paged.hasMoreAfter());
+	}
+
+	// スレッドの返信の一覧（TH-1、FN-08 6 章）。親メッセージと、返信を古い順に 50 件ずつ。
+	// 「削除されました」の親のスレッドも開ける（TH-7）
+	@Transactional(readOnly = true)
+	ReplyPage replies(long me, long parentId, @Nullable Long before, @Nullable Long after, @Nullable Integer rawLimit) {
+		int limit = validLimit(before, after, rawLimit);
+		Message parent = this.messages.findById(parentId)
+			.filter((m) -> !m.isReply())
+			.orElseThrow(MessageService::notFound);
+		Conversation conversation = this.conversations.findVisible(me, parent.getConversationId())
+			.orElseThrow(MessageService::notFound);
+		Paged paged = page(before, after, limit, new PageQueries() {
+			@Override
+			public List<Message> latest(Limit plusOne) {
+				return MessageService.this.messages.findLatestReplies(parentId, plusOne);
+			}
+
+			@Override
+			public List<Message> before(long id, Limit plusOne) {
+				return MessageService.this.messages.findRepliesBefore(parentId, id, plusOne);
+			}
+
+			@Override
+			public List<Message> after(long id, Limit plusOne) {
+				return MessageService.this.messages.findRepliesAfter(parentId, id, plusOne);
+			}
+
+			@Override
+			public boolean existsBefore(long id) {
+				return MessageService.this.messages.existsReplyBefore(parentId, id);
+			}
+
+			@Override
+			public boolean existsAfter(long id) {
+				return MessageService.this.messages.existsReplyAfter(parentId, id);
+			}
+		});
+		return new ReplyPage(view(me, conversation, parent), views(me, conversation, paged.items()),
+				paged.hasMoreBefore(), paged.hasMoreAfter());
+	}
+
+	private static int validLimit(@Nullable Long before, @Nullable Long after, @Nullable Integer rawLimit) {
 		if (before != null && after != null) {
 			throw new ApiException(ErrorCode.BAD_REQUEST, "before");
 		}
@@ -98,31 +177,54 @@ class MessageService {
 		if (limit < 1 || limit > MAX_LIMIT) {
 			throw new ApiException(ErrorCode.BAD_REQUEST, "limit");
 		}
-		Conversation conversation = requireVisible(me, conversationId);
+		return limit;
+	}
+
+	// before・after のどちらか、またはなし（最新）で limit 件を読み、古い順に返す。会話の一覧とスレッドの返信の一覧で使う
+	private static Paged page(@Nullable Long before, @Nullable Long after, int limit, PageQueries queries) {
 		// 1 件多く読んで、続きがあるかを知る
 		Limit plusOne = Limit.of(limit + 1);
 		List<Message> found;
 		boolean hasMoreBefore;
 		boolean hasMoreAfter;
 		if (after != null) {
-			found = new ArrayList<>(this.messages.findAfter(conversationId, after, plusOne));
+			found = new ArrayList<>(queries.after(after, plusOne));
 			hasMoreAfter = found.size() > limit;
 			found = found.subList(0, Math.min(limit, found.size()));
 			// 前があるか：読んだものの最初より前。1 件もなければ after 以前（after + 1 より前）にあるか
-			hasMoreBefore = this.messages.existsBefore(conversationId, found.isEmpty() ? after + 1 : first(found));
+			hasMoreBefore = queries.existsBefore(found.isEmpty() ? after + 1 : first(found));
 		}
 		else {
-			found = new ArrayList<>((before != null) ? this.messages.findBefore(conversationId, before, plusOne)
-					: this.messages.findLatest(conversationId, plusOne));
+			found = new ArrayList<>((before != null) ? queries.before(before, plusOne) : queries.latest(plusOne));
 			hasMoreBefore = found.size() > limit;
 			found = new ArrayList<>(found.subList(0, Math.min(limit, found.size())));
 			Collections.reverse(found);
 			// 後ろがあるか：最新を読んだときはない。before を指定したときは、読んだものの最後より後ろ。
 			// 1 件もなければ before 以降（before - 1 より後ろ）にあるか
-			hasMoreAfter = (before != null)
-					&& this.messages.existsAfter(conversationId, found.isEmpty() ? before - 1 : last(found));
+			hasMoreAfter = (before != null) && queries.existsAfter(found.isEmpty() ? before - 1 : last(found));
 		}
-		return new MessagePage(views(me, conversation, found), hasMoreBefore, hasMoreAfter);
+		return new Paged(found, hasMoreBefore, hasMoreAfter);
+	}
+
+	// 一覧を読む問い合わせ（会話のメッセージか、スレッドの返信か）
+	private interface PageQueries {
+
+		// 最新から古い順に
+		List<Message> latest(Limit plusOne);
+
+		// id より前を、新しい順に
+		List<Message> before(long id, Limit plusOne);
+
+		// id より後を、古い順に
+		List<Message> after(long id, Limit plusOne);
+
+		boolean existsBefore(long id);
+
+		boolean existsAfter(long id);
+
+	}
+
+	private record Paged(List<Message> items, boolean hasMoreBefore, boolean hasMoreAfter) {
 	}
 
 	// 1 件のメッセージ（添付の署名付き URL の期限が切れたときに読み直す。AT-10）
@@ -156,6 +258,60 @@ class MessageService {
 		}
 	}
 
+	// スレッドに返信する（TH-3）。送り方・clientId・添付は会話への送信と同じ。返信への返信はできない（TH-5）
+	MessageView postReply(long me, long parentId, @Nullable String rawBody, @Nullable String rawClientId,
+			@Nullable List<Long> rawAttachmentIds) {
+		UUID clientId = parseClientId(rawClientId);
+		List<Long> attachmentIds = (rawAttachmentIds == null) ? List.of() : rawAttachmentIds;
+		Attachments.requireAtMostFour(attachmentIds);
+		String body = MessageBodies.valid(rawBody, !attachmentIds.isEmpty());
+		try {
+			return run(() -> insertReply(me, parentId, body, clientId, attachmentIds));
+		}
+		catch (DataIntegrityViolationException ex) {
+			if (!isDuplicateClientId(ex)) {
+				throw ex;
+			}
+			return run(() -> this.messages.findByUserIdAndClientId(me, clientId)
+				.map((m) -> sameReply(me, parentId, m))
+				.orElseThrow(() -> ex));
+		}
+	}
+
+	// 返信の追加と親の件数の直しが、ほかの返信・削除と同時に起きても食い違わないよう、親の行をロックする（BR-8）
+	private MessageView insertReply(long me, long parentId, String body, UUID clientId, List<Long> attachmentIds) {
+		Message parent = this.messages.findByIdForUpdate(parentId).orElseThrow(MessageService::notFound);
+		Conversation conversation = this.conversations.findVisible(me, parent.getConversationId())
+			.orElseThrow(MessageService::notFound);
+		if (parent.isReply()) {
+			throw new ApiException(ErrorCode.CANNOT_REPLY_TO_REPLY);
+		}
+		Optional<Message> sent = this.messages.findByUserIdAndClientId(me, clientId);
+		if (sent.isPresent()) {
+			return sameReply(me, parentId, sent.get());
+		}
+		this.access.requireCanPost(me, conversation);
+		Message reply = this.messages.saveAndFlush(Message.reply(parent, me, clientId, body, this.clock.instant()));
+		this.attachments.attach(me, conversation.getId(), reply.getId(), attachmentIds);
+		parent.replyAdded(reply.getCreatedAt());
+		MessageView view = view(me, conversation, reply);
+		// スレッドを開いている人のパネルに返信を足し、会話を開いている人の親の件数と時刻を変える（TH-3）
+		notify(RealtimeEvent.Type.MESSAGE_CREATED, conversation, view.forEveryone());
+		notify(RealtimeEvent.Type.MESSAGE_UPDATED, conversation, view(me, conversation, parent).forEveryone());
+		if (conversation.getType() == Conversation.Type.DM) {
+			this.directMessages.messageSent(conversation);
+		}
+		return view;
+	}
+
+	// 同じ clientId で前に送った返信。ほかの親への返信やメッセージと同じ clientId は、入力の誤りにする
+	private MessageView sameReply(long me, long parentId, Message sent) {
+		if (!Objects.equals(sent.getParentId(), parentId)) {
+			throw new ApiException(ErrorCode.BAD_REQUEST, "clientId");
+		}
+		return view(me, requireVisible(me, sent.getConversationId()), sent);
+	}
+
 	private MessageView insert(long me, long conversationId, String body, UUID clientId, List<Long> attachmentIds) {
 		Conversation conversation = requireVisible(me, conversationId);
 		Optional<Message> sent = this.messages.findByUserIdAndClientId(me, clientId);
@@ -177,7 +333,7 @@ class MessageService {
 	// 同じ clientId で前に送ったもの。同じ送信のやり直しなので、それを返す（その後で「削除されました」にしていれば、その状態で返す）。
 	// ほかの会話に送ったものと同じ clientId は、画面が送信ごとに作り直すので起きない。起きたら入力の誤りにする
 	private MessageView sameSend(long me, long conversationId, Message sent) {
-		if (sent.getConversationId() != conversationId) {
+		if (sent.getConversationId() != conversationId || sent.isReply()) {
 			throw new ApiException(ErrorCode.BAD_REQUEST, "clientId");
 		}
 		return view(me, requireVisible(me, conversationId), sent);
@@ -210,11 +366,14 @@ class MessageService {
 		return view;
 	}
 
-	// 削除（MS-10・MS-11）。送った本人とオーナーだけ。
+	// 削除（MS-10・MS-11・TH-4）。送った本人とオーナーだけ。
 	// 返信のある親メッセージは「削除されました」にして返し、それ以外はデータごと消して空を返す。
-	// 返信を消したときの親の件数の直し（BR-8）は、スレッド（開発計画書 1-12）で足す
+	// 返信を消したときは、親の件数と最後の返信の日時を直し、「削除されました」の親の返信がなくなったら親も消す（BR-8、TH-7）。
+	// 返信の送信と同じ順（親 → 返信）で行をロックする
 	@Transactional
 	Optional<MessageView> delete(long me, long messageId) {
+		Long parentId = this.messages.findById(messageId).map(Message::getParentId).orElse(null);
+		Message parent = (parentId == null) ? null : this.messages.findByIdForUpdate(parentId).orElse(null);
 		Message message = this.messages.findByIdForUpdate(messageId).orElseThrow(MessageService::notFound);
 		Conversation conversation = this.conversations.findVisible(me, message.getConversationId())
 			.orElseThrow(MessageService::notFound);
@@ -232,9 +391,24 @@ class MessageService {
 			return Optional.of(view);
 		}
 		this.messages.delete(message);
+		this.messages.flush();
 		notify(RealtimeEvent.Type.MESSAGE_DELETED, conversation,
 				new RealtimeEvent.MessageDeleted(message.getId(), message.getParentId()));
+		if (parent != null) {
+			replyRemoved(me, conversation, parent);
+		}
 		return Optional.empty();
+	}
+
+	private void replyRemoved(long me, Conversation conversation, Message parent) {
+		parent.replyRemoved(this.messages.findLastReplyAt(parent.getId()));
+		if (parent.isDeleted() && parent.getReplyCount() == 0) {
+			this.messages.delete(parent);
+			notify(RealtimeEvent.Type.MESSAGE_DELETED, conversation,
+					new RealtimeEvent.MessageDeleted(parent.getId(), null));
+			return;
+		}
+		notify(RealtimeEvent.Type.MESSAGE_UPDATED, conversation, view(me, conversation, parent).forEveryone());
 	}
 
 	private void notify(RealtimeEvent.Type type, Conversation conversation, Object payload) {
@@ -256,22 +430,41 @@ class MessageService {
 		return views(me, conversation, List.of(message)).getFirst();
 	}
 
-	// 送った人をまとめて読んでから MessageView にする
+	// 送った人・返信した人・添付をまとめて読んでから MessageView にする
 	private List<MessageView> views(long me, Conversation conversation, List<Message> list) {
 		if (list.isEmpty()) {
 			return List.of();
 		}
 		boolean owner = isOwner(me, conversation);
 		Instant now = this.clock.instant();
-		Map<Long, UserSummary> authors = this.users
-			.findAllById(list.stream().map(Message::getUserId).distinct().toList())
+		Map<Long, List<Long>> repliers = repliers(list);
+		Set<Long> userIds = new HashSet<>(list.stream().map(Message::getUserId).toList());
+		repliers.values().forEach(userIds::addAll);
+		Map<Long, UserSummary> users = this.users.findAllById(userIds)
 			.stream()
 			.collect(Collectors.toMap(User::getId, (u) -> this.userSummaries.of(u, now)));
 		Map<Long, List<AttachmentView>> attached = this.attachments.views(list.stream().map(Message::getId).toList());
 		return list.stream()
-			.map((m) -> MessageView.of(m, authors.get(m.getUserId()), attached.getOrDefault(m.getId(), List.of()), me,
-					owner))
+			.map((m) -> MessageView.of(m, users.get(m.getUserId()), attached.getOrDefault(m.getId(), List.of()),
+					repliers.getOrDefault(m.getId(), List.of()).stream().map(users::get).toList(), me, owner))
 			.toList();
+	}
+
+	// 返信のある親メッセージごとに、最後に返信した人から MAX_REPLY_USERS 人（画面設計書 2.9 の返信した人のアバター）
+	private Map<Long, List<Long>> repliers(List<Message> list) {
+		List<Long> parents = list.stream().filter((m) -> m.getReplyCount() > 0).map(Message::getId).toList();
+		if (parents.isEmpty()) {
+			return Map.of();
+		}
+		return this.messages.findRepliers(parents)
+			.stream()
+			.sorted(Comparator.comparingLong(MessageRepository.Replier::lastReplyId).reversed())
+			.collect(Collectors.groupingBy(MessageRepository.Replier::parentId,
+					Collectors.mapping(MessageRepository.Replier::userId, Collectors.toList())))
+			.entrySet()
+			.stream()
+			.collect(Collectors.toMap(Map.Entry::getKey,
+					(e) -> e.getValue().subList(0, Math.min(MAX_REPLY_USERS, e.getValue().size()))));
 	}
 
 	private <T> T run(Supplier<T> action) {
@@ -318,6 +511,10 @@ class MessageService {
 
 	// メッセージの一覧の結果（FN-07 6 章）
 	record MessagePage(List<MessageView> items, boolean hasMoreBefore, boolean hasMoreAfter) {
+	}
+
+	// スレッドの返信の一覧の結果（FN-08 6 章）
+	record ReplyPage(MessageView parent, List<MessageView> items, boolean hasMoreBefore, boolean hasMoreAfter) {
 	}
 
 }

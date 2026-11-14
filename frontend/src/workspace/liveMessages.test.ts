@@ -9,7 +9,7 @@ import { addMessage, applyEvent, forViewer, settlePending, type Viewer } from '.
 const hanako = { username: 'hanako', displayName: 'はなこ', avatarUrl: null, statusEmoji: null, statusText: null }
 
 const message = (id: number, extra: Partial<MessageView> = {}): MessageView => ({
-  id, conversationId: 10, parentId: null, author: hanako, body: `本文${id}`, attachments: [], replyCount: 0, lastReplyAt: null,
+  id, conversationId: 10, parentId: null, author: hanako, body: `本文${id}`, attachments: [], replyCount: 0, lastReplyAt: null, replyUsers: [],
   createdAt: '2026-11-11T01:00:00Z', editedAt: null, deleted: false, mine: false, canDelete: false, ...extra,
 })
 
