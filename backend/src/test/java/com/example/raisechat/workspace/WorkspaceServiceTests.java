@@ -61,8 +61,8 @@ class WorkspaceServiceTests {
 	@BeforeEach
 	void setUp() {
 		this.service = new WorkspaceService(this.workspaces, this.members, new WorkspaceAccess(this.members),
-				this.conversations, this.conversationMembers, this.users, this.notifier, this.revoker,
-				TestEntities.fixedClock());
+				this.conversations, this.conversationMembers, this.users, TestEntities.userSummaries(), this.notifier,
+				this.revoker, TestEntities.fixedClock());
 	}
 
 	@Test

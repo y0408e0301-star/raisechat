@@ -19,7 +19,7 @@ import com.example.raisechat.realtime.RealtimeNotifier;
 import com.example.raisechat.realtime.SubscriptionRevoker;
 import com.example.raisechat.user.User;
 import com.example.raisechat.user.UserRepository;
-import com.example.raisechat.user.UserSummary;
+import com.example.raisechat.user.UserSummaries;
 
 // ワークスペースの作成・一覧・詳細・削除（機能定義書 FN-03）。
 // 削除したワークスペースの添付・アバターのファイル（S3）を消すのは、プロフィール・添付（開発計画書 1-10・1-11）で足す
@@ -41,6 +41,8 @@ class WorkspaceService {
 
 	private final UserRepository users;
 
+	private final UserSummaries userSummaries;
+
 	private final RealtimeNotifier notifier;
 
 	private final SubscriptionRevoker revoker;
@@ -49,13 +51,15 @@ class WorkspaceService {
 
 	WorkspaceService(WorkspaceRepository workspaces, WorkspaceMemberRepository members, WorkspaceAccess access,
 			ConversationRepository conversations, ConversationMemberRepository conversationMembers,
-			UserRepository users, RealtimeNotifier notifier, SubscriptionRevoker revoker, Clock clock) {
+			UserRepository users, UserSummaries userSummaries, RealtimeNotifier notifier, SubscriptionRevoker revoker,
+			Clock clock) {
 		this.workspaces = workspaces;
 		this.members = members;
 		this.access = access;
 		this.conversations = conversations;
 		this.conversationMembers = conversationMembers;
 		this.users = users;
+		this.userSummaries = userSummaries;
 		this.notifier = notifier;
 		this.revoker = revoker;
 		this.clock = clock;
@@ -86,8 +90,8 @@ class WorkspaceService {
 		Conversation general = this.conversations.save(Conversation.general(workspace.getId(), userId, now));
 		// まだメッセージがないので、最後に読んだメッセージは 0
 		this.conversationMembers.save(new ConversationMember(general.getId(), userId, 0, now));
-		return WorkspaceDetail.of(workspace, WorkspaceMember.Role.OWNER, UserSummary.of(owner, now), 1, general.getId(),
-				null);
+		return WorkspaceDetail.of(workspace, WorkspaceMember.Role.OWNER, this.userSummaries.of(owner, now), 1,
+				general.getId(), null);
 	}
 
 	// G-5 を開くときの詳細。最後に開いた会話が見られなくなっていたら、なしとして返し、画面は general を開く（W-4）
@@ -102,7 +106,7 @@ class WorkspaceService {
 		if (lastOpened != null && this.conversations.findVisible(userId, lastOpened).isEmpty()) {
 			lastOpened = null;
 		}
-		return WorkspaceDetail.of(workspace, member.getRole(), UserSummary.of(owner, this.clock.instant()),
+		return WorkspaceDetail.of(workspace, member.getRole(), this.userSummaries.of(owner, this.clock.instant()),
 				this.members.countByWorkspaceId(workspaceId), generalId, lastOpened);
 	}
 

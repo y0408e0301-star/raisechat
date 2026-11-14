@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-FD-02 |
-| 版数 | 0.1 |
+| 版数 | 0.2 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-10 |
+| 最終更新日 | 2026-11-14 |
 | 作成者 | （氏名） |
 | 上位文書 | [機能定義書](function-definition.md)（RC-FD） |
 | 状態 | 承認待ち |
@@ -15,6 +15,7 @@
 | 版数 | 日付 | 内容 | 作成者 |
 | --- | --- | --- | --- |
 | 0.1 | 2026-11-10 | 初版 | （氏名） |
+| 0.2 | 2026-11-14 | プロフィールを作るとき（開発計画書 1-10）に決めたことを足した：アバターの画素数の上限（4 章）、ステータスの絵文字を一覧の形に直すこと（4 章）、S3 に置いた後でデータベースに記録できなかったときの後始末（5 章の 6）、MemberView の消す時刻（6 章。G-16 の「（時刻）まで」に使う）、アバターがないときに外す API（6 章） | （氏名） |
 
 本書は機能定義書の一部である。承認は[機能定義書](function-definition.md)で一括して行う。API・リアルタイムの通知・メッセージの共通の決まりは機能定義書 3 章〜5 章のとおり。
 
@@ -91,9 +92,9 @@ sequenceDiagram
 
 | 項目 | 型 | 必須 | 条件 | 守られないとき |
 | --- | --- | --- | --- | --- |
-| アバター（file） | ファイル | | JPEG・PNG・WebP、5MB（5,242,880 バイト）まで。形式は拡張子ではなく中身で確かめる | M-9（API は 400 AVATAR_INVALID、5MB を超えれば 413 AVATAR_TOO_LARGE） |
+| アバター（file） | ファイル | | JPEG・PNG・WebP、5MB（5,242,880 バイト）まで。形式は拡張子ではなく中身で確かめる。幅×高さは 4,000 万画素まで（小さなファイルに圧縮された巨大な画像で、API のメモリを使い切らないため。画素を読む前に幅・高さだけを読んで確かめる） | M-9（API は 400 AVATAR_INVALID、5MB を超えれば 413 AVATAR_TOO_LARGE） |
 | 表示名（displayName） | 文字列 | ○ | トリム後 1〜30 文字 | M-5 |
-| ステータスの絵文字（statusEmoji） | 文字列 | | 絵文字 1 つ（FN-10 の 4 章と同じ条件） | 画面では一覧から選ぶだけ。API は 400 BAD_REQUEST |
+| ステータスの絵文字（statusEmoji） | 文字列 | | 絵文字 1 つ（FN-10 の 4 章と同じ条件）。異体字セレクタ（U+FE0F）の有無だけが違うものは、一覧の形に直して保存する | 画面では一覧から選ぶだけ。API は 400 BAD_REQUEST |
 | ステータスの文（statusText） | 文字列 | | トリム後 0〜100 文字。改行を含まない | 101 文字目以降は入力できない。API は 400 BAD_REQUEST |
 | 消す時刻（statusExpiresAt） | 日時 | | 今より後の日時か null（消さない）。画面が選んだものを日時に直して送る | 400 BAD_REQUEST |
 
@@ -106,6 +107,7 @@ sequenceDiagram
 | 3 | ステータスの絵文字も文も空なら、消す時刻も null にする |
 | 4 | アバターの URL は署名付き URL（有効期限 1 時間。N-20）。画面は期限が切れる前に、一覧を読み直したときの新しい URL に替える |
 | 5 | プロフィールの変更はリアルタイムで送らない（PF-8） |
+| 6 | アバターは S3 に置いてからデータベースに記録する。記録できなかったときは、置いたファイルを消す（消せなければ BR-12 と同じく記録して消し直す）。S3 に置けなかったときは、データベースを変えずに 500 を返す |
 
 ## 6. API（案）
 
@@ -114,11 +116,11 @@ sequenceDiagram
 | GET | /api/me/profile | なし | 200 MyProfile | |
 | PATCH | /api/me/profile | `{"displayName","statusEmoji","statusText","statusExpiresAt"}` | 200 UserSummary | 400 |
 | PUT | /api/me/avatar | multipart：file | 200 UserSummary | 400 AVATAR_INVALID、413 AVATAR_TOO_LARGE、500 |
-| DELETE | /api/me/avatar | なし | 200 UserSummary | |
+| DELETE | /api/me/avatar | なし | 200 UserSummary（アバターがなければ何もしない） | |
 | GET | /api/workspaces/{ws}/members/{username} | なし | 200 MemberView | 404 WORKSPACE_NOT_FOUND、404 USER_NOT_FOUND |
 
 - MyProfile：UserSummary に statusExpiresAt を足したもの
-- MemberView：UserSummary に role（OWNER・MEMBER）と joinedAt を足したもの（FN-05 と同じ）
+- MemberView：UserSummary に statusExpiresAt（消す時刻を過ぎていれば null）・role（OWNER・MEMBER）・joinedAt を足したもの（FN-05 と同じ）
 
 リアルタイムの通知：なし（5 章の 5）。
 

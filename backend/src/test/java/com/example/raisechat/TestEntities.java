@@ -4,12 +4,15 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 
+import org.mockito.Mockito;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.example.raisechat.storage.FileStorage;
 import com.example.raisechat.user.User;
+import com.example.raisechat.user.UserSummaries;
 
 // 単体テスト（DB を使わないもの）で使う準備。
 // エンティティの ID はデータベースが決めるので、保存せずに使うときはここで入れる
@@ -27,6 +30,11 @@ public final class TestEntities {
 
 	public static User user(long id, String username) {
 		return withId(new User(username, username + "の表示名", "hash-" + username, NOW), id);
+	}
+
+	// アバターの署名付き URL を作らない UserSummaries（単体テストのユーザーはアバターを持たない）
+	public static UserSummaries userSummaries() {
+		return new UserSummaries(Mockito.mock(FileStorage.class));
 	}
 
 	public static <T> T withId(T entity, long id) {

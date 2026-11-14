@@ -18,6 +18,8 @@ info:
     | UNAUTHENTICATED | 401 | ログインの有効期限が切れました。もう一度ログインしてください。 |
     | TOKEN_EXPIRED | 401 | ログインの有効期限が切れました。もう一度ログインしてください。 |
     | REFRESH_FAILED | 401 | ログインの有効期限が切れました。もう一度ログインしてください。 |
+    | AVATAR_INVALID | 400 | アバターに使えるのは 5MB までの JPEG・PNG・WebP の画像です。 |
+    | AVATAR_TOO_LARGE | 413 | アバターに使えるのは 5MB までの JPEG・PNG・WebP の画像です。 |
     | WORKSPACE_NAME_REQUIRED | 400 | ワークスペースの名前を入力してください。 |
     | WORKSPACE_LIMIT | 409 | 作れるワークスペースは 10 個までです。 |
     | WORKSPACE_NOT_FOUND | 404 | このワークスペースは見つからないか、参加していません。 |
@@ -268,7 +270,7 @@ paths:
       - FN-06 チャンネル
     get:
       description: 見られないとき（入っていないワークスペース・プライベートチャンネルなど）は 404
-      operationId: get_2
+      operationId: get_3
       parameters:
       - in: path
         name: conversationId
@@ -672,6 +674,125 @@ paths:
       summary: 招待リンクから参加する
       tags:
       - FN-04 招待
+  /api/me/avatar:
+    delete:
+      description: 表示名の頭文字の丸になる。アバターがなければ何もしない
+      operationId: removeAvatar
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSummary"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: アバターを外す
+      tags:
+      - FN-02 プロフィール
+    put:
+      description: JPEG・PNG・WebP の 5MB までの画像。真ん中を正方形に切り取り 256×256px にする。前のアバターは消す
+      operationId: changeAvatar
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSummary"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: アバターを替える
+      tags:
+      - FN-02 プロフィール
+  /api/me/profile:
+    get:
+      description: 消す時刻を過ぎたステータスは null
+      operationId: get
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyProfile"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 自分のプロフィール（G-10）
+      tags:
+      - FN-02 プロフィール
+    patch:
+      description: 4 つとも毎回送る。絵文字も文も空なら、消す時刻もなくす
+      operationId: update
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSummary"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 表示名とステータスを変える
+      tags:
+      - FN-02 プロフィール
   /api/messages/{messageId}:
     delete:
       description: 送った本人とオーナーだけ。返信のある親メッセージは「削除されました」にして 200 で返し、それ以外は消して 204
@@ -845,7 +966,7 @@ paths:
       - FN-03 ワークスペース
     get:
       description: 入っていない・存在しないときは 404
-      operationId: get
+      operationId: get_1
       parameters:
       - in: path
         name: workspaceId
@@ -1244,7 +1365,7 @@ paths:
       - FN-05 メンバー管理
     get:
       description: ワークスペースにいなければ 404
-      operationId: get_1
+      operationId: get_2
       parameters:
       - in: path
         name: workspaceId
@@ -1640,6 +1761,11 @@ components:
           type:
           - string
           - "null"
+        statusExpiresAt:
+          type:
+          - string
+          - "null"
+          format: date-time
         statusText:
           type:
           - string
@@ -1652,6 +1778,7 @@ components:
       - joinedAt
       - role
       - statusEmoji
+      - statusExpiresAt
       - statusText
       - username
     MessagePage:
@@ -1722,6 +1849,37 @@ components:
       - mine
       - parentId
       - replyCount
+    MyProfile:
+      type: object
+      properties:
+        avatarUrl:
+          type:
+          - string
+          - "null"
+        displayName:
+          type: string
+        statusEmoji:
+          type:
+          - string
+          - "null"
+        statusExpiresAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        statusText:
+          type:
+          - string
+          - "null"
+        username:
+          type: string
+      required:
+      - avatarUrl
+      - displayName
+      - statusEmoji
+      - statusExpiresAt
+      - statusText
+      - username
     PostMessageRequest:
       type: object
       properties:
@@ -1767,6 +1925,24 @@ components:
           description: 相手のユーザー ID（大文字・小文字を区別しない）
       required:
       - username
+    UpdateProfileRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+          description: 前後の空白を除いて 1〜30 文字
+        statusEmoji:
+          type: string
+          description: 絵文字 1 つ。空か null でなし
+        statusExpiresAt:
+          type: string
+          format: date-time
+          description: ステータスを消す日時。今より後か、null（消さない）
+        statusText:
+          type: string
+          description: 前後の空白を除いて 0〜100 文字。改行を含まない
+      required:
+      - displayName
     UserSummary:
       type: object
       properties:

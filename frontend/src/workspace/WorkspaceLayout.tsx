@@ -7,6 +7,8 @@ import AppHeader from '../components/AppHeader'
 import { useToast } from '../components/ToastContext'
 import ui from '../components/ui.module.css'
 import { M, M15, M22 } from '../messages'
+import ProfileDialog from '../profile/ProfileDialog'
+import { ProfileContext, type OpenProfile } from '../profile/ProfileContext'
 import type { RealtimeEvent } from '../realtime/events'
 import { useRealtime } from '../realtime/RealtimeContext'
 import CreateChannelDialog from './CreateChannelDialog'
@@ -34,6 +36,9 @@ function WorkspaceView({ workspaceId }: { workspaceId: number }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [startingDm, setStartingDm] = useState(false)
+  // G-16 で見ている人と、押した名前・アバター
+  const [profile, setProfile] = useState<{ user: Parameters<OpenProfile>[0], anchor: HTMLElement } | null>(null)
+  const openProfile = useCallback<OpenProfile>((user, anchor) => setProfile({ user, anchor }), [])
   const { onReconnect, subscribeUser } = useRealtime()
   const navigate = useNavigate()
 
@@ -133,36 +138,49 @@ function WorkspaceView({ workspaceId }: { workspaceId: number }) {
     openCreateChannel: () => setCreating(true),
   }
   return (
-    <div className={styles.page}>
-      <AppHeader workspace={loaded.workspace} />
-      <div className={`${styles.body} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
-        <Sidebar workspace={loaded.workspace} conversations={loaded.conversations}
-          onSelect={() => setSidebarOpen(false)} onCreateChannel={() => setCreating(true)}
-          onStartDm={() => setStartingDm(true)} />
-        <main className={styles.main}>
-          <Outlet context={context} />
-        </main>
+    <ProfileContext value={openProfile}>
+      <div className={styles.page}>
+        <AppHeader workspace={loaded.workspace} />
+        <div className={`${styles.body} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
+          <Sidebar workspace={loaded.workspace} conversations={loaded.conversations}
+            onSelect={() => setSidebarOpen(false)} onCreateChannel={() => setCreating(true)}
+            onStartDm={() => setStartingDm(true)} />
+          <main className={styles.main}>
+            <Outlet context={context} />
+          </main>
+        </div>
+        {creating && (
+          // G-13。作ったらサイドバーに足し、G-5 でそのチャンネルを開く（CH-2）
+          <CreateChannelDialog workspaceId={workspaceId} onClose={() => setCreating(false)}
+            onCreated={(created) => {
+              setCreating(false)
+              context.upsertConversation(created)
+              setSidebarOpen(false)
+              navigate(conversationUrl(workspaceId, created.id))
+            }} />
+        )}
+        {startingDm && (
+          // G-15。選んだ人との DM をサイドバーに足し、G-5 で開く（DM-2）
+          <StartDmDialog workspaceId={workspaceId} onClose={() => setStartingDm(false)}
+            onStarted={(dm) => {
+              setStartingDm(false)
+              context.upsertConversation(dm)
+              setSidebarOpen(false)
+              navigate(dmUrl(workspaceId, dm.id))
+            }} />
+        )}
+        {profile && (
+          // G-16。「メッセージを送る」で、その人との DM をサイドバーに足し、G-5 で開く（DM-3）
+          <ProfileDialog workspaceId={workspaceId} user={profile.user} anchor={profile.anchor}
+            onClose={() => setProfile(null)}
+            onStartDm={(dm) => {
+              setProfile(null)
+              context.upsertConversation(dm)
+              setSidebarOpen(false)
+              navigate(dmUrl(workspaceId, dm.id))
+            }} />
+        )}
       </div>
-      {creating && (
-        // G-13。作ったらサイドバーに足し、G-5 でそのチャンネルを開く（CH-2）
-        <CreateChannelDialog workspaceId={workspaceId} onClose={() => setCreating(false)}
-          onCreated={(created) => {
-            setCreating(false)
-            context.upsertConversation(created)
-            setSidebarOpen(false)
-            navigate(conversationUrl(workspaceId, created.id))
-          }} />
-      )}
-      {startingDm && (
-        // G-15。選んだ人との DM をサイドバーに足し、G-5 で開く（DM-2）
-        <StartDmDialog workspaceId={workspaceId} onClose={() => setStartingDm(false)}
-          onStarted={(dm) => {
-            setStartingDm(false)
-            context.upsertConversation(dm)
-            setSidebarOpen(false)
-            navigate(dmUrl(workspaceId, dm.id))
-          }} />
-      )}
-    </div>
+    </ProfileContext>
   )
 }

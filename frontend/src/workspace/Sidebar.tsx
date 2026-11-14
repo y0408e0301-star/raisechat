@@ -73,7 +73,7 @@ export default function Sidebar({ workspace, conversations, onSelect, onCreateCh
             {/* 相手のアバター・表示名・ステータスの絵文字（2.8） */}
             <NavLink to={dmUrl(workspace.id, c.id)} onClick={onSelect}
               className={({ isActive }) => `${itemClass({ isActive })} ${c.hasUnread ? styles.unread : ''}`}>
-              <Avatar displayName={c.dmPartner.displayName} size={32} />
+              <Avatar displayName={c.dmPartner.displayName} avatarUrl={c.dmPartner.avatarUrl} size={32} />
               <span className={styles.name}>
                 {c.dmPartner.displayName}{c.dmPartner.statusEmoji ? ` ${c.dmPartner.statusEmoji}` : ''}
               </span>

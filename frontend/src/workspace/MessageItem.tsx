@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { ApiError, editMessage, type MessageView } from '../api'
 import Avatar from '../components/Avatar'
+import ProfileButton from '../profile/ProfileButton'
 import { useToast } from '../components/ToastContext'
 import ui from '../components/ui.module.css'
 import { formatFull, formatTime } from '../dates'
@@ -69,13 +70,24 @@ export default function MessageItem({ entry, compact, onDelete, onEdited, onGone
           ? time
           : deleted
             ? <span className={styles.deletedAvatar} />
-            : <Avatar displayName={author.displayName} size={36} />}
+            : (
+              <ProfileButton user={author} label={`${author.displayName}のプロフィール`}>
+                <Avatar displayName={author.displayName} avatarUrl={author.avatarUrl} size={36} />
+              </ProfileButton>
+            )}
       </div>
       <div className={styles.main}>
         {!compact && (
           <div className={styles.header}>
-            {!deleted && <span className={styles.name}>{author.displayName}</span>}
-            {author.statusEmoji && !deleted && <span className={styles.status}>{author.statusEmoji}</span>}
+            {!deleted && (
+              <ProfileButton user={author}>
+                <span className={styles.name}>{author.displayName}</span>
+              </ProfileButton>
+            )}
+            {/* 重ねるとステータスの文を出す（画面設計書 2.7） */}
+            {author.statusEmoji && !deleted && (
+              <span className={styles.status} title={author.statusText ?? undefined}>{author.statusEmoji}</span>
+            )}
             {time}
             {edited}
           </div>

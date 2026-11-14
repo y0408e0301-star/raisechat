@@ -23,7 +23,7 @@ class MemberInputsTests {
 
 	@Test
 	void 表示名に区切りの文字があってもカーソルを元に戻せる() {
-		MemberView last = new MemberView("hanako", "は:な:こ", null, null, null, WorkspaceMember.Role.MEMBER,
+		MemberView last = new MemberView("hanako", "は:な:こ", null, null, null, null, WorkspaceMember.Role.MEMBER,
 				Instant.EPOCH);
 
 		MemberInputs.Cursor cursor = MemberInputs.Cursor.parse(MemberInputs.Cursor.after(last).format());

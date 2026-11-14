@@ -44,6 +44,10 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 		if (statusCode.value() == 404) {
 			return ErrorResponse.of(ErrorCode.NOT_FOUND, null);
 		}
+		// 送られたファイルが multipart の上限（アバターの 5MB）を超えた（FN-02 4 章）。multipart の API はアバターだけ
+		if (statusCode.value() == 413) {
+			return ErrorResponse.of(ErrorCode.AVATAR_TOO_LARGE, "file");
+		}
 		if (statusCode.is5xxServerError()) {
 			return ErrorResponse.of(ErrorCode.INTERNAL_ERROR, null);
 		}

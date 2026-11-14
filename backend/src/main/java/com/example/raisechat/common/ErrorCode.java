@@ -26,6 +26,11 @@ public enum ErrorCode {
 
 	REFRESH_FAILED(HttpStatus.UNAUTHORIZED, "ログインの有効期限が切れました。もう一度ログインしてください。"),
 
+	// プロフィール（FN-02 9 章。M-9）
+	AVATAR_INVALID(HttpStatus.BAD_REQUEST, "アバターに使えるのは 5MB までの JPEG・PNG・WebP の画像です。"),
+
+	AVATAR_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "アバターに使えるのは 5MB までの JPEG・PNG・WebP の画像です。"),
+
 	// ワークスペース（FN-03 9 章。M-11〜M-13）
 	WORKSPACE_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "ワークスペースの名前を入力してください。"),
 

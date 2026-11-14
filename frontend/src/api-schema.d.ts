@@ -129,7 +129,7 @@ export interface paths {
          * 会話の詳細
          * @description 見られないとき（入っていないワークスペース・プライベートチャンネルなど）は 404
          */
-        get: operations["get_2"];
+        get: operations["get_3"];
         put?: never;
         post?: never;
         /**
@@ -310,6 +310,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * アバターを替える
+         * @description JPEG・PNG・WebP の 5MB までの画像。真ん中を正方形に切り取り 256×256px にする。前のアバターは消す
+         */
+        put: operations["changeAvatar"];
+        post?: never;
+        /**
+         * アバターを外す
+         * @description 表示名の頭文字の丸になる。アバターがなければ何もしない
+         */
+        delete: operations["removeAvatar"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 自分のプロフィール（G-10）
+         * @description 消す時刻を過ぎたステータスは null
+         */
+        get: operations["get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * 表示名とステータスを変える
+         * @description 4 つとも毎回送る。絵文字も文も空なら、消す時刻もなくす
+         */
+        patch: operations["update"];
+        trace?: never;
+    };
     "/api/messages/{messageId}": {
         parameters: {
             query?: never;
@@ -369,7 +417,7 @@ export interface paths {
          * ワークスペースの詳細
          * @description 入っていない・存在しないときは 404
          */
-        get: operations["get"];
+        get: operations["get_1"];
         put?: never;
         post?: never;
         /**
@@ -541,7 +589,7 @@ export interface paths {
          * 1 人のメンバー
          * @description ワークスペースにいなければ 404
          */
-        get: operations["get_1"];
+        get: operations["get_2"];
         put?: never;
         post?: never;
         /**
@@ -689,6 +737,8 @@ export interface components {
             /** @enum {string} */
             role: "OWNER" | "MEMBER";
             statusEmoji: string | null;
+            /** Format: date-time */
+            statusExpiresAt: string | null;
             statusText: string | null;
             username: string;
         };
@@ -718,6 +768,15 @@ export interface components {
             /** Format: int32 */
             replyCount: number;
         };
+        MyProfile: {
+            avatarUrl: string | null;
+            displayName: string;
+            statusEmoji: string | null;
+            /** Format: date-time */
+            statusExpiresAt: string | null;
+            statusText: string | null;
+            username: string;
+        };
         PostMessageRequest: {
             /** @description 前後の空白を除き、改行を LF にそろえて 1〜4,000 文字（FN-07 4 章） */
             body: string;
@@ -742,6 +801,19 @@ export interface components {
         StartDmRequest: {
             /** @description 相手のユーザー ID（大文字・小文字を区別しない） */
             username: string;
+        };
+        UpdateProfileRequest: {
+            /** @description 前後の空白を除いて 1〜30 文字 */
+            displayName: string;
+            /** @description 絵文字 1 つ。空か null でなし */
+            statusEmoji?: string;
+            /**
+             * Format: date-time
+             * @description ステータスを消す日時。今より後か、null（消さない）
+             */
+            statusExpiresAt?: string;
+            /** @description 前後の空白を除いて 0〜100 文字。改行を含まない */
+            statusText?: string;
         };
         UserSummary: {
             avatarUrl: string | null;
@@ -1035,7 +1107,7 @@ export interface operations {
             };
         };
     };
-    get_2: {
+    get_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -1530,6 +1602,169 @@ export interface operations {
             };
         };
     };
+    changeAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserSummary"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    removeAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserSummary"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyProfile"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserSummary"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     delete: {
         parameters: {
             query?: never;
@@ -1703,7 +1938,7 @@ export interface operations {
             };
         };
     };
-    get: {
+    get_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -2158,7 +2393,7 @@ export interface operations {
             };
         };
     };
-    get_1: {
+    get_2: {
         parameters: {
             query?: never;
             header?: never;

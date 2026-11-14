@@ -6,6 +6,7 @@ import {
 } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import Avatar from '../components/Avatar'
+import ProfileButton from '../profile/ProfileButton'
 import { useToast } from '../components/ToastContext'
 import ui from '../components/ui.module.css'
 import { loadDraft, saveDraft } from '../drafts'
@@ -235,12 +236,15 @@ function ConversationView({ conversationId }: { conversationId: number }) {
         {/* 画面の横幅が 600px 未満のときだけ出す（2.19） */}
         <button type="button" className={styles.back} aria-label="サイドバーに戻る" onClick={showSidebar}>←</button>
         {conversation?.type === 'DM' && conversation.dmPartner && (
-          // DM の見出し：相手のアバター・表示名・@ユーザー ID・ステータス（DM-5）。押して G-16 はプロフィール（1-10）で足す
+          // DM の見出し：相手のアバター・表示名・@ユーザー ID・ステータス（DM-5）。アバターと表示名を押すと G-16。
+          // 見出し（h1）はボタンの中に置けないので、アバターと見出しの中の表示名をそれぞれボタンにする
           <div className={styles.partner}>
-            <Avatar displayName={conversation.dmPartner.displayName} size={32} />
+            <ProfileButton user={conversation.dmPartner} label={`${conversation.dmPartner.displayName}のプロフィール`}>
+              <Avatar displayName={conversation.dmPartner.displayName} avatarUrl={conversation.dmPartner.avatarUrl} size={32} />
+            </ProfileButton>
             <div className={styles.titles}>
               <h1 className={styles.name}>
-                {conversation.dmPartner.displayName}
+                <ProfileButton user={conversation.dmPartner}>{conversation.dmPartner.displayName}</ProfileButton>
                 <span className={styles.username}>@{conversation.dmPartner.username}</span>
               </h1>
               {(conversation.dmPartner.statusEmoji || conversation.dmPartner.statusText) && (

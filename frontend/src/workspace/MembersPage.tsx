@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { ApiError, fetchMembers, kickMember, leaveWorkspace, type MemberView } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import Avatar from '../components/Avatar'
+import ProfileButton from '../profile/ProfileButton'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useToast } from '../components/ToastContext'
 import ui from '../components/ui.module.css'
@@ -24,7 +25,6 @@ type Page = { items: MemberView[], nextCursor: string | null, memberCount: numbe
 type Confirming = { kind: 'kick', member: MemberView } | { kind: 'leave' } | { kind: 'delete' } | null
 
 // G-9 メンバー一覧画面（MB-1・MB-3・MB-5・W-6、画面設計書 11 章）。
-// 名前を押して G-16 を出すのは、プロフィール（開発計画書 1-10）で足す
 export default function MembersPage() {
   const { workspace, showSidebar } = useWorkspace()
   const { me } = useAuth()
@@ -128,9 +128,12 @@ export default function MembersPage() {
           <ul className={styles.rows}>
             {page.items.map((m) => (
               <li key={m.username} className={styles.row}>
-                <Avatar displayName={m.displayName} size={32} />
-                <span className={styles.name}>{m.displayName}{m.statusEmoji ? ` ${m.statusEmoji}` : ''}</span>
-                <span className={styles.username}>@{m.username}</span>
+                {/* 名前を押すと G-16（MB-2） */}
+                <ProfileButton user={m} className={styles.person}>
+                  <Avatar displayName={m.displayName} avatarUrl={m.avatarUrl} size={32} />
+                  <span className={styles.name}>{m.displayName}{m.statusEmoji ? ` ${m.statusEmoji}` : ''}</span>
+                  <span className={styles.username}>@{m.username}</span>
+                </ProfileButton>
                 {m.role === 'OWNER' && <span className={styles.badge}>オーナー</span>}
                 {owner && m.username !== me?.username && m.role !== 'OWNER' && (
                   <button type="button" className={`${ui.danger} ${styles.kick}`} aria-label={`${m.displayName}をキック`}

@@ -1,0 +1,40 @@
+/* G-10（画面設計書 12 章）。中身を横幅 720px の 1 列にして画面の中央に置く（2.19） */
+.page { max-width: 720px; margin: 24px auto; padding: 0 16px; }
+.head { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; }
+/* 2.2 画面の見出しは 18px・太字 */
+.title { font-size: 18px; margin: 0; }
+.back {
+  width: 32px; height: 32px; border: none; border-radius: 8px; background: none;
+  color: var(--text); font-size: 18px; cursor: pointer;
+}
+.back:hover { background: var(--frame); }
+
+.avatarRow { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+.buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+/* 「画像を選ぶ」で開く、ファイルを選ぶ部品そのものは出さない */
+.file { display: none; }
+
+.field { margin-bottom: 16px; }
+.label { display: block; font-weight: bold; margin-bottom: 4px; }
+.sub, .hint { color: var(--sub); }
+.hint { margin: 8px 0 0; }
+.error { color: var(--danger); margin: 4px 0 0; }
+
+.input, .select {
+  height: 40px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: 8px; color: var(--text); background: var(--bg);
+}
+.input { width: 100%; min-width: 0; }
+.input:focus, .select:focus { outline: 2px solid var(--primary); border-color: transparent; }
+.invalid { border-color: var(--danger); }
+
+.status { display: flex; align-items: center; gap: 8px; }
+.emoji {
+  flex: none; width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--bg); font-size: 20px; cursor: pointer;
+}
+.emoji:hover { background: var(--frame); }
+/* 絵文字を選んでいないときは、薄く出す */
+.placeholder { opacity: 0.4; filter: grayscale(1); }
+
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }

@@ -16,7 +16,7 @@ import com.example.raisechat.realtime.RealtimeEvent;
 import com.example.raisechat.realtime.RealtimeNotifier;
 import com.example.raisechat.user.User;
 import com.example.raisechat.user.UserRepository;
-import com.example.raisechat.user.UserSummary;
+import com.example.raisechat.user.UserSummaries;
 import com.example.raisechat.workspace.WorkspaceMemberRepository;
 
 // DM の見え方（機能定義書 FN-12）：相手（dmPartner）と送れるか（canPost）、サイドバーへの出し方と、その通知。
@@ -32,16 +32,20 @@ public class DirectMessages {
 
 	private final UserRepository users;
 
+	private final UserSummaries userSummaries;
+
 	private final RealtimeNotifier notifier;
 
 	private final Clock clock;
 
 	DirectMessages(ConversationRepository conversations, WorkspaceMemberRepository workspaceMembers,
-			MessageRepository messages, UserRepository users, RealtimeNotifier notifier, Clock clock) {
+			MessageRepository messages, UserRepository users, UserSummaries userSummaries, RealtimeNotifier notifier,
+			Clock clock) {
 		this.conversations = conversations;
 		this.workspaceMembers = workspaceMembers;
 		this.messages = messages;
 		this.users = users;
+		this.userSummaries = userSummaries;
 		this.notifier = notifier;
 		this.clock = clock;
 	}
@@ -64,7 +68,8 @@ public class DirectMessages {
 		Set<Long> members = new HashSet<>(this.workspaceMembers.findUserIds(dms.getFirst().getWorkspaceId()));
 		return dms.stream().map((c) -> {
 			long partner = c.partnerOf(viewer);
-			return ConversationSummary.ofDm(c, UserSummary.of(partners.get(partner), now), members.contains(partner));
+			return ConversationSummary.ofDm(c, this.userSummaries.of(partners.get(partner), now),
+					members.contains(partner));
 		}).toList();
 	}
 

@@ -21,7 +21,7 @@ import com.example.raisechat.realtime.RealtimeNotifier;
 import com.example.raisechat.realtime.SubscriptionRevoker;
 import com.example.raisechat.user.User;
 import com.example.raisechat.user.UserRepository;
-import com.example.raisechat.user.UserSummary;
+import com.example.raisechat.user.UserSummaries;
 
 // メンバーの一覧・キック・退出（機能定義書 FN-05）。
 // キック・退出した人には、コミットの後に workspace.removed を送り、そのワークスペースの会話の購読を取り消す（機能定義書 4.5）。
@@ -44,6 +44,8 @@ class MemberService {
 
 	private final UserRepository users;
 
+	private final UserSummaries userSummaries;
+
 	private final RealtimeNotifier notifier;
 
 	private final SubscriptionRevoker revoker;
@@ -54,14 +56,15 @@ class MemberService {
 
 	MemberService(WorkspaceMemberRepository members, WorkspaceRepository workspaces, WorkspaceAccess access,
 			ConversationRepository conversations, ConversationMemberRepository conversationMembers,
-			UserRepository users, RealtimeNotifier notifier, SubscriptionRevoker revoker, DirectMessages directMessages,
-			Clock clock) {
+			UserRepository users, UserSummaries userSummaries, RealtimeNotifier notifier, SubscriptionRevoker revoker,
+			DirectMessages directMessages, Clock clock) {
 		this.members = members;
 		this.workspaces = workspaces;
 		this.access = access;
 		this.conversations = conversations;
 		this.conversationMembers = conversationMembers;
 		this.users = users;
+		this.userSummaries = userSummaries;
 		this.notifier = notifier;
 		this.revoker = revoker;
 		this.directMessages = directMessages;
@@ -83,7 +86,8 @@ class MemberService {
 					.collect(Collectors.toMap(WorkspaceMember::getUserId, Function.identity()));
 		Instant now = this.clock.instant();
 		List<MemberView> items = page.stream()
-			.map((u) -> MemberView.of(UserSummary.of(u, now), roles.get(u.getId())))
+			.map((u) -> MemberView.of(this.userSummaries.of(u, now), u.currentStatusExpiresAt(now),
+					roles.get(u.getId())))
 			.toList();
 		String next = (found.size() > PAGE_SIZE) ? MemberInputs.Cursor.after(items.getLast()).format() : null;
 		return new WorkspaceMemberPage(items, next, this.members.countByWorkspaceId(workspaceId));
@@ -96,7 +100,8 @@ class MemberService {
 		User user = this.users.findByUsername(username).orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
 		WorkspaceMember member = this.members.findById(new WorkspaceMember.Key(workspaceId, user.getId()))
 			.orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
-		return MemberView.of(UserSummary.of(user, this.clock.instant()), member);
+		Instant now = this.clock.instant();
+		return MemberView.of(this.userSummaries.of(user, now), user.currentStatusExpiresAt(now), member);
 	}
 
 	// キックする（MB-3・MB-4）。オーナーだけ。オーナー（自分を含む）はキックできない（5 章の 1）

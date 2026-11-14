@@ -10,6 +10,8 @@ export const SEARCH_MAX = 80
 export const MEMBER_SEARCH_MAX = 30
 export const MESSAGE_MAX = 4000
 export const PASSWORD_MAX = 64
+// ステータスの文（FN-02 4 章）
+export const STATUS_TEXT_MAX = 100
 
 // 文字数は Unicode の文字（コードポイント）で数える（画面設計書 2.18）。API の数え方と同じ
 export function countChars(text: string): number {

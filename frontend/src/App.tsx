@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router'
+import { PROFILE_URL } from './api'
 import { AuthProvider } from './auth/AuthProvider'
 import { GuestOnly, RequireAuth } from './auth/guards'
 import Layout from './components/Layout'
@@ -8,6 +9,7 @@ import InvitePage from './pages/InvitePage'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import WorkspacesPage from './pages/WorkspacesPage'
+import ProfilePage from './profile/ProfilePage'
 import ChannelsPage from './workspace/ChannelsPage'
 import ConversationPage from './workspace/ConversationPage'
 import InvitesPage from './workspace/InvitesPage'
@@ -16,7 +18,7 @@ import WorkspaceHome from './workspace/WorkspaceHome'
 import WorkspaceLayout from './workspace/WorkspaceLayout'
 
 // 画面と URL（画面一覧 1 章）。BrowserRouter（テストでは MemoryRouter）の中で使う。
-// G-6・G-7・G-10は、それぞれの機能を作るときに足す（開発計画書 3 章）
+// G-6・G-7 は、それぞれの機能を作るときに足す（開発計画書 3 章）
 export default function App() {
   return (
     <AuthProvider>
@@ -34,6 +36,7 @@ export default function App() {
               {/* G-3・G-10 は簡単なヘッダーつき */}
               <Route element={<Layout />}>
                 <Route path="/" element={<WorkspacesPage />} />
+                <Route path={PROFILE_URL} element={<ProfilePage />} />
               </Route>
               {/* G-5 はワークスペース用のヘッダーとサイドバーつき */}
               <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>

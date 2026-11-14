@@ -12,7 +12,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-// ユーザー（データ設計書 4.1）。アバターの置き場所（avatar_key）は、使い始める 1-10 で足す
+// ユーザー（データ設計書 4.1）
 @Entity
 @Table(name = "users")
 public class User {
@@ -33,6 +33,9 @@ public class User {
 
 	@Column(nullable = false)
 	private String passwordHash;
+
+	// S3 のキー（avatars/{UUID}.png）。ないときは頭文字の丸を出す（PF-3）
+	private @Nullable String avatarKey;
 
 	// ステータス（PF-5）。消す時刻を過ぎたら出さない（FN-02 5 章の 2）
 	private @Nullable String statusEmoji;
@@ -86,7 +89,21 @@ public class User {
 		}
 	}
 
-	// ステータスを変える（PF-5・PF-6。1-10 で API から使う）。値は確かめてから渡す。絵文字も文もなければ消す時刻もなくす
+	// 表示名を変える（PF-4）。値は確かめてから渡す
+	public void changeDisplayName(String displayName, Instant now) {
+		this.displayName = displayName;
+		this.updatedAt = now;
+	}
+
+	// アバターを替える・外す（PF-2・PF-3）。前のキーを返すので、コミットの後で S3 から消す（BR-12）
+	public @Nullable String changeAvatar(@Nullable String avatarKey, Instant now) {
+		String previous = this.avatarKey;
+		this.avatarKey = avatarKey;
+		this.updatedAt = now;
+		return previous;
+	}
+
+	// ステータスを変える（PF-5・PF-6）。値は確かめてから渡す。絵文字も文もなければ消す時刻もなくす
 	public void changeStatus(@Nullable String emoji, @Nullable String text, @Nullable Instant expiresAt, Instant now) {
 		this.statusEmoji = emoji;
 		this.statusText = text;
@@ -120,6 +137,15 @@ public class User {
 
 	public String getDisplayName() {
 		return this.displayName;
+	}
+
+	public @Nullable String getAvatarKey() {
+		return this.avatarKey;
+	}
+
+	// 消す時刻（G-10 で「（時刻）まで」を出す）。過ぎていれば null
+	public @Nullable Instant currentStatusExpiresAt(Instant now) {
+		return isStatusExpired(now) ? null : this.statusExpiresAt;
 	}
 
 	public Instant getCreatedAt() {

@@ -11,6 +11,7 @@ import com.example.raisechat.common.ApiException;
 import com.example.raisechat.common.ErrorCode;
 import com.example.raisechat.user.User;
 import com.example.raisechat.user.UserRepository;
+import com.example.raisechat.user.UserSummaries;
 import com.example.raisechat.user.UserSummary;
 import com.example.raisechat.workspace.WorkspaceAccess;
 import com.example.raisechat.workspace.WorkspaceMemberRepository;
@@ -29,18 +30,21 @@ class DirectMessageService {
 
 	private final UserRepository users;
 
+	private final UserSummaries userSummaries;
+
 	private final DirectMessages directMessages;
 
 	private final Clock clock;
 
 	DirectMessageService(ConversationRepository conversations, ConversationMemberRepository members,
 			WorkspaceMemberRepository workspaceMembers, WorkspaceAccess workspaceAccess, UserRepository users,
-			DirectMessages directMessages, Clock clock) {
+			UserSummaries userSummaries, DirectMessages directMessages, Clock clock) {
 		this.conversations = conversations;
 		this.members = members;
 		this.workspaceMembers = workspaceMembers;
 		this.workspaceAccess = workspaceAccess;
 		this.users = users;
+		this.userSummaries = userSummaries;
 		this.directMessages = directMessages;
 		this.clock = clock;
 	}
@@ -70,7 +74,7 @@ class DirectMessageService {
 			this.members.insertIfAbsent(dm.getId(), low, 0, now);
 			this.members.insertIfAbsent(dm.getId(), high, 0, now);
 		}
-		UserSummary createdBy = UserSummary.of(this.users.findById(dm.getCreatedBy()).orElseThrow(), now);
+		UserSummary createdBy = this.userSummaries.of(this.users.findById(dm.getCreatedBy()).orElseThrow(), now);
 		ConversationDetail detail = ConversationDetail.of(this.directMessages.summary(dm, me), dm, 2, createdBy);
 		return new Started(detail, created);
 	}

@@ -1,0 +1,19 @@
+/* 押した場所の近くに出す吹き出し（画面設計書 2.15・18 章）。後ろの画面は覆わない。
+   外側を押したら閉じるよう、透明な覆いを敷く */
+.overlay { position: fixed; inset: 0; z-index: 40; }
+.panel {
+  position: fixed; margin: 0; border: 1px solid var(--frame); color: var(--text);
+  max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto;
+  background: var(--bg); border-radius: 8px; padding: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+.panel:focus { outline: none; }
+
+/* 画面の横幅が 600px 未満のときは、ダイアログ（2.5）と同じく後ろを覆い、横幅いっぱい・下から出す */
+@media (max-width: 599px) {
+  .overlay { background: rgba(0, 0, 0, 0.5); }
+  .panel {
+    top: auto !important; left: 0 !important; right: 0; bottom: 0;
+    width: 100% !important; max-width: 100%; border: none; border-radius: 8px 8px 0 0;
+  }
+}

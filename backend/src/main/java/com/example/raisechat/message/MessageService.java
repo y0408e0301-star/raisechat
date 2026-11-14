@@ -30,6 +30,7 @@ import com.example.raisechat.realtime.RealtimeEvent;
 import com.example.raisechat.realtime.RealtimeNotifier;
 import com.example.raisechat.user.User;
 import com.example.raisechat.user.UserRepository;
+import com.example.raisechat.user.UserSummaries;
 import com.example.raisechat.user.UserSummary;
 import com.example.raisechat.workspace.WorkspaceAccess;
 import com.example.raisechat.workspace.WorkspaceMember;
@@ -56,6 +57,8 @@ class MessageService {
 
 	private final UserRepository users;
 
+	private final UserSummaries userSummaries;
+
 	private final Clock clock;
 
 	private final TransactionTemplate transaction;
@@ -66,12 +69,14 @@ class MessageService {
 
 	MessageService(MessageRepository messages, ConversationRepository conversations,
 			ConversationMemberRepository conversationMembers, WorkspaceAccess workspaceAccess, UserRepository users,
-			Clock clock, TransactionTemplate transaction, RealtimeNotifier notifier, DirectMessages directMessages) {
+			UserSummaries userSummaries, Clock clock, TransactionTemplate transaction, RealtimeNotifier notifier,
+			DirectMessages directMessages) {
 		this.messages = messages;
 		this.conversations = conversations;
 		this.conversationMembers = conversationMembers;
 		this.workspaceAccess = workspaceAccess;
 		this.users = users;
+		this.userSummaries = userSummaries;
 		this.clock = clock;
 		this.transaction = transaction;
 		this.notifier = notifier;
@@ -252,7 +257,7 @@ class MessageService {
 		Map<Long, UserSummary> authors = this.users
 			.findAllById(list.stream().map(Message::getUserId).distinct().toList())
 			.stream()
-			.collect(Collectors.toMap(User::getId, (u) -> UserSummary.of(u, now)));
+			.collect(Collectors.toMap(User::getId, (u) -> this.userSummaries.of(u, now)));
 		return list.stream().map((m) -> MessageView.of(m, authors.get(m.getUserId()), me, owner)).toList();
 	}
 
