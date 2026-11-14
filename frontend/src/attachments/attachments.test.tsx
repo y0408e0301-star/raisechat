@@ -88,6 +88,15 @@ const ticket = (uploadId: number) => json(201, {
   expiresAt: '2026-11-14T10:00:00Z',
 })
 
+// 後から応答を返す（受け付けを待つ間の操作を確かめる）
+function deferred<T>() {
+  let resolve: ((value: T) => void) | undefined
+  const promise = new Promise<T>((r) => {
+    resolve = r
+  })
+  return { promise, resolve: (value: T) => resolve?.(value) }
+}
+
 const png = (name = 'photo.png', size = 100) => new File([new Uint8Array(size)], name, { type: 'image/png' })
 
 function open(routes: Record<string, Handler | Handler[]> = {}) {
@@ -179,6 +188,37 @@ describe('入力欄の添付（AT-1・AT-3・AT-4）', () => {
     await waitFor(() => expect(fetch.keys()).toContain('POST /api/uploads/78/complete'))
     // 前に受け付けてもらったものは外してもらう
     expect(fetch.keys()).toContain('DELETE /api/uploads/77')
+  })
+
+  it('受け付けを待つ間に「×」で外したら、受け付けられた後で外してもらう', async () => {
+    const accepted = deferred<Response>()
+    const fetch = open({
+      'POST /api/conversations/10/uploads': () => accepted.promise,
+      'DELETE /api/uploads/77': () => json(204),
+    })
+    const user = userEvent.setup()
+    await screen.findByRole('textbox', { name: 'メッセージ' })
+    fireEvent.change(fileInput(), { target: { files: [png()] } })
+    await waitFor(() => expect(fetch.keys()).toContain('POST /api/conversations/10/uploads'))
+
+    await user.click(within(previews()).getByRole('button', { name: 'photo.pngを外す' }))
+    await act(async () => accepted.resolve(ticket(77)))
+
+    await waitFor(() => expect(fetch.keys()).toContain('DELETE /api/uploads/77'))
+    expect(FakeXhr.all).toHaveLength(0)
+  })
+
+  it('描き直す前に続けて足しても 4 個までにする', async () => {
+    open({ 'POST /api/conversations/10/uploads': () => new Promise<Response>(() => {}) })
+    const textbox = await screen.findByRole('textbox', { name: 'メッセージ' })
+
+    act(() => {
+      fireEvent.paste(textbox, { clipboardData: { files: [png('1.png'), png('2.png'), png('3.png')] } })
+      fireEvent.paste(textbox, { clipboardData: { files: [png('4.png'), png('5.png')] } })
+    })
+
+    expect(within(previews()).getAllByRole('listitem')).toHaveLength(4)
+    expect(screen.getByText(M[38])).toBeInTheDocument()
   })
 
   // TC-09-12

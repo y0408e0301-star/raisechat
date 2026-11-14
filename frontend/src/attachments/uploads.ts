@@ -53,6 +53,8 @@ export function checkFiles(current: number, files: File[]): { accepted: File[], 
 // 失敗したら failed にして「もう一度」を待つ（AT-4）。送る前に外したもの・送らずに画面を離れたものは API に外してもらう
 export function useUploads(conversationId: number, notify: (message: string) => void) {
   const [uploads, setUploads] = useState<Upload[]>([])
+  // 並べている数。続けて足されたとき（描き直す前に 2 回貼り付けたなど）にも 4 個までを守るため、state とは別にすぐ数える
+  const count = useRef(0)
   const files = useRef(new Map<string, File>())
   const controllers = useRef(new Map<string, AbortController>())
   // 受け付けてもらった uploadId（送っていないもの）。外したとき・画面を離れたときに API に外してもらう
@@ -86,6 +88,11 @@ export function useUploads(conversationId: number, notify: (message: string) => 
     update(localId, { status: 'uploading', progress: 0 })
     try {
       const ticket = await createUpload(conversationId, file)
+      // 受け付けを待つ間に外された（×）。そのときはまだ ID を知らなかったので、ここで外してもらう
+      if (controller.signal.aborted) {
+        cancelUpload(ticket.uploadId).catch(() => {})
+        return
+      }
       uploadIds.current.set(localId, ticket.uploadId)
       await putToStorage(ticket, file, (progress) => update(localId, { progress }), controller.signal)
       const attachment = await completeUpload(ticket.uploadId)
@@ -96,6 +103,7 @@ export function useUploads(conversationId: number, notify: (message: string) => 
       if (e instanceof ApiError && (e.code === 'ATTACHMENT_TYPE_INVALID' || e.code === 'ATTACHMENT_TOO_LARGE')) {
         notifyRef.current(M[39])
         forget(localId, false)
+        count.current -= 1
         setUploads((list) => list.filter((u) => u.localId !== localId))
         return
       }
@@ -108,8 +116,9 @@ export function useUploads(conversationId: number, notify: (message: string) => 
 
   // ファイルを足す（📎・ドラッグ＆ドロップ・貼り付け）
   function add(selected: File[]) {
-    const { accepted, message } = checkFiles(uploads.length, selected)
+    const { accepted, message } = checkFiles(count.current, selected)
     if (message) notifyRef.current(message)
+    count.current += accepted.length
     const added = accepted.map((file): Upload => {
       const localId = crypto.randomUUID()
       files.current.set(localId, file)
@@ -132,6 +141,7 @@ export function useUploads(conversationId: number, notify: (message: string) => 
     const target = uploads.find((u) => u.localId === localId)
     if (target?.preview?.startsWith('blob:')) URL.revokeObjectURL(target.preview)
     forget(localId, true)
+    count.current -= 1
     setUploads((list) => list.filter((u) => u.localId !== localId))
   }
 
@@ -142,12 +152,14 @@ export function useUploads(conversationId: number, notify: (message: string) => 
       if (u.preview?.startsWith('blob:')) URL.revokeObjectURL(u.preview)
       forget(u.localId, false)
     }
+    count.current = 0
     setUploads([])
     return ready
   }
 
   // 送れなかったメッセージを取り消したとき、添付を入力欄に戻す（MS-13）
   function restore(attachments: AttachmentView[]) {
+    count.current += attachments.length
     setUploads((list) => [...list, ...attachments.map((a): Upload => ({
       localId: crypto.randomUUID(), name: a.fileName, kind: a.kind, preview: a.thumbnailUrl,
       progress: 1, status: 'ready', attachment: a,
