@@ -7,10 +7,14 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.Duration;
 import java.util.Iterator;
 import java.util.Optional;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReadParam;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 
@@ -22,11 +26,27 @@ public final class Images {
 	// 読み込んで、メモリを使い切らないよう、幅・高さだけを先に読んで確かめる
 	static final long MAX_PIXELS = 40_000_000L;
 
+	// 同時に読む画像の数。4,000 万画素の画像をそのまま読むと 1 枚で 160MB ほど使うので、同時に送られても
+	// API のメモリ（ヒープ）を使い切らないよう絞る。待ちきれなければ 500（M-49）にする
+	static final int CONCURRENT_READS = 2;
+
+	static final Duration READ_WAIT = Duration.ofSeconds(30);
+
+	private static final Semaphore READING = new Semaphore(CONCURRENT_READS, true);
+
 	private Images() {
 	}
 
-	// 読めない画像・大きすぎる画像は空を返す。アニメーションする画像は最初のコマを読む
+	// 画素をすべて読む（縮めずに使うとき）
 	public static Optional<BufferedImage> read(byte[] data) {
+		return read(data, 0);
+	}
+
+	// 読めない画像・大きすぎる画像は空を返す。アニメーションする画像は最初のコマを読む。
+	// minShortSide を渡すと、短い辺がその 2 倍を下回らない範囲で、画素を間引いて読む（縮めた後のきれいさは変わらず、
+	// 読むときのメモリが減る）。間引けない読み込みの部品では、すべて読む
+	public static Optional<BufferedImage> read(byte[] data, int minShortSide) {
+		acquire();
 		try (ImageInputStream in = ImageIO.createImageInputStream(new ByteArrayInputStream(data))) {
 			Iterator<ImageReader> readers = ImageIO.getImageReaders(in);
 			if (!readers.hasNext()) {
@@ -35,10 +55,17 @@ public final class Images {
 			ImageReader reader = readers.next();
 			try {
 				reader.setInput(in, true, true);
-				if ((long) reader.getWidth(0) * reader.getHeight(0) > MAX_PIXELS) {
+				int width = reader.getWidth(0);
+				int height = reader.getHeight(0);
+				if ((long) width * height > MAX_PIXELS) {
 					return Optional.empty();
 				}
-				return Optional.ofNullable(reader.read(0));
+				ImageReadParam param = reader.getDefaultReadParam();
+				int step = (minShortSide <= 0) ? 1 : Math.max(1, Math.min(width, height) / (minShortSide * 2));
+				if (step > 1) {
+					param.setSourceSubsampling(step, step, 0, 0);
+				}
+				return Optional.ofNullable(reader.read(0, param));
 			}
 			finally {
 				reader.dispose();
@@ -47,6 +74,21 @@ public final class Images {
 		// 壊れたファイルでは、読み込みの部品によって IOException 以外の例外も出る
 		catch (IOException | RuntimeException ex) {
 			return Optional.empty();
+		}
+		finally {
+			READING.release();
+		}
+	}
+
+	private static void acquire() {
+		try {
+			if (!READING.tryAcquire(READ_WAIT.toMillis(), TimeUnit.MILLISECONDS)) {
+				throw new IllegalStateException("画像の読み込みが混んでいて、待ちきれませんでした");
+			}
+		}
+		catch (InterruptedException ex) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException("画像の読み込みを待つ間に止められました", ex);
 		}
 	}
 

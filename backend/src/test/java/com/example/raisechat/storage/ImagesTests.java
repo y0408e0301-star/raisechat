@@ -59,6 +59,30 @@ class ImagesTests {
 		assertThat(Images.read(TestImages.pngHeaderOnly(8000, 5001))).isEmpty();
 	}
 
+	// 4,000×2,000px を、短い辺が 512px（256px の 2 倍）を下回らない範囲で 3 つに 1 つずつ読む
+	@Test
+	void 縮めるときは画素を間引いて読む() {
+		assertThat(Images.read(TestImages.png(4000, 2000), 256)).hasValueSatisfying((image) -> size(image, 1334, 667));
+		// 短い辺が 2 倍に満たなければ間引かない
+		assertThat(Images.read(TestImages.png(900, 600), 256)).hasValueSatisfying((image) -> size(image, 900, 600));
+	}
+
+	@Test
+	void 間引いて読んでも真ん中を正方形に切り取れる() {
+		BufferedImage avatar = Images.squareCrop(Images.read(TestImages.jpeg(3000, 1500), 256).orElseThrow(), 256);
+		size(avatar, 256, 256);
+		allRed(avatar);
+	}
+
+	// 読み込みの数の上限（同時に 2 つ）は、読めなかったときにも戻す
+	@Test
+	void 読めない画像が続いても次の画像を読める() {
+		for (int i = 0; i < Images.CONCURRENT_READS + 1; i++) {
+			assertThat(Images.read(new byte[] { 1, 2, 3 })).isEmpty();
+		}
+		assertThat(Images.read(TestImages.png(10, 10))).isPresent();
+	}
+
 	@Test
 	void 横長の画像は真ん中を正方形に切り取って縮める() {
 		BufferedImage avatar = Images.squareCrop(TestImages.read(TestImages.png(600, 300)), 256);

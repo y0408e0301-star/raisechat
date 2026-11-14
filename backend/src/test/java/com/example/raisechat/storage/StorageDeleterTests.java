@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 
 import com.example.raisechat.TestEntities;
 
@@ -57,6 +58,17 @@ class StorageDeleterTests {
 		verify(this.deletions).save(saved.capture());
 		assertThat(saved.getValue().getStorageKey()).isEqualTo("avatars/a.png");
 		assertThat(saved.getValue().getCreatedAt()).isEqualTo(TestEntities.NOW);
+		verify(this.storage).delete("avatars/b.png");
+	}
+
+	// データベースの行はコミットしてあるので、利用者にはエラーを返さない（ファイルは S3 に残る）
+	@Test
+	void 記録もできなくても例外を出さない() {
+		doThrow(SdkClientException.create("S3 につながらない")).when(this.storage).delete("avatars/a.png");
+		when(this.deletions.save(any())).thenThrow(new DataAccessResourceFailureException("DB が止まっている"));
+
+		this.deleter.deleteOrRecord(List.of("avatars/a.png", "avatars/b.png"));
+
 		verify(this.storage).delete("avatars/b.png");
 	}
 

@@ -95,7 +95,8 @@ class ProfileService {
 		if (ImageFormat.detect(data).filter(AVATAR_FORMATS::contains).isEmpty()) {
 			throw new ApiException(ErrorCode.AVATAR_INVALID, "file");
 		}
-		BufferedImage image = Images.read(data).orElseThrow(() -> new ApiException(ErrorCode.AVATAR_INVALID, "file"));
+		BufferedImage image = Images.read(data, AVATAR_SIZE)
+			.orElseThrow(() -> new ApiException(ErrorCode.AVATAR_INVALID, "file"));
 		String key = "avatars/" + UUID.randomUUID() + ".png";
 		this.storage.put(key, ImageFormat.PNG.contentType(), Images.png(Images.squareCrop(image, AVATAR_SIZE)));
 		Changed changed = null;
