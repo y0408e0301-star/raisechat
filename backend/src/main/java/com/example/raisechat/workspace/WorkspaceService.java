@@ -8,6 +8,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.raisechat.attachment.Attachments;
 import com.example.raisechat.common.ApiException;
 import com.example.raisechat.common.ErrorCode;
 import com.example.raisechat.conversation.Conversation;
@@ -47,12 +48,14 @@ class WorkspaceService {
 
 	private final SubscriptionRevoker revoker;
 
+	private final Attachments attachments;
+
 	private final Clock clock;
 
 	WorkspaceService(WorkspaceRepository workspaces, WorkspaceMemberRepository members, WorkspaceAccess access,
 			ConversationRepository conversations, ConversationMemberRepository conversationMembers,
 			UserRepository users, UserSummaries userSummaries, RealtimeNotifier notifier, SubscriptionRevoker revoker,
-			Clock clock) {
+			Attachments attachments, Clock clock) {
 		this.workspaces = workspaces;
 		this.members = members;
 		this.access = access;
@@ -62,6 +65,7 @@ class WorkspaceService {
 		this.userSummaries = userSummaries;
 		this.notifier = notifier;
 		this.revoker = revoker;
+		this.attachments = attachments;
 		this.clock = clock;
 	}
 
@@ -125,6 +129,8 @@ class WorkspaceService {
 		}
 		List<Long> memberIds = this.members.findUserIds(workspaceId);
 		List<Long> conversationIds = this.conversations.findIdsByWorkspaceId(workspaceId);
+		// 添付の行はワークスペースと一緒に消え、S3 のファイルはコミットの後で消す（BR-12）
+		this.attachments.deleteFilesOfWorkspace(workspaceId);
 		this.workspaces.delete(workspace);
 		for (long memberId : memberIds) {
 			this.notifier.toUser(memberId, RealtimeEvent.Type.WORKSPACE_REMOVED, workspaceId, null,

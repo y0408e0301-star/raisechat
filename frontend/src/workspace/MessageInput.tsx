@@ -1,7 +1,7 @@
 import type { KeyboardEvent, RefObject } from 'react'
 import { M } from '../messages'
 import { MESSAGE_MAX } from '../validation'
-import { isSendable, messageLength } from './messageText'
+import { messageLength } from './messageText'
 import styles from './MessageInput.module.css'
 
 // 残りがこの数より少なくなったら（本文が 3,800 文字を超えたら）残りの文字数を出す（MS-4）
@@ -14,7 +14,7 @@ const MAX_ROWS = 10
 type Props = {
   value: string
   onChange: (value: string) => void
-  // Enter キー（変換の確定を除く）
+  // Enter キー（変換の確定を除く）。送れるか（本文・添付があるか）は呼ぶ側が確かめる
   onSubmit: () => void
   // Esc キー（編集のときだけ）
   onCancel?: () => void
@@ -39,7 +39,7 @@ export default function MessageInput({ value, onChange, onSubmit, onCancel, labe
     // Enter で送り、Shift＋Enter で改行する。日本語の入力の変換を確定する Enter では送らない（MS-3・N-31）
     if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing || e.keyCode === 229) return
     e.preventDefault()
-    if (isSendable(value)) onSubmit()
+    onSubmit()
   }
 
   return (

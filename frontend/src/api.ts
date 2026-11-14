@@ -25,6 +25,8 @@ export type WorkspaceMemberPage = Schemas['WorkspaceMemberPage']
 export type InvitePage = Schemas['InvitePage']
 export type InvitePreview = Schemas['InvitePreview']
 export type MyProfile = Schemas['MyProfile']
+export type AttachmentView = Schemas['AttachmentView']
+export type UploadTicket = Schemas['UploadTicket']
 
 // API がエラーを返したとき（機能定義書 3.3）。message は画面にそのまま出せる文、
 // field があればその入力欄の下に出す
@@ -335,6 +337,44 @@ export function fetchMember(workspaceId: number, username: string): Promise<Memb
   return requestJson<MemberView>('GET', `/api/workspaces/${workspaceId}/members/${encodeURIComponent(username)}`)
 }
 
+// ---------------------------------------------------------------- FN-09 添付
+
+// アップロードを受け付けてもらい、S3 へ直接置く署名付きの PUT の URL を受け取る（FN-09 3.1）
+export function createUpload(conversationId: number, file: File): Promise<UploadTicket> {
+  return requestJson<UploadTicket>('POST', `/api/conversations/${conversationId}/uploads`,
+    { fileName: file.name, contentType: file.type, size: file.size } satisfies Schemas['CreateUploadRequest'])
+}
+
+export function completeUpload(uploadId: number): Promise<AttachmentView> {
+  return requestJson<AttachmentView>('POST', `/api/uploads/${uploadId}/complete`)
+}
+
+// 送る前に外す。外したものは API が S3 からも消す
+export async function cancelUpload(uploadId: number): Promise<void> {
+  await request('DELETE', `/api/uploads/${uploadId}`)
+}
+
+// ファイルを S3 へ直接 PUT する（API サーバーを通さない）。進み具合（0〜1）を onProgress で知らせる。
+// fetch は送る進み具合を取れないので XMLHttpRequest を使う。signal で止められる
+export function putToStorage(ticket: UploadTicket, file: File, onProgress: (ratio: number) => void,
+  signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', ticket.putUrl)
+    for (const [name, value] of Object.entries(ticket.headers)) xhr.setRequestHeader(name, value)
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total)
+    })
+    xhr.addEventListener('load', () => (xhr.status >= 200 && xhr.status < 300
+      ? resolve()
+      : reject(new ApiError(xhr.status, 'UPLOAD_FAILED', M[40]))))
+    xhr.addEventListener('error', () => reject(new ApiError(0, 'NETWORK_ERROR', M[40])))
+    xhr.addEventListener('abort', () => reject(new DOMException('止めました', 'AbortError')))
+    signal?.addEventListener('abort', () => xhr.abort())
+    xhr.send(file)
+  })
+}
+
 // ---------------------------------------------------------------- FN-12 DM
 
 // 相手との DM を開く。なければ作る（DM-2）
@@ -351,14 +391,23 @@ export function fetchMessages(conversationId: number, before?: number): Promise<
   return requestJson<MessagePage>('GET', `/api/conversations/${conversationId}/messages${query}`)
 }
 
-// clientId は送信ごとに作る UUID。もう一度送るときは同じものを使い、2 回追加されないようにする（FN-07 5 章の 8）
-export function sendMessage(conversationId: number, body: string, clientId: string): Promise<MessageView> {
+// clientId は送信ごとに作る UUID。もう一度送るときは同じものを使い、2 回追加されないようにする（FN-07 5 章の 8）。
+// attachmentIds は complete を済ませた添付（0〜4 個。FN-09）
+export function sendMessage(conversationId: number, body: string, clientId: string,
+  attachmentIds: number[] = []): Promise<MessageView> {
   return requestJson<MessageView>('POST', `/api/conversations/${conversationId}/messages`,
-    { body, clientId } satisfies Schemas['PostMessageRequest'])
+    { body, clientId, attachmentIds } satisfies Schemas['PostMessageRequest'])
 }
 
-export function editMessage(messageId: number, body: string): Promise<MessageView> {
-  return requestJson<MessageView>('PATCH', `/api/messages/${messageId}`, { body } satisfies Schemas['EditMessageRequest'])
+// keepAttachmentIds を渡すと、それ以外の添付を外す（AT-9）。渡さなければすべて残す
+export function editMessage(messageId: number, body: string, keepAttachmentIds?: number[]): Promise<MessageView> {
+  return requestJson<MessageView>('PATCH', `/api/messages/${messageId}`,
+    { body, keepAttachmentIds } satisfies Schemas['EditMessageRequest'])
+}
+
+// 1 件のメッセージ。添付の署名付き URL の期限が切れたときに読み直す（AT-10）
+export function fetchMessage(messageId: number): Promise<MessageView> {
+  return requestJson<MessageView>('GET', `/api/messages/${messageId}`)
 }
 
 // データごと消したときは null、「削除されました」にしたときはそのメッセージを返す（MS-11）

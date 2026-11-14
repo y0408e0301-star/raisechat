@@ -129,7 +129,7 @@ export interface paths {
          * 会話の詳細
          * @description 見られないとき（入っていないワークスペース・プライベートチャンネルなど）は 404
          */
-        get: operations["get_3"];
+        get: operations["get_4"];
         put?: never;
         post?: never;
         /**
@@ -241,7 +241,7 @@ export interface paths {
         put?: never;
         /**
          * メッセージを送る
-         * @description 同じ clientId で 2 回送ったときは、2 つ目を追加せず 1 つ目を返す
+         * @description 同じ clientId で 2 回送ったときは、2 つ目を追加せず 1 つ目を返す。添付があれば本文は空でもよい
          */
         post: operations["post"];
         delete?: never;
@@ -264,6 +264,26 @@ export interface paths {
          * @description 最後に読んだメッセージを進め（戻さない）、最後に開いた会話として記録する
          */
         post: operations["read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conversations/{conversationId}/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * アップロードを受け付ける
+         * @description 送れる会話のときだけ。返す putUrl に、headers のヘッダーを付けてファイルを PUT する（期限 15 分）。画像は 10MB、動画は 100MB まで
+         */
+        post: operations["create_3"];
         delete?: never;
         options?: never;
         head?: never;
@@ -345,7 +365,7 @@ export interface paths {
          * 自分のプロフィール（G-10）
          * @description 消す時刻を過ぎたステータスは null
          */
-        get: operations["get"];
+        get: operations["get_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -365,7 +385,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * 1 件のメッセージ
+         * @description 添付の署名付き URL の期限が切れたときに読み直す
+         */
+        get: operations["get"];
         put?: never;
         post?: never;
         /**
@@ -377,9 +401,49 @@ export interface paths {
         head?: never;
         /**
          * メッセージを編集する
-         * @description 送った本人だけ（オーナーでもほかの人のものは 403）
+         * @description 送った本人だけ（オーナーでもほかの人のものは 403）。keepAttachmentIds にない添付は外す（足すことはできない）
          */
         patch: operations["edit"];
+        trace?: never;
+    };
+    "/api/uploads/{uploadId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * 送る前に外す
+         * @description 自分の、まだ送っていないものだけ。S3 のファイルも消す
+         */
+        delete: operations["cancel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/uploads/{uploadId}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * アップロードを確かめる
+         * @description PUT の後に呼ぶ。大きさと先頭のバイトで形式を確かめ、画像なら幅・高さと縮小した画像を作る。形式が違えばファイルを消して 400
+         */
+        post: operations["complete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/workspaces": {
@@ -417,7 +481,7 @@ export interface paths {
          * ワークスペースの詳細
          * @description 入っていない・存在しないときは 404
          */
-        get: operations["get_1"];
+        get: operations["get_2"];
         put?: never;
         post?: never;
         /**
@@ -589,7 +653,7 @@ export interface paths {
          * 1 人のメンバー
          * @description ワークスペースにいなければ 404
          */
-        get: operations["get_2"];
+        get: operations["get_3"];
         put?: never;
         post?: never;
         /**
@@ -606,6 +670,25 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AttachmentView: {
+            contentType: string;
+            downloadUrl: string;
+            /** Format: date-time */
+            expiresAt: string;
+            fileName: string;
+            /** Format: int32 */
+            height: number | null;
+            /** Format: int64 */
+            id: number;
+            /** @enum {string} */
+            kind: "IMAGE" | "VIDEO";
+            /** Format: int64 */
+            size: number;
+            thumbnailUrl: string | null;
+            url: string;
+            /** Format: int32 */
+            width: number | null;
+        };
         ChannelListItem: {
             description: string | null;
             /** Format: int64 */
@@ -675,6 +758,17 @@ export interface components {
             /** @enum {string} */
             visibility: "PUBLIC" | "PRIVATE";
         };
+        CreateUploadRequest: {
+            /** @description image/jpeg・image/png・image/gif・image/webp・video/mp4・video/webm */
+            contentType: string;
+            /** @description 1〜255 文字。表示とダウンロードの名前にだけ使う */
+            fileName: string;
+            /**
+             * Format: int64
+             * @description バイト数
+             */
+            size: number;
+        };
         CreateWorkspaceRequest: {
             /** @description 前後の空白を除いて 1〜50 文字。改行を含まない（FN-03 4 章） */
             name: string;
@@ -684,8 +778,10 @@ export interface components {
             confirmName: string;
         };
         EditMessageRequest: {
-            /** @description 前後の空白を除き、改行を LF にそろえて 1〜4,000 文字（FN-07 4 章） */
+            /** @description 前後の空白を除き、改行を LF にそろえて 0〜4,000 文字。添付が残らないときは 1 文字以上（FN-07 4 章） */
             body: string;
+            /** @description 残す添付の ID。null ならすべて残す */
+            keepAttachmentIds?: number[];
         };
         ErrorResponse: {
             code: string;
@@ -748,6 +844,7 @@ export interface components {
             items: components["schemas"]["MessageView"][];
         };
         MessageView: {
+            attachments: components["schemas"]["AttachmentView"][];
             author: components["schemas"]["UserSummary"];
             body: string;
             canDelete: boolean;
@@ -778,7 +875,9 @@ export interface components {
             username: string;
         };
         PostMessageRequest: {
-            /** @description 前後の空白を除き、改行を LF にそろえて 1〜4,000 文字（FN-07 4 章） */
+            /** @description complete を済ませた添付の uploadId（0〜4 個。並べた順に出す） */
+            attachmentIds?: number[];
+            /** @description 前後の空白を除き、改行を LF にそろえて 0〜4,000 文字。添付がないときは 1 文字以上（FN-07 4 章） */
             body: string;
             /** @description 画面が送信ごとに作る UUID。同じ送信を 2 回追加しないために使う */
             clientId: string;
@@ -814,6 +913,16 @@ export interface components {
             statusExpiresAt?: string;
             /** @description 前後の空白を除いて 0〜100 文字。改行を含まない */
             statusText?: string;
+        };
+        UploadTicket: {
+            /** Format: date-time */
+            expiresAt: string;
+            headers: {
+                [key: string]: string;
+            };
+            putUrl: string;
+            /** Format: int64 */
+            uploadId: number;
         };
         UserSummary: {
             avatarUrl: string | null;
@@ -1107,7 +1216,7 @@ export interface operations {
             };
         };
     };
-    get_3: {
+    get_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -1522,6 +1631,50 @@ export interface operations {
             };
         };
     };
+    create_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description 受け付けた */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadTicket"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     preview: {
         parameters: {
             query?: never;
@@ -1685,7 +1838,7 @@ export interface operations {
             };
         };
     };
-    get: {
+    get_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -1743,6 +1896,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserSummary"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageView"];
                 };
             };
             /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
@@ -1858,6 +2051,84 @@ export interface operations {
             };
         };
     };
+    cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uploadId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 外した */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    complete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uploadId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentView"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list: {
         parameters: {
             query?: never;
@@ -1938,7 +2209,7 @@ export interface operations {
             };
         };
     };
-    get_1: {
+    get_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -2393,7 +2664,7 @@ export interface operations {
             };
         };
     };
-    get_2: {
+    get_3: {
         parameters: {
             query?: never;
             header?: never;

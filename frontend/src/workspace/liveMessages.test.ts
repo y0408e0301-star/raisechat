@@ -9,7 +9,7 @@ import { addMessage, applyEvent, forViewer, settlePending, type Viewer } from '.
 const hanako = { username: 'hanako', displayName: 'はなこ', avatarUrl: null, statusEmoji: null, statusText: null }
 
 const message = (id: number, extra: Partial<MessageView> = {}): MessageView => ({
-  id, conversationId: 10, parentId: null, author: hanako, body: `本文${id}`, replyCount: 0, lastReplyAt: null,
+  id, conversationId: 10, parentId: null, author: hanako, body: `本文${id}`, attachments: [], replyCount: 0, lastReplyAt: null,
   createdAt: '2026-11-11T01:00:00Z', editedAt: null, deleted: false, mine: false, canDelete: false, ...extra,
 })
 
@@ -51,7 +51,7 @@ describe('applyEvent', () => {
 })
 
 const pending = (clientId: string, body: string, failed = false) =>
-  ({ kind: 'pending' as const, clientId, author: me, body, createdAt: '2026-11-11T01:00:00Z', failed })
+  ({ kind: 'pending' as const, clientId, author: me, body, attachments: [], createdAt: '2026-11-11T01:00:00Z', failed })
 
 describe('settlePending', () => {
   it('自分の送信の通知は、同じ本文の「送信中」を 1 つ消す（改行と前後の空白はサーバーと同じにそろえて比べる）', () => {

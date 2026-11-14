@@ -12,7 +12,7 @@ import { opened, renderAt } from '../test/workspace'
 const hanako = { username: 'hanako', displayName: 'はなこ', avatarUrl: null, statusEmoji: null, statusText: null }
 
 const message = (id: number, body: string, extra: object = {}) => ({
-  id, conversationId: 10, parentId: null, author: me, body, replyCount: 0, lastReplyAt: null,
+  id, conversationId: 10, parentId: null, author: me, body, attachments: [], replyCount: 0, lastReplyAt: null,
   createdAt: '2026-11-11T01:00:00Z', editedAt: null, deleted: false, mine: true, canDelete: true, ...extra,
 })
 
@@ -218,7 +218,7 @@ describe('編集と削除（MS-9〜MS-11）', () => {
     await userEvent.type(screen.getByRole('textbox', { name: 'メッセージを編集' }), ' 後 {Enter}')
     expect(await screen.findByText('（編集済み）')).toBeInTheDocument()
     expect(screen.getByText('後')).toBeInTheDocument()
-    expect(sentJson(fetch, fetch.keys().indexOf('PATCH /api/messages/1'))).toEqual({ body: '後' })
+    expect(sentJson(fetch, fetch.keys().indexOf('PATCH /api/messages/1'))).toEqual({ body: '後', keepAttachmentIds: [] })
   })
 
   it('ほかの人のメッセージには「編集」を出さず、消せないものには「削除」も出さない', async () => {

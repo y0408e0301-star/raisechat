@@ -28,13 +28,13 @@ import com.example.raisechat.user.UserSummary;
 class MessageControllerTests {
 
 	private static final MessageView VIEW = new MessageView(30, 12, null,
-			new UserSummary("taro_y", "たろう", null, null, null), "**土曜**", 0, null,
+			new UserSummary("taro_y", "たろう", null, null, null), "**土曜**", List.of(), 0, null,
 			Instant.parse("2026-11-11T03:00:00Z"), null, false, true, true);
 
 	private static final String VIEW_JSON = """
 			{"id":30,"conversationId":12,"parentId":null,
 			 "author":{"username":"taro_y","displayName":"たろう","avatarUrl":null,"statusEmoji":null,"statusText":null},
-			 "body":"**土曜**","replyCount":0,"lastReplyAt":null,"createdAt":"2026-11-11T03:00:00Z","editedAt":null,
+			 "body":"**土曜**","attachments":[],"replyCount":0,"lastReplyAt":null,"createdAt":"2026-11-11T03:00:00Z","editedAt":null,
 			 "deleted":false,"mine":true,"canDelete":true}
 			""";
 
@@ -56,7 +56,7 @@ class MessageControllerTests {
 
 	@Test
 	void 送ると201() {
-		when(this.messageService.post(7, 12, "**土曜**", "6f1c2a0e-8b1d-4c55-9a7e-0d2f5b3c9e11")).thenReturn(VIEW);
+		when(this.messageService.post(7, 12, "**土曜**", "6f1c2a0e-8b1d-4c55-9a7e-0d2f5b3c9e11", null)).thenReturn(VIEW);
 		assertThat(this.mvc.post()
 			.uri("/api/conversations/12/messages")
 			.with(loggedIn(7))
@@ -70,7 +70,7 @@ class MessageControllerTests {
 
 	@Test
 	void 長すぎる本文は400とM35() {
-		when(this.messageService.post(7, 12, "x", "id"))
+		when(this.messageService.post(7, 12, "x", "id", null))
 			.thenThrow(new ApiException(ErrorCode.MESSAGE_TOO_LONG, "body"));
 		assertError(this.mvc.post()
 			.uri("/api/conversations/12/messages")
@@ -83,7 +83,7 @@ class MessageControllerTests {
 
 	@Test
 	void 編集は200() {
-		when(this.messageService.edit(7, 30, "直した")).thenReturn(VIEW);
+		when(this.messageService.edit(7, 30, "直した", null)).thenReturn(VIEW);
 		assertThat(this.mvc.patch()
 			.uri("/api/messages/30")
 			.with(loggedIn(7))

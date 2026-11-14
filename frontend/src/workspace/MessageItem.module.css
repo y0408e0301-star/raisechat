@@ -4,7 +4,7 @@
 .compact { padding-top: 2px; padding-bottom: 2px; }
 /* 送信中は透明度 50%（MS-3） */
 .sending { opacity: 0.5; }
-.side { flex: none; width: 36px; display: flex; justify-content: center; }
+.side { flex: none; width: 36px; display: flex; justify-content: center; align-items: flex-start; }
 .main { flex: 1; min-width: 0; }
 .header { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 /* 2.2 メッセージの表示名は 15px・太字 */

@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-FD-07 |
-| 版数 | 0.2 |
+| 版数 | 0.3 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-12 |
+| 最終更新日 | 2026-11-14 |
 | 作成者 | （氏名） |
 | 上位文書 | [機能定義書](function-definition.md)（RC-FD） |
 | 状態 | 承認待ち |
@@ -16,6 +16,7 @@
 | --- | --- | --- | --- |
 | 0.1 | 2026-11-10 | 初版 | （氏名） |
 | 0.2 | 2026-11-12 | 5 章の 7：通知には clientId がないため、API の応答より先に届いた自分のメッセージの通知は、本文で「送信中」と見分けることにした（開発計画書 1-5） | （氏名） |
+| 0.3 | 2026-11-14 | 添付を作るとき（開発計画書 1-11）に決めたことを足した：編集の keepAttachmentIds を送らなければ添付をすべて残すこと、GET /api/messages/{id}（添付の URL の期限切れで読み直す。FN-09） | （氏名） |
 
 本書は機能定義書の一部である。承認は[機能定義書](function-definition.md)で一括して行う。API・リアルタイムの通知・メッセージの共通の決まりは機能定義書 3 章〜5 章のとおり。
 
@@ -133,7 +134,7 @@ sequenceDiagram
 | 本文（body） | 文字列 | 添付がないときは ○ | トリム後、改行を LF にそろえて 0〜4,000 文字。添付がないときは 1 文字以上 | 0 文字で添付もないときは送れない（API は 400 MESSAGE_EMPTY）。4,001 文字以上は M-35（API は 400 MESSAGE_TOO_LONG） |
 | 添付（attachmentIds） | 数値の並び | | 0〜4 個。FN-09 の 4 章 | FN-09 の 9 章 |
 | clientId | 文字列 | ○ | UUID の形 | 400 BAD_REQUEST |
-| 残す添付（keepAttachmentIds） | 数値の並び | | 編集のときだけ。そのメッセージの添付の ID | 400 BAD_REQUEST。編集で添付を足すことはできない |
+| 残す添付（keepAttachmentIds） | 数値の並び | | 編集のときだけ。そのメッセージの添付の ID。送らなければ（null）すべて残す | 400 BAD_REQUEST。編集で添付を足すことはできない |
 
 ## 5. 業務ルール
 
@@ -156,6 +157,7 @@ sequenceDiagram
 | POST | /api/conversations/{id}/messages | `{"body","attachmentIds","clientId"}` | 201 MessageView | 400、403 NOT_CHANNEL_MEMBER・DM_PARTNER_LEFT、404 |
 | PATCH | /api/messages/{id} | `{"body","keepAttachmentIds"}` | 200 MessageView | 400、403 NOT_AUTHOR、404 MESSAGE_NOT_FOUND |
 | DELETE | /api/messages/{id} | なし | 204（データごと消したとき）、200 MessageView（「削除されました」にしたとき） | 403 FORBIDDEN、404 |
+| GET | /api/messages/{id} | なし | 200 MessageView（添付の新しい署名付き URL。FN-09 AT-10） | 404 MESSAGE_NOT_FOUND |
 
 - メッセージの一覧は、機能定義書 3.4 の例外である。before（その ID より前）、after（その ID より後）、around（その ID の前後 25 件ずつと、その ID のもの）で指定する
 - around で指定したメッセージがスレッドの返信のときは、その親メッセージの前後を返し、画面はスレッドのパネルも開く（FN-08）

@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import {
-  ApiError, conversationUrl, fetchConversation, fetchMessages, joinChannel, markRead, sendMessage,
-  type ConversationDetail, type MessageView,
+  ApiError, conversationUrl, fetchConversation, fetchMessage, fetchMessages, joinChannel, markRead, sendMessage,
+  type AttachmentView, type ConversationDetail, type MessageView,
 } from '../api'
+import attachmentStyles from '../attachments/Attachments.module.css'
+import { useUploads } from '../attachments/uploads'
 import { useAuth } from '../auth/AuthContext'
 import Avatar from '../components/Avatar'
 import ProfileButton from '../profile/ProfileButton'
@@ -52,6 +54,12 @@ function ConversationView({ conversationId }: { conversationId: number }) {
   const [joining, setJoining] = useState(false)
   // 入力の文。会話ごとに覚えておき、戻ってきたときに戻す（MS-15）
   const [draft, setDraftState] = useState(() => loadDraft(conversationId))
+  // 入力欄の添付（FN-09）。会話を移ったら、送っていないものは API に外してもらう
+  const uploads = useUploads(conversationId, toast)
+  // ファイルを会話の画面に重ねている間（ドラッグ＆ドロップ。AT-1）
+  const [dragging, setDragging] = useState(false)
+  // 添付の URL の期限切れで読み直している（または読み直した）メッセージ。同じものを何度も読み直さない（AT-10）
+  const refreshed = useRef(new Set<number>())
 
   const setDraft = useCallback((text: string) => {
     setDraftState(text)
@@ -144,9 +152,9 @@ function ConversationView({ conversationId }: { conversationId: number }) {
   }), [onReconnect, load, show])
 
   // 送る。返ってきたら「送信中」を普通の表示に替える。同じメッセージを 2 つ出さないよう ID で見分ける（FN-07 5 章の 7）
-  const post = useCallback(async (clientId: string, body: string) => {
+  const post = useCallback(async (clientId: string, body: string, attachments: AttachmentView[]) => {
     try {
-      const sent = await sendMessage(conversationId, body, clientId)
+      const sent = await sendMessage(conversationId, body, clientId, attachments.map((a) => a.id))
       setPending((list) => list.filter((p) => p.clientId !== clientId))
       updateItems((items) => addMessage(items, sent))
       markRead(conversationId, sent.id).catch(() => {})
@@ -156,13 +164,13 @@ function ConversationView({ conversationId }: { conversationId: number }) {
     }
   }, [conversationId, updateItems])
 
-  function send(body: string) {
+  function send(body: string, attachments: AttachmentView[]) {
     if (!me) return
     const clientId = crypto.randomUUID()
     setPending((list) => [...list,
-      { kind: 'pending', clientId, author: me, body, createdAt: new Date().toISOString(), failed: false }])
+      { kind: 'pending', clientId, author: me, body, attachments, createdAt: new Date().toISOString(), failed: false }])
     setDraft('')
-    void post(clientId, body)
+    void post(clientId, body, attachments)
   }
 
   // もう一度送る。同じ clientId で送るので、前の送信が届いていても 2 つにならない（TC-07-12）
@@ -170,15 +178,43 @@ function ConversationView({ conversationId }: { conversationId: number }) {
     const target = pending.find((p) => p.clientId === clientId)
     if (!target) return
     setPending((list) => list.map((p) => (p.clientId === clientId ? { ...p, failed: false } : p)))
-    void post(clientId, target.body)
+    void post(clientId, target.body, target.attachments)
   }
 
-  // 取り消す。一覧から消して、本文を入力欄に戻す（MS-13）
+  // 取り消す。一覧から消して、本文と添付を入力欄に戻す（MS-13）
   function cancel(clientId: string) {
     const target = pending.find((p) => p.clientId === clientId)
     if (!target) return
     setPending((list) => list.filter((p) => p.clientId !== clientId))
     setDraft(draft ? `${target.body}\n${draft}` : target.body)
+    uploads.restore(target.attachments)
+  }
+
+  // 添付が表示できなかった（署名付き URL の期限切れ）。メッセージを読み直して新しい URL に替える（AT-10）。
+  // 読み直しても表示できないものを繰り返し読み直さないよう、1 つのメッセージにつき 1 回だけにする
+  const refreshMessage = useCallback(async (messageId: number) => {
+    if (refreshed.current.has(messageId)) return
+    refreshed.current.add(messageId)
+    try {
+      const fresh = await fetchMessage(messageId)
+      updateItems((items) => items.map((m) => (m.id === messageId ? { ...fresh, mine: m.mine, canDelete: m.canDelete } : m)))
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) updateItems((items) => items.filter((m) => m.id !== messageId))
+    }
+  }, [updateItems])
+
+  // ファイルを会話の画面に重ねたら点線の枠を出し、落としたら添付する（AT-1）。送れない会話では受けない
+  const canAttach = typeof loaded === 'object' && loaded.conversation.canPost
+  function handleDragOver(e: DragEvent<HTMLDivElement>) {
+    if (!canAttach || !e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    setDragging(true)
+  }
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    setDragging(false)
+    if (!canAttach || e.dataTransfer.files.length === 0) return
+    e.preventDefault()
+    uploads.add(Array.from(e.dataTransfer.files))
   }
 
   // 参加していない公開チャンネルの「参加する」。入力欄を出し、サイドバーにも足す（CH-5）
@@ -231,7 +267,10 @@ function ConversationView({ conversationId }: { conversationId: number }) {
     : []
 
   return (
-    <>
+    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions
+    <div className={styles.page} onDragOver={handleDragOver} onDrop={handleDrop}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false) }}>
+      {dragging && <div className={attachmentStyles.dropZone}>ドロップして添付</div>}
       <div className={styles.head}>
         {/* 画面の横幅が 600px 未満のときだけ出す（2.19） */}
         <button type="button" className={styles.back} aria-label="サイドバーに戻る" onClick={showSidebar}>←</button>
@@ -296,10 +335,10 @@ function ConversationView({ conversationId }: { conversationId: number }) {
             loadingOlder={loadingOlder} onLoadOlder={loadOlder} onDelete={setDeleting}
             onEdited={(edited) => updateItems((items) => items.map((m) => (m.id === edited.id ? edited : m)))}
             onGone={(id) => updateItems((items) => items.filter((m) => m.id !== id))}
-            onRetry={retry} onCancel={cancel} />
+            onRetry={retry} onCancel={cancel} onExpired={refreshMessage} />
           {loaded.conversation.canPost
             ? (
-              <Composer value={draft} onChange={setDraft} onSend={send}
+              <Composer value={draft} onChange={setDraft} onSend={send} uploads={uploads}
                 placeholder={loaded.conversation.dmPartner
                   ? `${loaded.conversation.dmPartner.displayName} へのメッセージ`
                   : `# ${loaded.conversation.name} へのメッセージ`} />
@@ -342,6 +381,6 @@ function ConversationView({ conversationId }: { conversationId: number }) {
             setDeleting(null)
           }} />
       )}
-    </>
+    </div>
   )
 }

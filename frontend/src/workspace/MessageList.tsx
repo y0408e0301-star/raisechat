@@ -27,6 +27,8 @@ type Props = {
   onGone: (messageId: number) => void
   onRetry: (clientId: string) => void
   onCancel: (clientId: string) => void
+  // 添付が表示できなかった（署名付き URL の期限切れ。AT-10）
+  onExpired: (messageId: number) => void
 }
 
 function info(e: Entry) {

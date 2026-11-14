@@ -44,6 +44,11 @@ info:
     | NOT_CHANNEL_MEMBER | 403 | このチャンネルに参加すると、メッセージを送れます。 |
     | NOT_AUTHOR | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
     | MESSAGE_NOT_FOUND | 404 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
+    | TOO_MANY_ATTACHMENTS | 400 | 添付できるのは 1 通に 4 個までです。 |
+    | ATTACHMENT_TYPE_INVALID | 400 | 添付できるのは、10MB までの画像（JPEG・PNG・GIF・WebP）と 100MB までの動画（MP4・WebM）です。 |
+    | ATTACHMENT_TOO_LARGE | 413 | 添付できるのは、10MB までの画像（JPEG・PNG・GIF・WebP）と 100MB までの動画（MP4・WebM）です。 |
+    | UPLOAD_NOT_FOUND_IN_STORAGE | 400 | ファイルをアップロードできませんでした。もう一度お試しください。 |
+    | UPLOAD_NOT_FOUND | 404 | ファイルをアップロードできませんでした。もう一度お試しください。 |
     | BAD_REQUEST | 400 | 入力が正しくありません。 |
     | FORBIDDEN | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
     | NOT_FOUND | 404 | 見つかりません。 |
@@ -270,7 +275,7 @@ paths:
       - FN-06 チャンネル
     get:
       description: 見られないとき（入っていないワークスペース・プライベートチャンネルなど）は 404
-      operationId: get_3
+      operationId: get_4
       parameters:
       - in: path
         name: conversationId
@@ -538,7 +543,7 @@ paths:
       tags:
       - FN-07 メッセージ
     post:
-      description: 同じ clientId で 2 回送ったときは、2 つ目を追加せず 1 つ目を返す
+      description: 同じ clientId で 2 回送ったときは、2 つ目を追加せず 1 つ目を返す。添付があれば本文は空でもよい
       operationId: post
       parameters:
       - in: path
@@ -610,6 +615,46 @@ paths:
       summary: 会話を開いた・読んだ（FN-14）
       tags:
       - FN-06 チャンネル
+  /api/conversations/{conversationId}/uploads:
+    post:
+      description: 送れる会話のときだけ。返す putUrl に、headers のヘッダーを付けてファイルを PUT する（期限 15 分）。画像は
+        10MB、動画は 100MB まで
+      operationId: create_3
+      parameters:
+      - in: path
+        name: conversationId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUploadRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadTicket"
+          description: 受け付けた
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: アップロードを受け付ける
+      tags:
+      - FN-09 添付
   /api/invites/{token}:
     get:
       description: ログインしていなくてもよい。ログインしていなければワークスペースの名前だけを返す。使えないリンクは 410
@@ -739,7 +784,7 @@ paths:
   /api/me/profile:
     get:
       description: 消す時刻を過ぎたステータスは null
-      operationId: get
+      operationId: get_1
       responses:
         "200":
           content:
@@ -832,8 +877,40 @@ paths:
       summary: メッセージを削除する
       tags:
       - FN-07 メッセージ
+    get:
+      description: 添付の署名付き URL の期限が切れたときに読み直す
+      operationId: get
+      parameters:
+      - in: path
+        name: messageId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageView"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 1 件のメッセージ
+      tags:
+      - FN-07 メッセージ
     patch:
-      description: 送った本人だけ（オーナーでもほかの人のものは 403）
+      description: 送った本人だけ（オーナーでもほかの人のものは 403）。keepAttachmentIds にない添付は外す（足すことはできない）
       operationId: edit
       parameters:
       - in: path
@@ -870,6 +947,68 @@ paths:
       summary: メッセージを編集する
       tags:
       - FN-07 メッセージ
+  /api/uploads/{uploadId}:
+    delete:
+      description: 自分の、まだ送っていないものだけ。S3 のファイルも消す
+      operationId: cancel
+      parameters:
+      - in: path
+        name: uploadId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: 外した
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 送る前に外す
+      tags:
+      - FN-09 添付
+  /api/uploads/{uploadId}/complete:
+    post:
+      description: PUT の後に呼ぶ。大きさと先頭のバイトで形式を確かめ、画像なら幅・高さと縮小した画像を作る。形式が違えばファイルを消して 400
+      operationId: complete
+      parameters:
+      - in: path
+        name: uploadId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttachmentView"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: アップロードを確かめる
+      tags:
+      - FN-09 添付
   /api/workspaces:
     get:
       description: 名前の順（同じ名前は作った順）。ページングしない
@@ -966,7 +1105,7 @@ paths:
       - FN-03 ワークスペース
     get:
       description: 入っていない・存在しないときは 404
-      operationId: get_1
+      operationId: get_2
       parameters:
       - in: path
         name: workspaceId
@@ -1365,7 +1504,7 @@ paths:
       - FN-05 メンバー管理
     get:
       description: ワークスペースにいなければ 404
-      operationId: get_2
+      operationId: get_3
       parameters:
       - in: path
         name: workspaceId
@@ -1402,6 +1541,57 @@ paths:
       - FN-05 メンバー管理
 components:
   schemas:
+    AttachmentView:
+      type: object
+      properties:
+        contentType:
+          type: string
+        downloadUrl:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        fileName:
+          type: string
+        height:
+          type:
+          - integer
+          - "null"
+          format: int32
+        id:
+          type: integer
+          format: int64
+        kind:
+          type: string
+          enum:
+          - IMAGE
+          - VIDEO
+        size:
+          type: integer
+          format: int64
+        thumbnailUrl:
+          type:
+          - string
+          - "null"
+        url:
+          type: string
+        width:
+          type:
+          - integer
+          - "null"
+          format: int32
+      required:
+      - contentType
+      - downloadUrl
+      - expiresAt
+      - fileName
+      - height
+      - id
+      - kind
+      - size
+      - thumbnailUrl
+      - url
+      - width
     ChannelListItem:
       type: object
       properties:
@@ -1590,6 +1780,23 @@ components:
       required:
       - name
       - visibility
+    CreateUploadRequest:
+      type: object
+      properties:
+        contentType:
+          type: string
+          description: image/jpeg・image/png・image/gif・image/webp・video/mp4・video/webm
+        fileName:
+          type: string
+          description: 1〜255 文字。表示とダウンロードの名前にだけ使う
+        size:
+          type: integer
+          format: int64
+          description: バイト数
+      required:
+      - contentType
+      - fileName
+      - size
     CreateWorkspaceRequest:
       type: object
       properties:
@@ -1611,7 +1818,14 @@ components:
       properties:
         body:
           type: string
-          description: "前後の空白を除き、改行を LF にそろえて 1〜4,000 文字（FN-07 4 章）"
+          description: "前後の空白を除き、改行を LF にそろえて 0〜4,000 文字。添付が残らないときは 1 文字以上（FN-07 4\
+            \ 章）"
+        keepAttachmentIds:
+          type: array
+          description: 残す添付の ID。null ならすべて残す
+          items:
+            type: integer
+            format: int64
       required:
       - body
     ErrorResponse:
@@ -1799,6 +2013,10 @@ components:
     MessageView:
       type: object
       properties:
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttachmentView"
         author:
           $ref: "#/components/schemas/UserSummary"
         body:
@@ -1837,6 +2055,7 @@ components:
           type: integer
           format: int32
       required:
+      - attachments
       - author
       - body
       - canDelete
@@ -1883,9 +2102,16 @@ components:
     PostMessageRequest:
       type: object
       properties:
+        attachmentIds:
+          type: array
+          description: complete を済ませた添付の uploadId（0〜4 個。並べた順に出す）
+          items:
+            type: integer
+            format: int64
         body:
           type: string
-          description: "前後の空白を除き、改行を LF にそろえて 1〜4,000 文字（FN-07 4 章）"
+          description: "前後の空白を除き、改行を LF にそろえて 0〜4,000 文字。添付がないときは 1 文字以上（FN-07 4 章\
+            ）"
         clientId:
           type: string
           description: 画面が送信ごとに作る UUID。同じ送信を 2 回追加しないために使う
@@ -1943,6 +2169,26 @@ components:
           description: 前後の空白を除いて 0〜100 文字。改行を含まない
       required:
       - displayName
+    UploadTicket:
+      type: object
+      properties:
+        expiresAt:
+          type: string
+          format: date-time
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        putUrl:
+          type: string
+        uploadId:
+          type: integer
+          format: int64
+      required:
+      - expiresAt
+      - headers
+      - putUrl
+      - uploadId
     UserSummary:
       type: object
       properties:

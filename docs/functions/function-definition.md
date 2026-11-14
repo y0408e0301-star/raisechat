@@ -3,7 +3,7 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-FD |
-| 版数 | 0.10 |
+| 版数 | 0.11 |
 | 作成日 | 2026-11-10 |
 | 最終更新日 | 2026-11-14 |
 | 作成者 | （氏名） |
@@ -24,6 +24,7 @@
 | 0.8 | 2026-11-13 | FN-03 を 0.2、FN-05 を 0.2 にした（ワークスペースの削除とメンバー管理を作るときに決めたこと） | （氏名） |
 | 0.9 | 2026-11-13 | FN-12 を 0.2 にした（DM の通知と入力の誤り）。4.3 の conversation.updated を送るときに、DM のメッセージと相手が抜けた・戻ったときを足した | （氏名） |
 | 0.10 | 2026-11-14 | FN-02 を 0.2（アバターの画素数の上限・後始末、MemberView の消す時刻）、FN-05 を 0.3（MemberView の消す時刻）、FN-10 を 0.2（使える絵文字に component を足し、U+FE0F の違いを直す）にした | （氏名） |
+| 0.11 | 2026-11-14 | FN-07 を 0.3（編集の keepAttachmentIds、GET /api/messages/{id}）、FN-09 を 0.2（形式の確かめ方・縮小した画像・外し方など）にした。3.5 の MessageView の attachments に downloadUrl を足した | （氏名） |
 
 ## 承認
 
@@ -223,7 +224,8 @@ statusEmoji・statusText は、ステータスがないか、消す日時を過�
   "mentions": ["hana"],
   "attachments": [
     { "id": 77, "kind": "IMAGE", "contentType": "image/png", "fileName": "photo.png", "size": 204800,
-      "width": 1600, "height": 1200, "url": "https://…（署名付き URL）", "thumbnailUrl": "https://…", "expiresAt": "2026-11-10T07:30:00Z" }
+      "width": 1600, "height": 1200, "url": "https://…（署名付き URL）", "thumbnailUrl": "https://…",
+      "downloadUrl": "https://…（元のファイル名で保存させる）", "expiresAt": "2026-11-10T07:30:00Z" }
   ],
   "reactions": [
     { "emoji": "👍", "count": 3, "reactedByMe": true, "users": ["hana", "jiro", "taro_y"] }

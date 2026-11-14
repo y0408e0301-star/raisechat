@@ -17,6 +17,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.raisechat.attachment.Attachments;
 import com.example.raisechat.common.ApiException;
 import com.example.raisechat.common.ErrorCode;
 import com.example.raisechat.message.MessageRepository;
@@ -67,12 +68,14 @@ class ChannelService {
 
 	private final SubscriptionRevoker revoker;
 
+	private final Attachments attachments;
+
 	private final Clock clock;
 
 	ChannelService(ConversationRepository conversations, ConversationMemberRepository members,
 			WorkspaceMemberRepository workspaceMembers, MessageRepository messages, WorkspaceAccess workspaceAccess,
 			UserRepository users, UserSummaries userSummaries, RealtimeNotifier notifier, SubscriptionRevoker revoker,
-			Clock clock) {
+			Attachments attachments, Clock clock) {
 		this.conversations = conversations;
 		this.members = members;
 		this.workspaceMembers = workspaceMembers;
@@ -82,6 +85,7 @@ class ChannelService {
 		this.userSummaries = userSummaries;
 		this.notifier = notifier;
 		this.revoker = revoker;
+		this.attachments = attachments;
 		this.clock = clock;
 	}
 
@@ -186,7 +190,8 @@ class ChannelService {
 	}
 
 	// 削除する（CH-9）。オーナーだけ、general 以外。プライベートチャンネルはオーナーがメンバーのときだけ（見られるとき）。
-	// 消す前に見られた人に、コミットの後で conversation.removed（DELETED）を送り、購読を取り消す（CH-10、機能定義書 4.5）
+	// 消す前に見られた人に、コミットの後で conversation.removed（DELETED）を送り、購読を取り消す（CH-10、機能定義書 4.5）。
+	// 添付の行は会話と一緒に消え、S3 のファイルはコミットの後で消す（BR-12）
 	@Transactional
 	void delete(long me, long conversationId) {
 		Conversation channel = requireChannel(me, conversationId);
@@ -199,6 +204,7 @@ class ChannelService {
 		List<Long> viewers = (channel.getVisibility() == Conversation.Visibility.PUBLIC)
 				? this.workspaceMembers.findUserIds(channel.getWorkspaceId())
 				: this.members.findUserIds(conversationId);
+		this.attachments.deleteFilesOfConversation(conversationId);
 		this.conversations.delete(channel);
 		for (long viewer : viewers) {
 			this.notifier.toUser(viewer, RealtimeEvent.Type.CONVERSATION_REMOVED, channel.getWorkspaceId(),

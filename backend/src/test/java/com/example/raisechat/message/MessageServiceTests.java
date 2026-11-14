@@ -20,9 +20,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import com.example.raisechat.TestEntities;
+import com.example.raisechat.attachment.Attachments;
 import com.example.raisechat.conversation.Conversation;
-import com.example.raisechat.conversation.ConversationMember;
-import com.example.raisechat.conversation.ConversationMemberRepository;
+import com.example.raisechat.conversation.ConversationAccess;
 import com.example.raisechat.conversation.ConversationRepository;
 import com.example.raisechat.conversation.DirectMessages;
 import com.example.raisechat.realtime.RealtimeNotifier;
@@ -47,7 +47,10 @@ class MessageServiceTests {
 	ConversationRepository conversations;
 
 	@Mock
-	ConversationMemberRepository conversationMembers;
+	ConversationAccess access;
+
+	@Mock
+	Attachments attachments;
 
 	@Mock
 	WorkspaceAccess workspaceAccess;
@@ -65,12 +68,11 @@ class MessageServiceTests {
 
 	@BeforeEach
 	void setUp() {
-		this.service = new MessageService(this.messages, this.conversations, this.conversationMembers,
+		this.service = new MessageService(this.messages, this.conversations, this.access, this.attachments,
 				this.workspaceAccess, this.users, TestEntities.userSummaries(), TestEntities.fixedClock(),
 				TestEntities.immediateTransaction(), this.notifier, this.directMessages);
-		when(this.conversations.findVisible(TARO, CONVERSATION)).thenReturn(
-				Optional.of(TestEntities.withId(Conversation.general(3, TARO, TestEntities.NOW), CONVERSATION)));
-		when(this.conversationMembers.existsById(new ConversationMember.Key(CONVERSATION, TARO))).thenReturn(true);
+		when(this.access.requireVisible(TARO, CONVERSATION))
+			.thenReturn(TestEntities.withId(Conversation.general(3, TARO, TestEntities.NOW), CONVERSATION));
 	}
 
 	private static DataIntegrityViolationException violation(String constraint) {
@@ -88,7 +90,7 @@ class MessageServiceTests {
 			.thenReturn(new WorkspaceMember(3, TARO, WorkspaceMember.Role.MEMBER, TestEntities.NOW));
 		when(this.users.findAllById(List.of(TARO))).thenReturn(List.of(TestEntities.user(TARO, "taro_y")));
 
-		MessageView view = this.service.post(TARO, CONVERSATION, "本文", CLIENT_ID.toString());
+		MessageView view = this.service.post(TARO, CONVERSATION, "本文", CLIENT_ID.toString(), null);
 
 		assertThat(view.id()).isEqualTo(30);
 		// 先に追加した方が通知を送っているので、2 つ目は送らない
@@ -101,7 +103,8 @@ class MessageServiceTests {
 		DataIntegrityViolationException other = violation("messages_conversation_id_fkey");
 		when(this.messages.saveAndFlush(any())).thenThrow(other);
 
-		assertThatThrownBy(() -> this.service.post(TARO, CONVERSATION, "本文", CLIENT_ID.toString())).isSameAs(other);
+		assertThatThrownBy(() -> this.service.post(TARO, CONVERSATION, "本文", CLIENT_ID.toString(), null))
+			.isSameAs(other);
 	}
 
 }

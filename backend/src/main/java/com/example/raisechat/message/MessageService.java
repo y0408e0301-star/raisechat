@@ -19,11 +19,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.example.raisechat.attachment.AttachmentView;
+import com.example.raisechat.attachment.Attachments;
 import com.example.raisechat.common.ApiException;
 import com.example.raisechat.common.ErrorCode;
 import com.example.raisechat.conversation.Conversation;
-import com.example.raisechat.conversation.ConversationMember;
-import com.example.raisechat.conversation.ConversationMemberRepository;
+import com.example.raisechat.conversation.ConversationAccess;
 import com.example.raisechat.conversation.ConversationRepository;
 import com.example.raisechat.conversation.DirectMessages;
 import com.example.raisechat.realtime.RealtimeEvent;
@@ -37,7 +38,8 @@ import com.example.raisechat.workspace.WorkspaceMember;
 
 // メッセージの一覧・送信・編集・削除（機能定義書 FN-07）。
 // 送信・編集・削除は、コミットの後に会話を見ている人へリアルタイムの通知を送る（FN-07 6 章）。
-// 未読・メンションの通知（conversation.updated・notify）は 1-15、添付は 1-11、スレッドの返信は 1-12、メンションは 1-14 で足す
+// 添付（FN-09）は送信で結びつけ、編集で外し、削除で消す（S3 のファイルはコミットの後。BR-12）。
+// 未読・メンションの通知（conversation.updated・notify）は 1-15、スレッドの返信は 1-12、メンションは 1-14 で足す
 @Service
 class MessageService {
 
@@ -51,7 +53,9 @@ class MessageService {
 
 	private final ConversationRepository conversations;
 
-	private final ConversationMemberRepository conversationMembers;
+	private final ConversationAccess access;
+
+	private final Attachments attachments;
 
 	private final WorkspaceAccess workspaceAccess;
 
@@ -67,13 +71,13 @@ class MessageService {
 
 	private final DirectMessages directMessages;
 
-	MessageService(MessageRepository messages, ConversationRepository conversations,
-			ConversationMemberRepository conversationMembers, WorkspaceAccess workspaceAccess, UserRepository users,
-			UserSummaries userSummaries, Clock clock, TransactionTemplate transaction, RealtimeNotifier notifier,
-			DirectMessages directMessages) {
+	MessageService(MessageRepository messages, ConversationRepository conversations, ConversationAccess access,
+			Attachments attachments, WorkspaceAccess workspaceAccess, UserRepository users, UserSummaries userSummaries,
+			Clock clock, TransactionTemplate transaction, RealtimeNotifier notifier, DirectMessages directMessages) {
 		this.messages = messages;
 		this.conversations = conversations;
-		this.conversationMembers = conversationMembers;
+		this.access = access;
+		this.attachments = attachments;
 		this.workspaceAccess = workspaceAccess;
 		this.users = users;
 		this.userSummaries = userSummaries;
@@ -121,12 +125,25 @@ class MessageService {
 		return new MessagePage(views(me, conversation, found), hasMoreBefore, hasMoreAfter);
 	}
 
-	// 送る（MS-3）。同じ clientId で 2 回送られたときは、2 つ目を追加せず 1 つ目を返す（FN-07 5 章の 8）
-	MessageView post(long me, long conversationId, @Nullable String rawBody, @Nullable String rawClientId) {
+	// 1 件のメッセージ（添付の署名付き URL の期限が切れたときに読み直す。AT-10）
+	@Transactional(readOnly = true)
+	MessageView get(long me, long messageId) {
+		Message message = this.messages.findById(messageId).orElseThrow(MessageService::notFound);
+		Conversation conversation = this.conversations.findVisible(me, message.getConversationId())
+			.orElseThrow(MessageService::notFound);
+		return view(me, conversation, message);
+	}
+
+	// 送る（MS-3）。同じ clientId で 2 回送られたときは、2 つ目を追加せず 1 つ目を返す（FN-07 5 章の 8）。
+	// 添付（AT-3）があれば本文は空でもよい
+	MessageView post(long me, long conversationId, @Nullable String rawBody, @Nullable String rawClientId,
+			@Nullable List<Long> rawAttachmentIds) {
 		UUID clientId = parseClientId(rawClientId);
-		String body = MessageBodies.valid(rawBody);
+		List<Long> attachmentIds = (rawAttachmentIds == null) ? List.of() : rawAttachmentIds;
+		Attachments.requireAtMostFour(attachmentIds);
+		String body = MessageBodies.valid(rawBody, !attachmentIds.isEmpty());
 		try {
-			return run(() -> insert(me, conversationId, body, clientId));
+			return run(() -> insert(me, conversationId, body, clientId, attachmentIds));
 		}
 		catch (DataIntegrityViolationException ex) {
 			// 同じ clientId が同時に送られ、もう一方が先に追加した（一意の制約）。それ以外の失敗はそのまま投げる
@@ -139,15 +156,16 @@ class MessageService {
 		}
 	}
 
-	private MessageView insert(long me, long conversationId, String body, UUID clientId) {
+	private MessageView insert(long me, long conversationId, String body, UUID clientId, List<Long> attachmentIds) {
 		Conversation conversation = requireVisible(me, conversationId);
 		Optional<Message> sent = this.messages.findByUserIdAndClientId(me, clientId);
 		if (sent.isPresent()) {
 			return sameSend(me, conversationId, sent.get());
 		}
-		requireCanPost(me, conversation);
+		this.access.requireCanPost(me, conversation);
 		Message message = this.messages
 			.saveAndFlush(new Message(conversationId, me, clientId, body, this.clock.instant()));
+		this.attachments.attach(me, conversationId, message.getId(), attachmentIds);
 		MessageView view = view(me, conversation, message);
 		notify(RealtimeEvent.Type.MESSAGE_CREATED, conversation, view.forEveryone());
 		if (conversation.getType() == Conversation.Type.DM) {
@@ -168,10 +186,11 @@ class MessageService {
 	// 編集（MS-9）。送った本人だけ。オーナーでもほかの人のものは編集できない（MS-10）。
 	// 送れるか（チャンネルのメンバーか）は確かめない。本人がワークスペースのメンバーで会話を見られる間は、
 	// チャンネルから抜けた後でも自分のメッセージを直せる（FN-07 5 章の 5）。
-	// 同時に「削除されました」にされたとき、消した本文を編集で戻さないよう、削除と同じく行をロックする
+	// 同時に「削除されました」にされたとき、消した本文を編集で戻さないよう、削除と同じく行をロックする。
+	// keepAttachmentIds で残す添付を決め、ほかは外す（AT-9。null ならすべて残す）。本文が空で添付も残らないなら送れない
 	@Transactional
-	MessageView edit(long me, long messageId, @Nullable String rawBody) {
-		String body = MessageBodies.valid(rawBody);
+	MessageView edit(long me, long messageId, @Nullable String rawBody, @Nullable List<Long> keepAttachmentIds) {
+		String body = MessageBodies.valid(rawBody, true);
 		Message message = this.messages.findByIdForUpdate(messageId).orElseThrow(MessageService::notFound);
 		Conversation conversation = this.conversations.findVisible(me, message.getConversationId())
 			.orElseThrow(MessageService::notFound);
@@ -180,6 +199,10 @@ class MessageService {
 		}
 		if (message.getUserId() != me) {
 			throw new ApiException(ErrorCode.NOT_AUTHOR);
+		}
+		int remaining = this.attachments.keepOnly(messageId, keepAttachmentIds);
+		if (body.isEmpty() && remaining == 0) {
+			throw new ApiException(ErrorCode.MESSAGE_EMPTY, "body");
 		}
 		message.edit(body, this.clock.instant());
 		MessageView view = view(me, conversation, message);
@@ -201,6 +224,7 @@ class MessageService {
 		if (message.getUserId() != me && !isOwner(me, conversation)) {
 			throw new ApiException(ErrorCode.FORBIDDEN);
 		}
+		this.attachments.removeAllOf(messageId);
 		if (message.getReplyCount() > 0) {
 			message.markDeleted(this.clock.instant());
 			MessageView view = view(me, conversation, message);
@@ -218,22 +242,7 @@ class MessageService {
 	}
 
 	private Conversation requireVisible(long me, long conversationId) {
-		return this.conversations.findVisible(me, conversationId)
-			.orElseThrow(() -> new ApiException(ErrorCode.CONVERSATION_NOT_FOUND));
-	}
-
-	// 送れるか（ConversationSummary の canPost）。チャンネルはメンバーのときだけ。
-	// DM は相手がいまワークスペースのメンバーのときだけ（FN-12 DM-6）
-	private void requireCanPost(long me, Conversation conversation) {
-		if (conversation.getType() == Conversation.Type.DM) {
-			if (!this.directMessages.canPost(conversation, me)) {
-				throw new ApiException(ErrorCode.DM_PARTNER_LEFT);
-			}
-			return;
-		}
-		if (!this.conversationMembers.existsById(new ConversationMember.Key(conversation.getId(), me))) {
-			throw new ApiException(ErrorCode.NOT_CHANNEL_MEMBER);
-		}
+		return this.access.requireVisible(me, conversationId);
 	}
 
 	// ほかの人のメッセージを削除できるオーナーか。DM ではオーナーでも削除できない（オーナーは DM を見られない。FN-12 5 章の 6）
@@ -258,7 +267,11 @@ class MessageService {
 			.findAllById(list.stream().map(Message::getUserId).distinct().toList())
 			.stream()
 			.collect(Collectors.toMap(User::getId, (u) -> this.userSummaries.of(u, now)));
-		return list.stream().map((m) -> MessageView.of(m, authors.get(m.getUserId()), me, owner)).toList();
+		Map<Long, List<AttachmentView>> attached = this.attachments.views(list.stream().map(Message::getId).toList());
+		return list.stream()
+			.map((m) -> MessageView.of(m, authors.get(m.getUserId()), attached.getOrDefault(m.getId(), List.of()), me,
+					owner))
+			.toList();
 	}
 
 	private <T> T run(Supplier<T> action) {

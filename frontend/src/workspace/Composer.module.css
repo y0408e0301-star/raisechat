@@ -13,3 +13,5 @@
 @media (pointer: coarse) {
   .icon { min-width: 44px; height: 44px; }
 }
+/* 「📎」で開く、ファイルを選ぶ部品そのものは出さない */
+.file { display: none; }

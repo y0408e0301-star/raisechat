@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-FD-09 |
-| 版数 | 0.1 |
+| 版数 | 0.2 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-10 |
+| 最終更新日 | 2026-11-14 |
 | 作成者 | （氏名） |
 | 上位文書 | [機能定義書](function-definition.md)（RC-FD） |
 | 状態 | 承認待ち |
@@ -15,6 +15,7 @@
 | 版数 | 日付 | 内容 | 作成者 |
 | --- | --- | --- | --- |
 | 0.1 | 2026-11-10 | 初版 | （氏名） |
+| 0.2 | 2026-11-14 | 添付を作るとき（開発計画書 1-11）に決めたことを足した：形式の確かめ方（動画の先頭のバイト、読めない画像）、縮小した画像の置き場所、complete を 2 回送ったとき、送る前に外せるもの、画面を離れたときと「もう一度」のときの外し方、AttachmentView の downloadUrl と thumbnailUrl、エラーの code（UPLOAD_NOT_FOUND） | （氏名） |
 
 本書は機能定義書の一部である。承認は[機能定義書](function-definition.md)で一括して行う。API・リアルタイムの通知・メッセージの共通の決まりは機能定義書 3 章〜5 章のとおり。
 
@@ -93,7 +94,7 @@ sequenceDiagram
 | 項目 | 型 | 必須 | 条件 | 守られないとき |
 | --- | --- | --- | --- | --- |
 | ファイルの数 | 数値 | | 1 通に 0〜4 個 | M-38（API は 400 TOO_MANY_ATTACHMENTS） |
-| 形式（contentType） | 文字列 | ○ | image/jpeg・image/png・image/gif・image/webp・video/mp4・video/webm。complete のときに、ファイルの先頭の数バイトでも確かめる（拡張子だけでは決めない） | M-39（API は 400 ATTACHMENT_TYPE_INVALID） |
+| 形式（contentType） | 文字列 | ○ | image/jpeg・image/png・image/gif・image/webp・video/mp4・video/webm。complete のときに、ファイルの先頭の 16 バイトでも確かめる（拡張子だけでは決めない）。画像はアバターと同じ見分け方（FN-02）、MP4 は 5〜8 バイト目が「ftyp」、WebM は先頭が EBML の印（1A 45 DF A3）。先頭は画像の形でも、読めない画像（壊れている・4,000 万画素を超える）は添付できない | M-39（API は 400 ATTACHMENT_TYPE_INVALID） |
 | 大きさ（size） | 数値 | ○ | 画像は 1〜10,485,760 バイト、動画は 1〜104,857,600 バイト | M-39（API は 413 ATTACHMENT_TOO_LARGE） |
 | ファイル名（fileName） | 文字列 | ○ | 1〜255 文字。表示にだけ使い、S3 の置き場所には使わない | 長いときは画面で 255 文字に切って送る。API は 400 BAD_REQUEST |
 
@@ -110,17 +111,21 @@ sequenceDiagram
 | 7 | 添付を消すとき（メッセージの削除、編集で外す、チャンネル・ワークスペースの削除、送らなかったもの）は、データベースの行をコミットした後に S3 のファイル（縮小した画像を含む）を消す。消せなかったものは記録して 1 日 1 回消し直す（要件定義書 N-11） |
 | 8 | 送らなかった添付（message_id が空のまま 24 時間たったもの）は、1 日 1 回まとめて消す（AT-11） |
 | 9 | S3 のバケットは、本アプリの画面の URL からの PUT だけを受け付けるよう CORS を設定する（やり方はインフラ設計書で決める） |
+| 10 | 縮小した画像は、元のファイルの置き場所に「-thumb.jpg」（透過のある画像は「-thumb.png」）を付けたところに置く。同じ添付の complete が同時に来ても同じところに置くので、片方を消す必要がない。complete は、済んだものに 2 回送っても同じ AttachmentView を返す |
+| 11 | complete では、S3 に置かれたファイルの大きさが受け付けたときの大きさと違うときも、形式が違うときと同じく S3 のファイルと記録を消して 400 にする。S3 の読み書き（10MB までの画像の読み込みと縮小）はトランザクションの外で行い、最後に行をロックして「アップロード済み」にする |
+| 12 | 送る前に外せる（DELETE）・complete できるのは、アップロードした本人の、まだメッセージに付いていないものだけ。会話を見られなくなったもの（キック・退出・削除）も complete できない（404） |
+| 13 | 画面は、「もう一度」のときは受け付けからやり直し、前に受け付けてもらったものは DELETE で外す。送らずに会話を移った・画面を閉じたときも、送っていないものを DELETE で外す（届かなかったものは AT-11 で消える）。送れなかったメッセージを「取り消す」と、本文と一緒に添付も入力欄に戻す |
 
 ## 6. API（案）
 
 | メソッド | URL | 入力 | 出力（成功） | 主なエラー |
 | --- | --- | --- | --- | --- |
 | POST | /api/conversations/{id}/uploads | `{"fileName","contentType","size"}` | 201 `{"uploadId","putUrl","headers","expiresAt"}` | 400 ATTACHMENT_TYPE_INVALID、403（送れない会話）、404、413 ATTACHMENT_TOO_LARGE |
-| POST | /api/uploads/{uploadId}/complete | なし | 200 AttachmentView | 400 ATTACHMENT_TYPE_INVALID・UPLOAD_NOT_FOUND_IN_STORAGE、404 |
-| DELETE | /api/uploads/{uploadId} | なし（送る前に外したとき） | 204 | 404 |
+| POST | /api/uploads/{uploadId}/complete | なし | 200 AttachmentView | 400 ATTACHMENT_TYPE_INVALID・UPLOAD_NOT_FOUND_IN_STORAGE、404 UPLOAD_NOT_FOUND |
+| DELETE | /api/uploads/{uploadId} | なし（送る前に外したとき） | 204 | 404 UPLOAD_NOT_FOUND |
 | GET | /api/messages/{id} | なし | 200 MessageView（新しい署名付き URL） | 404 MESSAGE_NOT_FOUND |
 
-AttachmentView：MessageView の attachments の 1 つと同じ形（機能定義書 3.5）。添付をメッセージに付けるのは FN-07 の POST …/messages（attachmentIds）で行う。
+AttachmentView：MessageView の attachments の 1 つと同じ形（機能定義書 3.5）。url は表示用（Content-Type を記録した形式に固定）、thumbnailUrl は縮小した画像（作らなかった画像は url と同じ。動画は null）、downloadUrl は元のファイル名で保存させるもの（5 章の 6）。添付をメッセージに付けるのは FN-07 の POST …/messages（attachmentIds）で行う。
 
 リアルタイムの通知：なし（添付はメッセージの通知（FN-07）に含めて送る）。
 
@@ -150,7 +155,8 @@ AttachmentView：MessageView の attachments の 1 つと同じ形（機能定�
 | 形式が違う（中身が申告と違うときも） | 400 | ATTACHMENT_TYPE_INVALID | M-39 |
 | 大きすぎる | 413 | ATTACHMENT_TOO_LARGE | M-39 |
 | S3 にファイルがない（PUT が終わっていない） | 400 | UPLOAD_NOT_FOUND_IN_STORAGE | M-40 |
-| 自分のものでない・ほかの会話の・送り済みの添付を付けようとした | 400 | BAD_REQUEST | 入力が正しくありません。 |
+| 自分のものでない・ほかの会話の・送り済みの・complete していない添付を付けようとした。同じ添付を 2 回並べた | 400 | BAD_REQUEST | 入力が正しくありません。 |
+| ほかの人の・送り済みの・ないアップロードを complete・DELETE した | 404 | UPLOAD_NOT_FOUND | M-40 |
 | アップロード（S3 への PUT を含む）に失敗 | 500 など | — | M-40 |
 | 動画を再生できない | — | — | M-41 |
 
