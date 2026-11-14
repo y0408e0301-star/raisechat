@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-FD-05 |
-| 版数 | 0.2 |
+| 版数 | 0.3 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-13 |
+| 最終更新日 | 2026-11-14 |
 | 作成者 | （氏名） |
 | 上位文書 | [機能定義書](function-definition.md)（RC-FD） |
 | 状態 | 承認待ち |
@@ -16,6 +16,7 @@
 | --- | --- | --- | --- |
 | 0.1 | 2026-11-10 | 初版 | （氏名） |
 | 0.2 | 2026-11-13 | メンバー管理を作るとき（開発計画書 1-8）に決めたことを 6 章に足した：一覧の形と人数、カーソルの中身、ユーザー ID の探し方、もういない人のキック、購読を取り消す会話 | （氏名） |
+| 0.3 | 2026-11-14 | MemberView にステータスを消す時刻（statusExpiresAt）を足した（FN-02 0.2。G-16 の「（時刻）まで」に使う） | （氏名） |
 
 本書は機能定義書の一部である。承認は[機能定義書](function-definition.md)で一括して行う。API・リアルタイムの通知・メッセージの共通の決まりは機能定義書 3 章〜5 章のとおり。
 
@@ -95,7 +96,7 @@ FN-04 の 3.2 のとおり。DM は、その人の conversation_members の行�
 | DELETE | /api/workspaces/{ws}/members/{username} | なし | 204 | 403 NOT_OWNER・CANNOT_KICK_OWNER、404 USER_NOT_FOUND |
 | POST | /api/workspaces/{ws}/leave | なし | 204 | 403 OWNER_CANNOT_LEAVE、404 |
 
-MemberView：UserSummary に role（OWNER・MEMBER）と joinedAt を足したもの。
+MemberView：UserSummary に statusExpiresAt（消す時刻を過ぎていれば null）・role（OWNER・MEMBER）・joinedAt を足したもの。
 
 - 一覧の形は `{"items","nextCursor","memberCount"}`（API の仕様書では WorkspaceMemberPage。FN-06 の会話のメンバーの一覧と名前を分けた）。memberCount は絞り込まないワークスペースの人数
 - 一覧のカーソルは「最後に出した行の順位（オーナー 0・メンバー 1）:ユーザー ID:表示名」（機能定義書 3.4。画面は中身を読まない）。形が違えば 400 BAD_REQUEST

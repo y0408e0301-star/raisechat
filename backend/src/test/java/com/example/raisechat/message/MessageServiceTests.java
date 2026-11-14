@@ -66,8 +66,8 @@ class MessageServiceTests {
 	@BeforeEach
 	void setUp() {
 		this.service = new MessageService(this.messages, this.conversations, this.conversationMembers,
-				this.workspaceAccess, this.users, TestEntities.fixedClock(), TestEntities.immediateTransaction(),
-				this.notifier, this.directMessages);
+				this.workspaceAccess, this.users, TestEntities.userSummaries(), TestEntities.fixedClock(),
+				TestEntities.immediateTransaction(), this.notifier, this.directMessages);
 		when(this.conversations.findVisible(TARO, CONVERSATION)).thenReturn(
 				Optional.of(TestEntities.withId(Conversation.general(3, TARO, TestEntities.NOW), CONVERSATION)));
 		when(this.conversationMembers.existsById(new ConversationMember.Key(CONVERSATION, TARO))).thenReturn(true);

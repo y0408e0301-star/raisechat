@@ -1,0 +1,109 @@
+package com.example.raisechat.storage;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.List;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
+
+import com.example.raisechat.TestEntities;
+
+import software.amazon.awssdk.core.exception.SdkClientException;
+
+// S3 のファイルを消す。消せなかったものは記録して後で消し直す（データ設計書 BR-12）
+@ExtendWith(MockitoExtension.class)
+class StorageDeleterTests {
+
+	@Mock
+	FileStorage storage;
+
+	@Mock
+	StorageDeletionRepository deletions;
+
+	private StorageDeleter deleter;
+
+	@BeforeEach
+	void setUp() {
+		this.deleter = new StorageDeleter(this.storage, this.deletions, TestEntities.fixedClock());
+	}
+
+	@Test
+	void すべてのキーを消す() {
+		this.deleter.deleteOrRecord(List.of("avatars/a.png", "avatars/b.png"));
+		verify(this.storage).delete("avatars/a.png");
+		verify(this.storage).delete("avatars/b.png");
+		verify(this.deletions, never()).save(any());
+	}
+
+	// BR-12
+	@Test
+	void 消せなかったキーを記録しほかのキーは続けて消す() {
+		doThrow(SdkClientException.create("S3 につながらない")).when(this.storage).delete("avatars/a.png");
+		doNothing().when(this.storage).delete("avatars/b.png");
+		this.deleter.deleteOrRecord(List.of("avatars/a.png", "avatars/b.png"));
+
+		ArgumentCaptor<StorageDeletion> saved = ArgumentCaptor.forClass(StorageDeletion.class);
+		verify(this.deletions).save(saved.capture());
+		assertThat(saved.getValue().getStorageKey()).isEqualTo("avatars/a.png");
+		assertThat(saved.getValue().getCreatedAt()).isEqualTo(TestEntities.NOW);
+		verify(this.storage).delete("avatars/b.png");
+	}
+
+	// データベースの行はコミットしてあるので、利用者にはエラーを返さない（ファイルは S3 に残る）
+	@Test
+	void 記録もできなくても例外を出さない() {
+		doThrow(SdkClientException.create("S3 につながらない")).when(this.storage).delete("avatars/a.png");
+		when(this.deletions.save(any())).thenThrow(new DataAccessResourceFailureException("DB が止まっている"));
+
+		this.deleter.deleteOrRecord(List.of("avatars/a.png", "avatars/b.png"));
+
+		verify(this.storage).delete("avatars/b.png");
+	}
+
+	@Test
+	void 記録があるかを確かめられなくても例外を出さない() {
+		doThrow(SdkClientException.create("S3 につながらない")).when(this.storage).delete("avatars/a.png");
+		when(this.deletions.existsByStorageKey("avatars/a.png"))
+			.thenThrow(new DataAccessResourceFailureException("DB が止まっている"));
+
+		this.deleter.deleteOrRecord(List.of("avatars/a.png"));
+
+		verify(this.deletions, never()).save(any());
+	}
+
+	@Test
+	void すでに記録してあるキーは重ねて記録しない() {
+		doThrow(SdkClientException.create("S3 につながらない")).when(this.storage).delete("avatars/a.png");
+		when(this.deletions.existsByStorageKey("avatars/a.png")).thenReturn(true);
+		this.deleter.deleteOrRecord(List.of("avatars/a.png"));
+		verify(this.deletions, never()).save(any());
+	}
+
+	// BR-12
+	@Test
+	void 消し直しで消せたものは記録も消し消せなかったものは残す() {
+		StorageDeletion ok = new StorageDeletion("avatars/a.png", TestEntities.NOW);
+		StorageDeletion ng = new StorageDeletion("avatars/b.png", TestEntities.NOW);
+		when(this.deletions.findAll()).thenReturn(List.of(ok, ng));
+		doNothing().when(this.storage).delete("avatars/a.png");
+		doThrow(SdkClientException.create("S3 につながらない")).when(this.storage).delete("avatars/b.png");
+
+		this.deleter.retry();
+
+		verify(this.deletions).delete(ok);
+		verify(this.deletions, never()).delete(ng);
+	}
+
+}

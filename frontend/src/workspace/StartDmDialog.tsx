@@ -98,7 +98,7 @@ export default function StartDmDialog({ workspaceId, onClose, onStarted }: Props
             <li key={m.username}>
               {/* 2.17 ユーザーの行。右のボタンは出さず、行を押して選ぶ */}
               <button type="button" className={styles.pick} onClick={() => choose(m)} disabled={starting !== null}>
-                <Avatar displayName={m.displayName} size={32} />
+                <Avatar displayName={m.displayName} avatarUrl={m.avatarUrl} size={32} />
                 <span className={styles.personName}>{m.displayName}{m.statusEmoji ? ` ${m.statusEmoji}` : ''}</span>
                 <span className={styles.username}>@{m.username}</span>
               </button>

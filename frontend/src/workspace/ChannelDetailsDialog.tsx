@@ -115,7 +115,7 @@ export default function ChannelDetailsDialog({ channel, owner, onClose, onInvite
 function Person({ user }: { user: UserSummary }) {
   return (
     <>
-      <Avatar displayName={user.displayName} size={32} />
+      <Avatar displayName={user.displayName} avatarUrl={user.avatarUrl} size={32} />
       <span className={styles.personName}>{user.displayName}{user.statusEmoji ? ` ${user.statusEmoji}` : ''}</span>
       <span className={styles.username}>@{user.username}</span>
     </>

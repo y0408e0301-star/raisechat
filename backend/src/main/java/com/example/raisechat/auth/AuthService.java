@@ -18,6 +18,7 @@ import com.example.raisechat.common.ErrorCode;
 import com.example.raisechat.user.DisplayNames;
 import com.example.raisechat.user.User;
 import com.example.raisechat.user.UserRepository;
+import com.example.raisechat.user.UserSummaries;
 import com.example.raisechat.user.UserSummary;
 
 // ユーザー登録・ログイン・JWT の取り直し・ログアウト（機能定義書 FN-01）
@@ -41,6 +42,8 @@ class AuthService {
 
 	private final UserRepository users;
 
+	private final UserSummaries userSummaries;
+
 	private final RefreshTokenRepository refreshTokens;
 
 	private final TokenService tokens;
@@ -52,9 +55,10 @@ class AuthService {
 	// ユーザーがいないときに、いるときと同じくらい時間をかけるために確かめるハッシュ（FN-01 3.2）
 	private final String dummyPasswordHash;
 
-	AuthService(UserRepository users, RefreshTokenRepository refreshTokens, TokenService tokens,
-			PasswordEncoder passwordEncoder, Clock clock) {
+	AuthService(UserRepository users, UserSummaries userSummaries, RefreshTokenRepository refreshTokens,
+			TokenService tokens, PasswordEncoder passwordEncoder, Clock clock) {
 		this.users = users;
+		this.userSummaries = userSummaries;
 		this.refreshTokens = refreshTokens;
 		this.tokens = tokens;
 		this.passwordEncoder = passwordEncoder;
@@ -85,7 +89,7 @@ class AuthService {
 		catch (DataIntegrityViolationException ex) {
 			throw new ApiException(ErrorCode.USERNAME_TAKEN, "username");
 		}
-		return new LoginResult(UserSummary.of(user, this.clock.instant()), this.tokens.issue(user));
+		return new LoginResult(this.userSummaries.of(user, this.clock.instant()), this.tokens.issue(user));
 	}
 
 	// 失敗の回数を増やしたことは、401・423 を返すときもコミットする（noRollbackFor）
@@ -112,7 +116,7 @@ class AuthService {
 			throw new ApiException(user.isLocked(now) ? ErrorCode.LOGIN_LOCKED : ErrorCode.LOGIN_FAILED);
 		}
 		user.recordSuccessfulLogin(now);
-		return new LoginResult(UserSummary.of(user, this.clock.instant()), this.tokens.issue(user));
+		return new LoginResult(this.userSummaries.of(user, this.clock.instant()), this.tokens.issue(user));
 	}
 
 	// リフレッシュトークンを使って、両方のトークンを新しくする（FN-01 3.3、BR-11）。
@@ -136,7 +140,7 @@ class AuthService {
 		current.revoke(now);
 		User user = this.users.findById(current.getUserId())
 			.orElseThrow(() -> new ApiException(ErrorCode.REFRESH_FAILED));
-		return new LoginResult(UserSummary.of(user, this.clock.instant()), this.tokens.issue(user));
+		return new LoginResult(this.userSummaries.of(user, this.clock.instant()), this.tokens.issue(user));
 	}
 
 	// ログアウトしたブラウザのリフレッシュトークンだけを無効にする（ほかのブラウザのログインは続く。FN-01 5 章 No.7）
@@ -154,7 +158,7 @@ class AuthService {
 	UserSummary me(long userId) {
 		// JWT は正しいがユーザーがいないときは、ログインしていないものとして扱う（退会はないが、DB を作り直したときなど）
 		return this.users.findById(userId)
-			.map((user) -> UserSummary.of(user, this.clock.instant()))
+			.map((user) -> this.userSummaries.of(user, this.clock.instant()))
 			.orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED));
 	}
 

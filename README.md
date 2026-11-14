@@ -34,6 +34,15 @@ cd frontend
 npm ci
 ```
 
+### アバター・添付の置き場所（AWS S3）
+
+アバター（FN-02）と、あとで作る添付（FN-09）は、開発中も本物の S3 の開発用バケット `rc-files-dev-467112307516`（東京リージョン、非公開）に置きます。API サーバーは AWS の鍵を AWS SDK の標準の探し方で見つけるので、開発する PC で `aws configure` を済ませ、`~/.aws/credentials` に、このバケットの `avatars/`・`workspaces/` を読み書きできる IAM ユーザーの鍵を置いておきます。
+
+- 画面は API が発行した署名付き URL（1 時間。N-20）で S3 から直接読みます。バケットの URL を直接開いても 403 で見られません
+- 自動のテスト（`mvnw verify`）は Testcontainers で MinIO（S3 の代わり。`chainguard/minio`）を起動するので、AWS の鍵は要りません
+- S3 から消せなかったファイルは storage_deletions の表に記録し、毎日 4:30 に消し直します
+- 確かめるためにバケットに置いたファイルは、確かめ終わったら消します（開発計画書 5 章）
+
 ### 起動する
 
 ターミナルを使い、リポジトリのフォルダから次を順に実行します。
@@ -49,7 +58,7 @@ npm ci
 - API サーバーは http://localhost:8080/actuator/health で `{"status":"UP"}` が返れば起動済みです
 - API の仕様書は http://localhost:8080/swagger-ui.html （Swagger UI）で見られます（下の「API の仕様書」）
 - ポートは上の表のものだけを使います（[CLAUDE.md](CLAUDE.md) の「サーバーのポート」）。使われていたら、そのポートを使っているプロセスを止めてから起動し直します（別のポートでは起動しません）。ほかのアプリ（BookLog など）の PostgreSQL のコンテナが 5432 を使っていたら、`docker stop <コンテナ名>` で止めてから起動します
-- 開発では、データベースの接続先・JWT の秘密の値・画面の URL（WebSocket の Origin の確かめに使う）は `backend/src/main/resources/application.properties` の既定値（開発用）を使うので、設定は要りません。公開環境では環境変数（`DB_URL`・`DB_USERNAME`・`DB_PASSWORD`・`JWT_SECRET`・`COOKIE_SECURE=true`・`WEB_ORIGIN`）で渡します
+- 開発では、データベースの接続先・JWT の秘密の値・画面の URL（WebSocket の Origin の確かめに使う）・S3 のバケットは `backend/src/main/resources/application.properties` の既定値（開発用）を使うので、設定は要りません（S3 の鍵は上の「アバター・添付の置き場所」）。公開環境では環境変数（`DB_URL`・`DB_USERNAME`・`DB_PASSWORD`・`JWT_SECRET`・`COOKIE_SECURE=true`・`WEB_ORIGIN`・`S3_BUCKET`）で渡します
 - 画面の dev サーバー（5173）は、`/api` と WebSocket の `/ws` を API サーバー（8080）へ転送します
 
 ### 止める
@@ -78,7 +87,7 @@ Pull Request を作ったときは、GitHub Actions（[.github/workflows/ci.yml]
 | Controller のテスト | `*ControllerTests`（`@ControllerTest`） | URL・ステータス・JSON の形、ログインと CSRF トークンが要るか、エラーの形 | Controller・ログインの確かめ方（SecurityConfig） | Service（`@MockitoBean`） |
 | API のテスト | `*ApiTests` | 機能定義書 10 章の観点を、API を通して（Controller から DB まで） | すべて | なし |
 
-- **開発用の DB（compose.yaml）は使いません。** DB を使うテストは、Testcontainers が使い捨ての PostgreSQL 17 を Docker で起動し、終わったら消します。Docker は動かしておいてください
+- **開発用の DB（compose.yaml）と S3 の開発用バケットは使いません。** DB を使うテストは、Testcontainers が使い捨ての PostgreSQL 17 を、API のテストは S3 の代わりの MinIO も Docker で起動し、終わったら消します。Docker は動かしておいてください
 - H2 などのメモリーの DB は使いません。PostgreSQL にしかない機能を本番と同じ形で確かめるためです
 - Controller のテストで、ログインした状態は `ControllerTestSupport.loggedIn(ユーザーの ID)` で作ります。spring-security-test の `jwt()` は CSRF の確認を飛ばすため使いません（本アプリは Cookie で JWT を送るので CSRF を確かめています）
 
@@ -90,7 +99,9 @@ Pull Request を作ったときは、GitHub Actions（[.github/workflows/ci.yml]
 | --- | --- | --- |
 | 関数のテスト | `api.test.ts`・`validation.test.ts` | API の URL・メソッド・送る形、CSRF のヘッダー、JWT の取り直し（同時に 401 でも 1 回だけ）、入力の条件と境界値 |
 | 部品のテスト | `components/*.test.tsx`・`auth/*.test.tsx` | ヘッダー・メニュー・ダイアログ・トースト・お知らせ欄・ログインの状態と移り先 |
-| 画面のテスト | `pages/*.test.tsx`・`workspace/*.test.tsx`・`App.test.tsx` | 機能定義書 10 章の観点のうち画面で確かめるもの（メッセージの出し方、押せる・押せない、移り先） |
+| 画面のテスト | `pages/*.test.tsx`・`workspace/*.test.tsx`・`profile/*.test.tsx`・`App.test.tsx` | 機能定義書 10 章の観点のうち画面で確かめるもの（メッセージの出し方、押せる・押せない、移り先） |
+
+- 絵文字の一覧（emoji-picker-element）は jsdom では動かないので、画面のテストでは選ぶボタンだけの偽物にします（`profile/profilePage.test.tsx`）
 
 ## API の仕様書（OpenAPI）
 

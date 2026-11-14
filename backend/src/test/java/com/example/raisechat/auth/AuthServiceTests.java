@@ -56,8 +56,8 @@ class AuthServiceTests {
 	@BeforeEach
 	void setUp() {
 		when(this.passwordEncoder.encode("dummy-password-0")).thenReturn(DUMMY_HASH);
-		this.service = new AuthService(this.users, this.refreshTokens, this.tokens, this.passwordEncoder,
-				TestEntities.fixedClock());
+		this.service = new AuthService(this.users, TestEntities.userSummaries(), this.refreshTokens, this.tokens,
+				this.passwordEncoder, TestEntities.fixedClock());
 	}
 
 	@Nested

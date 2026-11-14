@@ -13,6 +13,7 @@ import com.example.raisechat.common.ApiException;
 import com.example.raisechat.common.ErrorCode;
 import com.example.raisechat.message.MessageRepository;
 import com.example.raisechat.user.UserRepository;
+import com.example.raisechat.user.UserSummaries;
 import com.example.raisechat.user.UserSummary;
 import com.example.raisechat.workspace.WorkspaceAccess;
 import com.example.raisechat.workspace.WorkspaceMember;
@@ -32,18 +33,21 @@ class ConversationService {
 
 	private final UserRepository users;
 
+	private final UserSummaries userSummaries;
+
 	private final DirectMessages directMessages;
 
 	private final Clock clock;
 
 	ConversationService(ConversationRepository conversations, ConversationMemberRepository members,
 			MessageRepository messages, WorkspaceAccess workspaceAccess, UserRepository users,
-			DirectMessages directMessages, Clock clock) {
+			UserSummaries userSummaries, DirectMessages directMessages, Clock clock) {
 		this.conversations = conversations;
 		this.members = members;
 		this.messages = messages;
 		this.workspaceAccess = workspaceAccess;
 		this.users = users;
+		this.userSummaries = userSummaries;
 		this.directMessages = directMessages;
 		this.clock = clock;
 	}
@@ -64,7 +68,8 @@ class ConversationService {
 	ConversationDetail get(long userId, long conversationId) {
 		Conversation conversation = requireVisible(userId, conversationId);
 		Instant now = this.clock.instant();
-		UserSummary createdBy = UserSummary.of(this.users.findById(conversation.getCreatedBy()).orElseThrow(), now);
+		UserSummary createdBy = this.userSummaries.of(this.users.findById(conversation.getCreatedBy()).orElseThrow(),
+				now);
 		long memberCount = this.members.countByConversationId(conversationId);
 		if (conversation.getType() == Conversation.Type.DM) {
 			return ConversationDetail.of(this.directMessages.summary(conversation, userId), conversation, memberCount,

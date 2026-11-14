@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@stomp/stompjs": "7.5.0",
+    "emoji-picker-element": "1.29.1",
+    "emoji-picker-element-data": "1.8.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-markdown": "10.1.0",

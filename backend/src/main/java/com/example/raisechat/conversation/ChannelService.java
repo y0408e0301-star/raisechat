@@ -25,6 +25,7 @@ import com.example.raisechat.realtime.RealtimeNotifier;
 import com.example.raisechat.realtime.SubscriptionRevoker;
 import com.example.raisechat.user.User;
 import com.example.raisechat.user.UserRepository;
+import com.example.raisechat.user.UserSummaries;
 import com.example.raisechat.user.UserSummary;
 import com.example.raisechat.workspace.WorkspaceAccess;
 import com.example.raisechat.workspace.WorkspaceMember;
@@ -60,6 +61,8 @@ class ChannelService {
 
 	private final UserRepository users;
 
+	private final UserSummaries userSummaries;
+
 	private final RealtimeNotifier notifier;
 
 	private final SubscriptionRevoker revoker;
@@ -68,13 +71,15 @@ class ChannelService {
 
 	ChannelService(ConversationRepository conversations, ConversationMemberRepository members,
 			WorkspaceMemberRepository workspaceMembers, MessageRepository messages, WorkspaceAccess workspaceAccess,
-			UserRepository users, RealtimeNotifier notifier, SubscriptionRevoker revoker, Clock clock) {
+			UserRepository users, UserSummaries userSummaries, RealtimeNotifier notifier, SubscriptionRevoker revoker,
+			Clock clock) {
 		this.conversations = conversations;
 		this.members = members;
 		this.workspaceMembers = workspaceMembers;
 		this.messages = messages;
 		this.workspaceAccess = workspaceAccess;
 		this.users = users;
+		this.userSummaries = userSummaries;
 		this.notifier = notifier;
 		this.revoker = revoker;
 		this.clock = clock;
@@ -174,7 +179,7 @@ class ChannelService {
 		for (User user : invitees.values()) {
 			if (addMember(conversationId, user.getId())) {
 				notifyJoined(user.getId(), channel);
-				added.add(UserSummary.of(user, now));
+				added.add(this.userSummaries.of(user, now));
 			}
 		}
 		return added;
@@ -214,7 +219,7 @@ class ChannelService {
 		Instant now = this.clock.instant();
 		String next = (found.size() > PAGE_SIZE)
 				? new ChannelInputs.Cursor(page.getLast().getId(), page.getLast().getDisplayName()).format() : null;
-		return new MemberPage(page.stream().map((u) -> UserSummary.of(u, now)).toList(), next);
+		return new MemberPage(page.stream().map((u) -> this.userSummaries.of(u, now)).toList(), next);
 	}
 
 	// 招待の候補（CH-7）：そのチャンネルにいないワークスペースのメンバー。表示名かユーザー ID で絞り込む
@@ -228,7 +233,7 @@ class ChannelService {
 		return this.members
 			.findCandidates(channel.getWorkspaceId(), conversationId, ChannelInputs.pattern(q), CANDIDATE_LIMIT)
 			.stream()
-			.map((u) -> UserSummary.of(u, now))
+			.map((u) -> this.userSummaries.of(u, now))
 			.toList();
 	}
 
@@ -262,7 +267,7 @@ class ChannelService {
 	// 参加した人から見た詳細
 	private ConversationDetail detail(Conversation channel) {
 		Instant now = this.clock.instant();
-		UserSummary createdBy = UserSummary.of(this.users.findById(channel.getCreatedBy()).orElseThrow(), now);
+		UserSummary createdBy = this.userSummaries.of(this.users.findById(channel.getCreatedBy()).orElseThrow(), now);
 		long memberCount = this.members.countByConversationId(channel.getId());
 		return ConversationDetail.of(channel, true, memberCount, createdBy);
 	}

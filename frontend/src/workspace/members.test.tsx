@@ -95,7 +95,7 @@ describe('キック（MB-3、TC-05-2）', () => {
     })
     const user = userEvent.setup()
     await screen.findByRole('heading', { level: 1, name: 'メンバー（3 人）' })
-    expect(within(rows()[0]).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(rows()[0]).queryByRole('button', { name: /キック/ })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'はなこをキック' }))
     const dialog = screen.getByRole('dialog', { name: 'メンバーのキック' })

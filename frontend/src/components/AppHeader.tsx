@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { workspaceUrl } from '../api'
+import { PROFILE_URL, workspaceUrl } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import Avatar from './Avatar'
 import styles from './AppHeader.module.css'
@@ -22,8 +22,7 @@ function shorten(name: string): string {
 }
 
 // ヘッダー（画面設計書 2.6）と、そのすぐ下のお知らせ欄（2.4）。
-// ワークスペース用のヘッダーの検索欄はメッセージ検索（開発計画書 1-16）、「@」とメンションの件数は通知（1-15）で足す。
-// 自分のアバターのメニューの「プロフィールの設定」は、G-10 を作るプロフィール（1-10）で足す
+// ワークスペース用のヘッダーの検索欄はメッセージ検索（開発計画書 1-16）、「@」とメンションの件数は通知（1-15）で足す
 export default function AppHeader({ workspace }: Props) {
   const { me, signOut } = useAuth()
   const [sending, setSending] = useState(false)
@@ -53,8 +52,8 @@ export default function AppHeader({ workspace }: Props) {
           {me && (
             // 自分のアバターを押すとメニュー（W-5）
             <Menu label={`${me.displayName}（@${me.username}）のメニュー`} buttonClassName={styles.me} alignRight
-              items={[{ label: 'ワークスペースの一覧', to: '/' }]}>
-              <Avatar displayName={me.displayName} size={32} />
+              items={[{ label: 'プロフィールの設定', to: PROFILE_URL }, { label: 'ワークスペースの一覧', to: '/' }]}>
+              <Avatar displayName={me.displayName} avatarUrl={me.avatarUrl} size={32} />
             </Menu>
           )}
           <button type="button" className={ui.secondary} onClick={handleLogout} disabled={sending}>

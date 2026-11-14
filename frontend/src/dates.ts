@@ -46,3 +46,15 @@ export function formatDateTime(iso: string, now: Date = new Date()): string {
   const year = p.year === parts(now).year ? '' : `${p.year}年`
   return `${year}${p.month}月${p.day}日 ${p.hour}:${p.minute}`
 }
+
+// ステータスを消す時刻（G-16・G-10）。今日なら「17:00」、ほかの日は「11月17日 10:15」
+export function formatUntil(iso: string, now: Date = new Date()): string {
+  return dayKey(iso) === dayKey(now.toISOString()) ? formatTime(iso) : formatDateTime(iso, now)
+}
+
+// 日本時間のその日の 23:59（UTC では 14:59）。もう過ぎていれば次の日の 23:59（PF-5 の「今日の終わり」）
+export function endOfDay(now: Date): Date {
+  const p = parts(now)
+  const end = new Date(Date.UTC(p.year, p.month - 1, p.day, 14, 59))
+  return end.getTime() > now.getTime() ? end : new Date(end.getTime() + 24 * 60 * 60 * 1000)
+}

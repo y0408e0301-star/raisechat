@@ -37,11 +37,12 @@ describe('AppHeader', () => {
     expect(screen.getByTitle('😀'.repeat(21))).toHaveTextContent(`${'😀'.repeat(20)}…`)
   })
 
-  it('W-5：自分のアバターを押すと「ワークスペースの一覧」のメニューを出し、Esc キーで閉じる', async () => {
+  it('W-5：自分のアバターを押すと「プロフィールの設定」「ワークスペースの一覧」のメニューを出し、Esc キーで閉じる', async () => {
     renderHeader({ id: 3, name: '仲間うち' })
     const button = screen.getByRole('button', { name: 'たろう（@taro_y）のメニュー' })
     await userEvent.click(button)
     expect(button).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'プロフィールの設定' })).toHaveAttribute('href', '/settings/profile')
     expect(screen.getByRole('link', { name: 'ワークスペースの一覧' })).toHaveAttribute('href', '/')
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByRole('link', { name: 'ワークスペースの一覧' })).not.toBeInTheDocument()

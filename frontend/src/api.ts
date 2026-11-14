@@ -24,6 +24,7 @@ export type MemberView = Schemas['MemberView']
 export type WorkspaceMemberPage = Schemas['WorkspaceMemberPage']
 export type InvitePage = Schemas['InvitePage']
 export type InvitePreview = Schemas['InvitePreview']
+export type MyProfile = Schemas['MyProfile']
 
 // API がエラーを返したとき（機能定義書 3.3）。message は画面にそのまま出せる文、
 // field があればその入力欄の下に出す
@@ -104,12 +105,14 @@ function csrfHeader(): Record<string, string> {
   return token ? { 'X-XSRF-TOKEN': decodeURIComponent(token) } : {}
 }
 
-// body があれば JSON で送る。添付のファイルは API を通さず、ブラウザから S3 へ直接送る（機能定義書 FN-09）
+// body があれば JSON で送る。FormData（アバター。FN-02）なら multipart で送る（Content-Type はブラウザが境界の文字列と一緒に付ける）。
+// 添付のファイルは API を通さず、ブラウザから S3 へ直接送る（機能定義書 FN-09）
 async function call(method: string, url: string, body?: unknown): Promise<Response> {
   const headers: Record<string, string> = method === 'GET' ? {} : csrfHeader()
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const form = body instanceof FormData
+  if (body !== undefined && !form) headers['Content-Type'] = 'application/json'
   try {
-    return await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) })
+    return await fetch(url, { method, headers, body: body === undefined ? undefined : form ? body : JSON.stringify(body) })
   } catch {
     // つながらない
     throw new ApiError(0, 'NETWORK_ERROR', M[49])
@@ -306,6 +309,32 @@ export async function deleteChannel(conversationId: number): Promise<void> {
   await request('DELETE', `/api/conversations/${conversationId}`)
 }
 
+// ---------------------------------------------------------------- FN-02 プロフィール
+
+export function fetchMyProfile(): Promise<MyProfile> {
+  return requestJson<MyProfile>('GET', '/api/me/profile')
+}
+
+// 4 つとも毎回送る。statusExpiresAt は null で「消さない」
+export function updateProfile(input: Schemas['UpdateProfileRequest']): Promise<Me> {
+  return requestJson<Me>('PATCH', '/api/me/profile', input)
+}
+
+export function changeAvatar(file: File): Promise<Me> {
+  const form = new FormData()
+  form.append('file', file)
+  return requestJson<Me>('PUT', '/api/me/avatar', form)
+}
+
+export function removeAvatar(): Promise<Me> {
+  return requestJson<Me>('DELETE', '/api/me/avatar')
+}
+
+// G-16 の 1 人のメンバー。ワークスペースにいなければ 404 USER_NOT_FOUND（PF-9）
+export function fetchMember(workspaceId: number, username: string): Promise<MemberView> {
+  return requestJson<MemberView>('GET', `/api/workspaces/${workspaceId}/members/${encodeURIComponent(username)}`)
+}
+
 // ---------------------------------------------------------------- FN-12 DM
 
 // 相手との DM を開く。なければ作る（DM-2）
@@ -355,3 +384,5 @@ export const channelsUrl = (workspaceId: number) => `/w/${workspaceId}/channels`
 export const membersUrl = (workspaceId: number) => `/w/${workspaceId}/members`
 // G-11 招待リンクの管理画面
 export const invitesUrl = (workspaceId: number) => `/w/${workspaceId}/invites`
+// G-10 プロフィールの設定画面
+export const PROFILE_URL = '/settings/profile'

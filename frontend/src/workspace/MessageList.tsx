@@ -110,7 +110,7 @@ export default function MessageList({ conversation, entries, hasMoreBefore, load
           ? (
             // 会話の始まり（DM。相手のアバター・表示名。画面設計書 2.9）
             <div className={styles.start}>
-              <Avatar displayName={conversation.dmPartner.displayName} size={96} />
+              <Avatar displayName={conversation.dmPartner.displayName} avatarUrl={conversation.dmPartner.avatarUrl} size={96} />
               <h2 className={styles.startTitle}>{conversation.dmPartner.displayName}</h2>
               <p className={styles.startText}>
                 {conversation.dmPartner.displayName}さんとのダイレクトメッセージはここから始まります。

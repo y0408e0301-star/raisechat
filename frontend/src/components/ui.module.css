@@ -16,11 +16,13 @@
   .primary, .secondary, .danger { height: 44px; }
 }
 
-/* 2.7 アバター（画像がないときの頭文字の丸） */
+/* 2.7 アバター（画像と、画像がないときの頭文字の丸） */
 .avatar {
   flex: none; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--frame); color: var(--text); font-weight: bold;
+  /* 画像のアバター（img）は丸く切り取る */
+  object-fit: cover;
 }
 
 /* 2.4 中身の代わりに出すメッセージ（画面の中身を出す場所の中央に補足文字で出す） */
