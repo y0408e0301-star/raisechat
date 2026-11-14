@@ -3,7 +3,7 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-FD |
-| 版数 | 0.11 |
+| 版数 | 0.12 |
 | 作成日 | 2026-11-10 |
 | 最終更新日 | 2026-11-14 |
 | 作成者 | （氏名） |
@@ -25,6 +25,7 @@
 | 0.9 | 2026-11-13 | FN-12 を 0.2 にした（DM の通知と入力の誤り）。4.3 の conversation.updated を送るときに、DM のメッセージと相手が抜けた・戻ったときを足した | （氏名） |
 | 0.10 | 2026-11-14 | FN-02 を 0.2（アバターの画素数の上限・後始末、MemberView の消す時刻）、FN-05 を 0.3（MemberView の消す時刻）、FN-10 を 0.2（使える絵文字に component を足し、U+FE0F の違いを直す）にした | （氏名） |
 | 0.11 | 2026-11-14 | FN-07 を 0.3（編集の keepAttachmentIds、GET /api/messages/{id}）、FN-09 を 0.2（形式の確かめ方・縮小した画像・外し方など）にした。3.5 の MessageView の attachments に downloadUrl を足した | （氏名） |
+| 0.12 | 2026-11-14 | FN-08 を 0.3 にした（スレッドを作るときに決めたこと）。3.5 の MessageView に replyUsers を足した | （氏名） |
 
 ## 承認
 
@@ -232,6 +233,7 @@ statusEmoji・statusText は、ステータスがないか、消す日時を過�
   ],
   "replyCount": 2,
   "lastReplyAt": "2026-11-10T01:07:00Z",
+  "replyUsers": [ { "username": "hana", "displayName": "はな", "avatarUrl": null, "statusEmoji": null, "statusText": null } ],
   "createdAt": "2026-11-10T01:02:00Z",
   "editedAt": null,
   "deleted": false,
@@ -245,7 +247,8 @@ statusEmoji・statusText は、ステータスがないか、消す日時を過�
 - reactions.users は、絵文字を付けた人の username を付けた順に最大 20 人まで返す（重ねたときに出す。FN-10）
 - deleted が true のとき（スレッドの返信がある親メッセージを削除したとき。FN-07 MS-11）は、body は空、attachments・reactions は空の並びにする
 - canDelete は、自分のメッセージか、自分がそのワークスペースのオーナーのときに true
-- スレッドの返信（parentId があるもの）では、replyCount は 0、lastReplyAt は null
+- replyUsers は、返信のある親メッセージの、最後に返信した人から 3 人（画面設計書 2.9 の返信した人のアバター）
+- スレッドの返信（parentId があるもの）では、replyCount は 0、lastReplyAt は null、replyUsers は空の並び
 
 ---
 

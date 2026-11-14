@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
   ApiError, conversationUrl, fetchConversation, fetchMessage, fetchMessages, joinChannel, markRead, sendMessage,
   type AttachmentView, type ConversationDetail, type MessageView,
@@ -22,6 +22,7 @@ import DeleteMessageDialog from './DeleteMessageDialog'
 import type { Entry } from './entries'
 import { addMessage, applyEvent, settlePending, type Viewer } from './liveMessages'
 import MessageList from './MessageList'
+import ThreadPanel from './ThreadPanel'
 import { useWorkspace } from './WorkspaceContext'
 
 // G-5 の会話（画面設計書 7.1）。会話を切り替えたら読み込み直すよう、ID ごとに作り直す。
@@ -60,6 +61,22 @@ function ConversationView({ conversationId }: { conversationId: number }) {
   const [dragging, setDragging] = useState(false)
   // 添付の URL の期限切れで読み直している（または読み直した）メッセージ。同じものを何度も読み直さない（AT-10）
   const refreshed = useRef(new Set<number>())
+  // 開いているスレッド（親メッセージの ID）。URL の ?thread= に入れ、読み込み直しても開いたままにする（TH-6）
+  const [searchParams, setSearchParams] = useSearchParams()
+  const threadParam = Number(searchParams.get('thread'))
+  const threadId = Number.isInteger(threadParam) && threadParam > 0 ? threadParam : null
+  const openThread = useCallback((messageId: number) => {
+    setSearchParams((params) => {
+      params.set('thread', String(messageId))
+      return params
+    })
+  }, [setSearchParams])
+  const closeThread = useCallback(() => {
+    setSearchParams((params) => {
+      params.delete('thread')
+      return params
+    }, { replace: true })
+  }, [setSearchParams])
 
   const setDraft = useCallback((text: string) => {
     setDraftState(text)
@@ -110,15 +127,15 @@ function ConversationView({ conversationId }: { conversationId: number }) {
   // DM ではオーナーでもほかの人のメッセージを削除できない（FN-12 5 章の 6）
   const isDm = typeof loaded === 'object' && loaded.conversation.type === 'DM'
   const owner = workspace.role === 'OWNER' && !isDm
+  const viewer = useMemo<Viewer | null>(() => (me ? { me, owner } : null), [me, owner])
   useEffect(() => {
-    if (!me) return
-    const viewer: Viewer = { me, owner }
+    if (!viewer) return
     return subscribeConversation(conversationId, (event: RealtimeEvent) => {
       if (event.conversationId !== conversationId) return
       setPending((list) => settlePending(list, event, viewer))
       updateItems((items) => applyEvent(items, event, viewer))
     })
-  }, [subscribeConversation, conversationId, me, owner, updateItems])
+  }, [subscribeConversation, conversationId, viewer, updateItems])
 
   // 開いている会話から抜けた・削除されたら general に移る。削除のときは M-28 を出す（CH-8・CH-10、画面設計書 7.3）
   const generalUrl = conversationUrl(workspace.id, workspace.generalConversationId)
@@ -267,7 +284,8 @@ function ConversationView({ conversationId }: { conversationId: number }) {
     : []
 
   return (
-    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions
+    <div className={styles.layout}>
+    {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions */}
     <div className={styles.page} onDragOver={handleDragOver} onDrop={handleDrop}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false) }}>
       {dragging && <div className={attachmentStyles.dropZone}>ドロップして添付</div>}
@@ -335,7 +353,7 @@ function ConversationView({ conversationId }: { conversationId: number }) {
             loadingOlder={loadingOlder} onLoadOlder={loadOlder} onDelete={setDeleting}
             onEdited={(edited) => updateItems((items) => items.map((m) => (m.id === edited.id ? edited : m)))}
             onGone={(id) => updateItems((items) => items.filter((m) => m.id !== id))}
-            onRetry={retry} onCancel={cancel} onExpired={refreshMessage} />
+            onRetry={retry} onCancel={cancel} onExpired={refreshMessage} onOpenThread={openThread} />
           {loaded.conversation.canPost
             ? (
               <Composer value={draft} onChange={setDraft} onSend={send} uploads={uploads}
@@ -381,6 +399,12 @@ function ConversationView({ conversationId }: { conversationId: number }) {
             setDeleting(null)
           }} />
       )}
+    </div>
+    {threadId !== null && typeof loaded === 'object' && viewer && (
+      // スレッドのパネル（画面設計書 7.2）。スレッドを切り替えたら読み込み直すよう、親の ID ごとに作り直す
+      <ThreadPanel key={threadId} conversation={loaded.conversation} parentId={threadId} viewer={viewer}
+        onClose={closeThread} />
+    )}
     </div>
   )
 }

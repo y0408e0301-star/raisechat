@@ -29,6 +29,8 @@ type Props = {
   onCancel: (clientId: string) => void
   // 添付が表示できなかった（署名付き URL の期限切れ。AT-10）
   onExpired: (messageId: number) => void
+  // スレッドを開く（TH-1・TH-2）
+  onOpenThread: (messageId: number) => void
 }
 
 function info(e: Entry) {
@@ -141,7 +143,8 @@ export default function MessageList({ conversation, entries, hasMoreBefore, load
                   <span>{formatDayDivider(createdAt)}</span>
                 </div>
               )}
-              <MessageItem entry={entry} compact={!newDay && continues(prev, entry)} {...handlers} />
+              <MessageItem entry={entry} compact={!newDay && continues(prev, entry)} canPost={conversation.canPost}
+                {...handlers} />
             </Fragment>
           )
         })}

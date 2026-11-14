@@ -5,7 +5,7 @@ type Props = {
   displayName: string
   // 署名付き URL（1 時間。FN-02 5 章の 4）。なければ頭文字を出す
   avatarUrl?: string | null
-  size: 32 | 36 | 96 | 128
+  size: 20 | 32 | 36 | 96 | 128
 }
 
 // ユーザーを表す丸（画面設計書 2.7）。アバターの画像があれば丸く切り取って出し、

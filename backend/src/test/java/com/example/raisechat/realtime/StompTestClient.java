@@ -119,8 +119,17 @@ final class StompTestClient implements AutoCloseable {
 		return this.received.poll(millis, TimeUnit.MILLISECONDS) == null;
 	}
 
-	@Nullable String error() throws InterruptedException {
-		return this.errors.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+	// 断られたか（購読・SEND）。サーバーは ERROR のフレームを送ってから接続を切るが、CI のように遅い環境では
+	// 切れるのが先に届いて ERROR のフレームを受け取れないことがあるので、どちらかが 5 秒以内に起きれば断られたとみなす
+	boolean rejected() throws InterruptedException {
+		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS);
+		while (System.nanoTime() < deadline) {
+			if (!this.errors.isEmpty() || this.closed.isDone()) {
+				return true;
+			}
+			Thread.sleep(20);
+		}
+		return false;
 	}
 
 	// 切れたときの理由（サーバーが付けた番号）

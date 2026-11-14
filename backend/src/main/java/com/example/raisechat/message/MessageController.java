@@ -62,6 +62,26 @@ class MessageController {
 				request.attachmentIds());
 	}
 
+	@Operation(summary = "スレッドの返信の一覧（FN-08）",
+			description = "親メッセージと、返信を古い順に返す。before・after・limit は会話の一覧と同じ。「削除されました」の親のスレッドも読める")
+	@GetMapping("/api/messages/{parentId}/replies")
+	MessageService.ReplyPage replies(@AuthenticationPrincipal Jwt jwt, @PathVariable long parentId,
+			@RequestParam(required = false) @Nullable Long before, @RequestParam(required = false) @Nullable Long after,
+			@RequestParam(required = false) @Nullable Integer limit) {
+		return this.messageService.replies(CurrentUser.id(jwt), parentId, before, after, limit);
+	}
+
+	@Operation(summary = "スレッドに返信する（FN-08）",
+			description = "送り方・clientId・添付は会話への送信と同じ。返信への返信は 400 CANNOT_REPLY_TO_REPLY")
+	@ApiResponse(responseCode = "201", description = "送った")
+	@PostMapping("/api/messages/{parentId}/replies")
+	@ResponseStatus(HttpStatus.CREATED)
+	MessageView reply(@AuthenticationPrincipal Jwt jwt, @PathVariable long parentId,
+			@RequestBody PostMessageRequest request) {
+		return this.messageService.postReply(CurrentUser.id(jwt), parentId, request.body(), request.clientId(),
+				request.attachmentIds());
+	}
+
 	@Operation(summary = "メッセージを編集する",
 			description = "送った本人だけ（オーナーでもほかの人のものは 403）。keepAttachmentIds にない添付は外す（足すことはできない）")
 	@PatchMapping("/api/messages/{messageId}")
