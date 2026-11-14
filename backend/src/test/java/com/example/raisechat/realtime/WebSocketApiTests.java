@@ -178,7 +178,7 @@ class WebSocketApiTests {
 
 		client.subscribe(topic(other));
 
-		assertThat(client.error()).isNotNull();
+		assertThat(client.rejected()).isTrue();
 		assertThat(client.closeStatus()).isNotNull();
 		assertThat(this.registry.findSubscriptions((s) -> topic(other).equals(s.getDestination()))).isEmpty();
 	}
@@ -190,18 +190,18 @@ class WebSocketApiTests {
 
 		client.subscribe(topic(privateChannel));
 
-		assertThat(client.error()).isNotNull();
+		assertThat(client.rejected()).isTrue();
 	}
 
 	@Test
 	void ない会話と数字でない宛先は購読できない() throws Exception {
 		StompTestClient missing = connect(this.taro);
 		missing.subscribe(topic(9999));
-		assertThat(missing.error()).isNotNull();
+		assertThat(missing.rejected()).isTrue();
 
 		StompTestClient notNumber = connect(this.taro);
 		notNumber.subscribe("/topic/conversations/abc");
-		assertThat(notNumber.error()).isNotNull();
+		assertThat(notNumber.rejected()).isTrue();
 	}
 
 	@Test
@@ -210,7 +210,7 @@ class WebSocketApiTests {
 
 		client.subscribe("/topic/anything");
 
-		assertThat(client.error()).isNotNull();
+		assertThat(client.rejected()).isTrue();
 	}
 
 	@Test
@@ -219,7 +219,7 @@ class WebSocketApiTests {
 
 		client.send(topic(this.general), "{}");
 
-		assertThat(client.error()).isNotNull();
+		assertThat(client.rejected()).isTrue();
 	}
 
 	// チャンネルの作成（1-6）はまだないので SQL で作る。taro だけが入っている
