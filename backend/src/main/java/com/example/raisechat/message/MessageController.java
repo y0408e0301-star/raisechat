@@ -1,5 +1,7 @@
 package com.example.raisechat.message;
 
+import java.util.List;
+
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -44,20 +46,28 @@ class MessageController {
 		return this.messageService.list(CurrentUser.id(jwt), conversationId, before, after, limit);
 	}
 
-	@Operation(summary = "メッセージを送る", description = "同じ clientId で 2 回送ったときは、2 つ目を追加せず 1 つ目を返す")
+	@Operation(summary = "1 件のメッセージ", description = "添付の署名付き URL の期限が切れたときに読み直す")
+	@GetMapping("/api/messages/{messageId}")
+	MessageView get(@AuthenticationPrincipal Jwt jwt, @PathVariable long messageId) {
+		return this.messageService.get(CurrentUser.id(jwt), messageId);
+	}
+
+	@Operation(summary = "メッセージを送る", description = "同じ clientId で 2 回送ったときは、2 つ目を追加せず 1 つ目を返す。添付があれば本文は空でもよい")
 	@ApiResponse(responseCode = "201", description = "送った")
 	@PostMapping("/api/conversations/{conversationId}/messages")
 	@ResponseStatus(HttpStatus.CREATED)
 	MessageView post(@AuthenticationPrincipal Jwt jwt, @PathVariable long conversationId,
 			@RequestBody PostMessageRequest request) {
-		return this.messageService.post(CurrentUser.id(jwt), conversationId, request.body(), request.clientId());
+		return this.messageService.post(CurrentUser.id(jwt), conversationId, request.body(), request.clientId(),
+				request.attachmentIds());
 	}
 
-	@Operation(summary = "メッセージを編集する", description = "送った本人だけ（オーナーでもほかの人のものは 403）")
+	@Operation(summary = "メッセージを編集する",
+			description = "送った本人だけ（オーナーでもほかの人のものは 403）。keepAttachmentIds にない添付は外す（足すことはできない）")
 	@PatchMapping("/api/messages/{messageId}")
 	MessageView edit(@AuthenticationPrincipal Jwt jwt, @PathVariable long messageId,
 			@RequestBody EditMessageRequest request) {
-		return this.messageService.edit(CurrentUser.id(jwt), messageId, request.body());
+		return this.messageService.edit(CurrentUser.id(jwt), messageId, request.body(), request.keepAttachmentIds());
 	}
 
 	@Operation(summary = "メッセージを削除する", description = "送った本人とオーナーだけ。返信のある親メッセージは「削除されました」にして 200 で返し、それ以外は消して 204")
@@ -73,13 +83,15 @@ class MessageController {
 
 	record PostMessageRequest(
 			@Schema(requiredMode = Schema.RequiredMode.REQUIRED,
-					description = "前後の空白を除き、改行を LF にそろえて 1〜4,000 文字（FN-07 4 章）") @Nullable String body,
+					description = "前後の空白を除き、改行を LF にそろえて 0〜4,000 文字。添付がないときは 1 文字以上（FN-07 4 章）") @Nullable String body,
 			@Schema(requiredMode = Schema.RequiredMode.REQUIRED,
-					description = "画面が送信ごとに作る UUID。同じ送信を 2 回追加しないために使う") @Nullable String clientId) {
+					description = "画面が送信ごとに作る UUID。同じ送信を 2 回追加しないために使う") @Nullable String clientId,
+			@Schema(description = "complete を済ませた添付の uploadId（0〜4 個。並べた順に出す）") @Nullable List<Long> attachmentIds) {
 	}
 
 	record EditMessageRequest(@Schema(requiredMode = Schema.RequiredMode.REQUIRED,
-			description = "前後の空白を除き、改行を LF にそろえて 1〜4,000 文字（FN-07 4 章）") @Nullable String body) {
+			description = "前後の空白を除き、改行を LF にそろえて 0〜4,000 文字。添付が残らないときは 1 文字以上（FN-07 4 章）") @Nullable String body,
+			@Schema(description = "残す添付の ID。null ならすべて残す") @Nullable List<Long> keepAttachmentIds) {
 	}
 
 }

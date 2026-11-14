@@ -36,7 +36,21 @@ class StorageDeleterTests {
 
 	@BeforeEach
 	void setUp() {
-		this.deleter = new StorageDeleter(this.storage, this.deletions, TestEntities.fixedClock());
+		this.deleter = new StorageDeleter(this.storage, this.deletions, TestEntities.fixedClock(),
+				TestEntities.immediateTransaction());
+	}
+
+	// トランザクションの外なら、すぐ消す
+	@Test
+	void トランザクションの外ならすぐ消す() {
+		this.deleter.deleteAfterCommit(List.of("avatars/a.png"));
+		verify(this.storage).delete("avatars/a.png");
+	}
+
+	@Test
+	void 消すものがなければ何もしない() {
+		this.deleter.deleteAfterCommit(List.of());
+		verify(this.storage, never()).delete(any());
 	}
 
 	@Test

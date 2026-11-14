@@ -134,7 +134,7 @@ describe('API の呼び出し方', () => {
     // データごと消したら null、「削除されました」にしたらそのメッセージ
     await expect(deleteMessage(30)).resolves.toBeNull()
     await expect(deleteMessage(30)).resolves.toEqual({ id: 30, deleted: true })
-    expect(sentJson(fetch, 2)).toEqual({ body: '本文', clientId: 'client-1' })
+    expect(sentJson(fetch, 2)).toEqual({ body: '本文', clientId: 'client-1', attachmentIds: [] })
     expect(sentJson(fetch, 3)).toEqual({ body: '直した' })
   })
 

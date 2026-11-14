@@ -22,6 +22,7 @@ import com.example.raisechat.TestEntities;
 import com.example.raisechat.common.ErrorCode;
 import com.example.raisechat.conversation.Conversation;
 import com.example.raisechat.conversation.ConversationMember;
+import com.example.raisechat.attachment.Attachments;
 import com.example.raisechat.conversation.ConversationMemberRepository;
 import com.example.raisechat.conversation.ConversationRepository;
 import com.example.raisechat.realtime.RealtimeNotifier;
@@ -56,13 +57,16 @@ class WorkspaceServiceTests {
 	@Mock
 	SubscriptionRevoker revoker;
 
+	@Mock
+	Attachments attachments;
+
 	private WorkspaceService service;
 
 	@BeforeEach
 	void setUp() {
 		this.service = new WorkspaceService(this.workspaces, this.members, new WorkspaceAccess(this.members),
 				this.conversations, this.conversationMembers, this.users, TestEntities.userSummaries(), this.notifier,
-				this.revoker, TestEntities.fixedClock());
+				this.revoker, this.attachments, TestEntities.fixedClock());
 	}
 
 	@Test

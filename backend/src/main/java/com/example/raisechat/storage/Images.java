@@ -12,6 +12,7 @@ import java.util.Iterator;
 import java.util.Optional;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.function.IntBinaryOperator;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReadParam;
@@ -39,13 +40,24 @@ public final class Images {
 
 	// 画素をすべて読む（縮めずに使うとき）
 	public static Optional<BufferedImage> read(byte[] data) {
-		return read(data, 0);
+		return decode(data, (width, height) -> 1).map(Decoded::image);
 	}
 
-	// 読めない画像・大きすぎる画像は空を返す。アニメーションする画像は最初のコマを読む。
-	// minShortSide を渡すと、短い辺がその 2 倍を下回らない範囲で、画素を間引いて読む（縮めた後のきれいさは変わらず、
-	// 読むときのメモリが減る）。間引けない読み込みの部品では、すべて読む
+	// アバター（真ん中を正方形に切り取る）のために読む。短い辺が minShortSide の 2 倍を下回らない範囲で、画素を間引いて読む
+	// （縮めた後のきれいさは変わらず、読むときのメモリが減る）。間引けない読み込みの部品では、すべて読む
 	public static Optional<BufferedImage> read(byte[] data, int minShortSide) {
+		return decode(data, (width, height) -> Math.max(1, Math.min(width, height) / (minShortSide * 2)))
+			.map(Decoded::image);
+	}
+
+	// 縮小した画像（長い辺を maxLongSide までにする。FN-09 5 章の 4）のために読む。長い辺が maxLongSide の 2 倍を
+	// 下回らない範囲で間引いて読み、元の幅・高さも返す
+	public static Optional<Decoded> readForThumbnail(byte[] data, int maxLongSide) {
+		return decode(data, (width, height) -> Math.max(1, Math.max(width, height) / (maxLongSide * 2)));
+	}
+
+	// 読めない画像・大きすぎる画像は空を返す。アニメーションする画像は最初のコマを読む。step は幅・高さから間引く間隔を決める
+	private static Optional<Decoded> decode(byte[] data, IntBinaryOperator step) {
 		acquire();
 		try (ImageInputStream in = ImageIO.createImageInputStream(new ByteArrayInputStream(data))) {
 			Iterator<ImageReader> readers = ImageIO.getImageReaders(in);
@@ -61,11 +73,11 @@ public final class Images {
 					return Optional.empty();
 				}
 				ImageReadParam param = reader.getDefaultReadParam();
-				int step = (minShortSide <= 0) ? 1 : Math.max(1, Math.min(width, height) / (minShortSide * 2));
-				if (step > 1) {
-					param.setSourceSubsampling(step, step, 0, 0);
+				int every = step.applyAsInt(width, height);
+				if (every > 1) {
+					param.setSourceSubsampling(every, every, 0, 0);
 				}
-				return Optional.ofNullable(reader.read(0, param));
+				return Optional.ofNullable(reader.read(0, param)).map((image) -> new Decoded(image, width, height));
 			}
 			finally {
 				reader.dispose();
@@ -106,12 +118,43 @@ public final class Images {
 		return scale(current, size);
 	}
 
+	// 縦横の比を変えずに、長い辺を maxLongSide にする（FN-09 5 章の 4）。透過があれば残す
+	public static BufferedImage fit(BufferedImage image, int maxLongSide) {
+		int type = image.getColorModel().hasAlpha() ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB;
+		double ratio = (double) maxLongSide / Math.max(image.getWidth(), image.getHeight());
+		int width = Math.max(1, (int) Math.round(image.getWidth() * ratio));
+		int height = Math.max(1, (int) Math.round(image.getHeight() * ratio));
+		BufferedImage current = image;
+		// 一度に大きく縮めると粗くなるので、半分ずつ縮めてから最後に決めた大きさにする
+		while (current.getWidth() / 2 >= width && current.getHeight() / 2 >= height) {
+			current = scale(current, current.getWidth() / 2, current.getHeight() / 2, type);
+		}
+		return scale(current, width, height, type);
+	}
+
+	public static boolean hasAlpha(BufferedImage image) {
+		return image.getColorModel().hasAlpha();
+	}
+
 	public static byte[] png(BufferedImage image) {
+		return write(image, "png");
+	}
+
+	// 透過のない画像だけ（JPEG は透過を持てない）。透過があれば png を使う
+	public static byte[] jpeg(BufferedImage image) {
+		BufferedImage rgb = image;
+		if (image.getType() != BufferedImage.TYPE_INT_RGB) {
+			rgb = scale(image, image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
+		}
+		return write(rgb, "jpeg");
+	}
+
+	private static byte[] write(BufferedImage image, String format) {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		try {
-			// 書き出す部品がない形の画像なら false（squareCrop が作る ARGB の画像では起きない）
-			if (!ImageIO.write(image, "png", out)) {
-				throw new IllegalStateException("PNG に書き出せない画像です");
+			// 書き出す部品がない形の画像なら false（ここで作る ARGB・RGB の画像では起きない）
+			if (!ImageIO.write(image, format, out)) {
+				throw new IllegalStateException(format + " に書き出せない画像です");
 			}
 		}
 		catch (IOException ex) {
@@ -122,17 +165,25 @@ public final class Images {
 	}
 
 	private static BufferedImage scale(BufferedImage image, int side) {
-		BufferedImage scaled = new BufferedImage(side, side, BufferedImage.TYPE_INT_ARGB);
+		return scale(image, side, side, BufferedImage.TYPE_INT_ARGB);
+	}
+
+	private static BufferedImage scale(BufferedImage image, int width, int height, int type) {
+		BufferedImage scaled = new BufferedImage(width, height, type);
 		Graphics2D g = scaled.createGraphics();
 		try {
 			g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
 			g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-			g.drawImage(image, 0, 0, side, side, null);
+			g.drawImage(image, 0, 0, width, height, null);
 		}
 		finally {
 			g.dispose();
 		}
 		return scaled;
+	}
+
+	// 読んだ画像（間引いていることがある）と、元の画像の幅・高さ
+	public record Decoded(BufferedImage image, int width, int height) {
 	}
 
 }

@@ -14,10 +14,15 @@ final class MessageBodies {
 	}
 
 	// 改行を LF にそろえ、前後の空白を取り除いてから、0〜4,000 文字（コードポイント）か確かめる（BR-1）。
-	// 添付（開発計画書 1-11）を作るまでは、本文がないものは送れない
+	// 添付がないときは 1 文字以上
 	static String valid(@Nullable String raw) {
+		return valid(raw, false);
+	}
+
+	// allowEmpty：添付があるので、本文は空でもよい
+	static String valid(@Nullable String raw, boolean allowEmpty) {
 		String body = (raw == null) ? "" : raw.replace("\r\n", "\n").replace('\r', '\n').strip();
-		if (body.isEmpty()) {
+		if (body.isEmpty() && !allowEmpty) {
 			throw new ApiException(ErrorCode.MESSAGE_EMPTY, "body");
 		}
 		if (body.codePointCount(0, body.length()) > MAX) {

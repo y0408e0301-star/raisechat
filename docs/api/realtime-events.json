@@ -14,6 +14,7 @@
       "statusText" : null
     },
     "body" : "土曜の集合は駅前で",
+    "attachments" : [ ],
     "replyCount" : 0,
     "lastReplyAt" : null,
     "createdAt" : "2026-11-10T01:02:00Z",
@@ -39,6 +40,7 @@
       "statusText" : null
     },
     "body" : "土曜の集合は駅の北口で",
+    "attachments" : [ ],
     "replyCount" : 0,
     "lastReplyAt" : null,
     "createdAt" : "2026-11-10T01:02:00Z",

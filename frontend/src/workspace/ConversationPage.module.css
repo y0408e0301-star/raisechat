@@ -1,3 +1,5 @@
+/* 会話の画面全体。ファイルを重ねたときの点線の枠（ドラッグ＆ドロップ）をこの中に出す */
+.page { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 /* 画面設計書 7.1 会話の見出し */
 .head { flex: none; display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--line); min-height: 56px; }
 .titles { flex: 1; min-width: 0; }

@@ -99,9 +99,10 @@ Pull Request を作ったときは、GitHub Actions（[.github/workflows/ci.yml]
 | --- | --- | --- |
 | 関数のテスト | `api.test.ts`・`validation.test.ts` | API の URL・メソッド・送る形、CSRF のヘッダー、JWT の取り直し（同時に 401 でも 1 回だけ）、入力の条件と境界値 |
 | 部品のテスト | `components/*.test.tsx`・`auth/*.test.tsx` | ヘッダー・メニュー・ダイアログ・トースト・お知らせ欄・ログインの状態と移り先 |
-| 画面のテスト | `pages/*.test.tsx`・`workspace/*.test.tsx`・`profile/*.test.tsx`・`App.test.tsx` | 機能定義書 10 章の観点のうち画面で確かめるもの（メッセージの出し方、押せる・押せない、移り先） |
+| 画面のテスト | `pages/*.test.tsx`・`workspace/*.test.tsx`・`profile/*.test.tsx`・`attachments/*.test.tsx`・`App.test.tsx` | 機能定義書 10 章の観点のうち画面で確かめるもの（メッセージの出し方、押せる・押せない、移り先） |
 
 - 絵文字の一覧（emoji-picker-element）は jsdom では動かないので、画面のテストでは選ぶボタンだけの偽物にします（`profile/profilePage.test.tsx`）
+- 添付を S3 へ直接 PUT する XMLHttpRequest は、テストの中で偽物に替え、進み具合・成功・失敗をテストから起こします（`attachments/attachments.test.tsx`）
 
 ## API の仕様書（OpenAPI）
 

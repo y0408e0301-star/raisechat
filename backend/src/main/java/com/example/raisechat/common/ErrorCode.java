@@ -92,6 +92,20 @@ public enum ErrorCode {
 
 	MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "操作に失敗しました。時間をおいてもう一度お試しください。"),
 
+	// 添付（FN-09 9 章。M-38〜M-40）
+	TOO_MANY_ATTACHMENTS(HttpStatus.BAD_REQUEST, "添付できるのは 1 通に 4 個までです。"),
+
+	ATTACHMENT_TYPE_INVALID(HttpStatus.BAD_REQUEST, "添付できるのは、10MB までの画像（JPEG・PNG・GIF・WebP）と 100MB までの動画（MP4・WebM）です。"),
+
+	ATTACHMENT_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE,
+			"添付できるのは、10MB までの画像（JPEG・PNG・GIF・WebP）と 100MB までの動画（MP4・WebM）です。"),
+
+	// S3 にファイルがない（PUT が終わっていない）
+	UPLOAD_NOT_FOUND_IN_STORAGE(HttpStatus.BAD_REQUEST, "ファイルをアップロードできませんでした。もう一度お試しください。"),
+
+	// アップロードがない・自分のものでない・送り済み
+	UPLOAD_NOT_FOUND(HttpStatus.NOT_FOUND, "ファイルをアップロードできませんでした。もう一度お試しください。"),
+
 	// 画面を通さずに送られた、条件に合わない入力（JSON が読めない、上限を超えた文字数など）
 	BAD_REQUEST(HttpStatus.BAD_REQUEST, "入力が正しくありません。"),
 
