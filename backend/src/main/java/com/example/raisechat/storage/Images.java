@@ -109,7 +109,10 @@ public final class Images {
 	public static byte[] png(BufferedImage image) {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		try {
-			ImageIO.write(image, "png", out);
+			// 書き出す部品がない形の画像なら false（squareCrop が作る ARGB の画像では起きない）
+			if (!ImageIO.write(image, "png", out)) {
+				throw new IllegalStateException("PNG に書き出せない画像です");
+			}
 		}
 		catch (IOException ex) {
 			// 書き出し先はメモリなので、起きない
