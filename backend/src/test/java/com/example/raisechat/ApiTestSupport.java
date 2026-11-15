@@ -61,6 +61,11 @@ public final class ApiTestSupport {
 			.exchange();
 	}
 
+	// 本文なしの PUT（リアクションを付ける）
+	public static MvcTestResult put(MockMvcTester mvc, Cookie user, String uri) {
+		return mvc.put().uri(uri).cookie(user).with(csrf()).exchange();
+	}
+
 	public static MvcTestResult delete(MockMvcTester mvc, Cookie user, String uri) {
 		return mvc.delete().uri(uri).cookie(user).with(csrf()).exchange();
 	}

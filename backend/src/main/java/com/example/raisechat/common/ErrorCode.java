@@ -109,6 +109,14 @@ public enum ErrorCode {
 	// アップロードがない・自分のものでない・送り済み
 	UPLOAD_NOT_FOUND(HttpStatus.NOT_FOUND, "ファイルをアップロードできませんでした。もう一度お試しください。"),
 
+	// リアクション（FN-10 9 章。M-42・M-49）。画面では一覧から選ぶだけなので、EMOJI_INVALID は画面には出さない
+	EMOJI_INVALID(HttpStatus.BAD_REQUEST, "入力が正しくありません。"),
+
+	REACTION_LIMIT(HttpStatus.CONFLICT, "このメッセージにはこれ以上の種類のリアクションを付けられません。"),
+
+	// 「削除されました」のメッセージには付けられない
+	MESSAGE_DELETED(HttpStatus.FORBIDDEN, "操作に失敗しました。時間をおいてもう一度お試しください。"),
+
 	// 画面を通さずに送られた、条件に合わない入力（JSON が読めない、上限を超えた文字数など）
 	BAD_REQUEST(HttpStatus.BAD_REQUEST, "入力が正しくありません。"),
 
