@@ -24,6 +24,7 @@ import com.example.raisechat.message.MessageRepository;
 import com.example.raisechat.realtime.RealtimeEvent;
 import com.example.raisechat.realtime.RealtimeNotifier;
 import com.example.raisechat.realtime.SubscriptionRevoker;
+import com.example.raisechat.unread.UnreadCounts;
 import com.example.raisechat.user.User;
 import com.example.raisechat.user.UserRepository;
 import com.example.raisechat.user.UserSummaries;
@@ -72,10 +73,14 @@ class ChannelService {
 
 	private final Clock clock;
 
+	private final UnreadCounts unreadCounts;
+
+	private final CountNotices countNotices;
+
 	ChannelService(ConversationRepository conversations, ConversationMemberRepository members,
 			WorkspaceMemberRepository workspaceMembers, MessageRepository messages, WorkspaceAccess workspaceAccess,
 			UserRepository users, UserSummaries userSummaries, RealtimeNotifier notifier, SubscriptionRevoker revoker,
-			Attachments attachments, Clock clock) {
+			Attachments attachments, Clock clock, UnreadCounts unreadCounts, CountNotices countNotices) {
 		this.conversations = conversations;
 		this.members = members;
 		this.workspaceMembers = workspaceMembers;
@@ -87,6 +92,8 @@ class ChannelService {
 		this.revoker = revoker;
 		this.attachments = attachments;
 		this.clock = clock;
+		this.unreadCounts = unreadCounts;
+		this.countNotices = countNotices;
 	}
 
 	// G-8 の一覧（CH-3）：公開チャンネルと、自分が入っているプライベートチャンネルを名前の順に 50 件ずつ
@@ -160,6 +167,8 @@ class ChannelService {
 		if (channel.getVisibility() == Conversation.Visibility.PRIVATE) {
 			this.revoker.revoke(me, conversationId);
 		}
+		// 抜けたチャンネルの未読は数えない。プライベートならメンションも見られなくなる（NT-11）
+		this.countNotices.workspaceChanged(channel.getWorkspaceId(), List.of(me));
 	}
 
 	// プライベートチャンネルに招待する（CH-7）。招待する人はそのチャンネルのメンバー（見られるので入っている）。
@@ -212,6 +221,8 @@ class ChannelService {
 					new RealtimeEvent.ConversationRemoved(conversationId, RealtimeEvent.RemovedReason.DELETED));
 			this.revoker.revoke(viewer, conversationId);
 		}
+		// 消えたチャンネルの未読・メンションは数えない（NT-11）
+		this.countNotices.workspaceChanged(channel.getWorkspaceId(), viewers);
 	}
 
 	// 会話のメンバー（CH-6）：表示名の順に 50 人ずつ。表示名かユーザー ID で絞り込める
@@ -267,7 +278,8 @@ class ChannelService {
 	// 入った人のサイドバーに足す（ほかのタブ・招待された人の画面のため）
 	private void notifyJoined(long userId, Conversation channel) {
 		this.notifier.toUser(userId, RealtimeEvent.Type.CONVERSATION_UPDATED, channel.getWorkspaceId(), channel.getId(),
-				ConversationSummary.of(channel, true));
+				ConversationSummary.of(channel, true)
+					.withCounts(this.unreadCounts.ofConversation(userId, channel.getId())));
 	}
 
 	// 参加した人から見た詳細

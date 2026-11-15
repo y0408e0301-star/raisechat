@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
@@ -27,6 +29,7 @@ import com.example.raisechat.conversation.ConversationMemberRepository;
 import com.example.raisechat.conversation.ConversationRepository;
 import com.example.raisechat.realtime.RealtimeNotifier;
 import com.example.raisechat.realtime.SubscriptionRevoker;
+import com.example.raisechat.unread.UnreadCounts;
 import com.example.raisechat.user.UserRepository;
 import com.example.raisechat.user.UserSummary;
 
@@ -60,13 +63,17 @@ class WorkspaceServiceTests {
 	@Mock
 	Attachments attachments;
 
+	@Mock
+	UnreadCounts unreadCounts;
+
 	private WorkspaceService service;
 
 	@BeforeEach
 	void setUp() {
 		this.service = new WorkspaceService(this.workspaces, this.members, new WorkspaceAccess(this.members),
 				this.conversations, this.conversationMembers, this.users, TestEntities.userSummaries(), this.notifier,
-				this.revoker, this.attachments, TestEntities.fixedClock());
+				this.revoker, this.attachments, TestEntities.fixedClock(), this.unreadCounts);
+		lenient().when(this.unreadCounts.ofMember(anyLong(), anyLong())).thenReturn(UnreadCounts.WorkspaceCounts.NONE);
 	}
 
 	@Test

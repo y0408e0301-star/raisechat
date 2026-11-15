@@ -27,6 +27,26 @@ interface MentionRepository extends JpaRepository<Mention, Mention.Key> {
 
 	List<Mention> findByMessageId(long messageId);
 
+	// 会話を読んだ（FN-14 NT-4、BR-15）：その会話の親メッセージのうち ID が :upTo 以下のものの、自分あてのメンション
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query(value = """
+			UPDATE mentions mn SET is_read = true
+			FROM messages m
+			WHERE m.id = mn.message_id AND mn.user_id = :me AND NOT mn.is_read
+			  AND m.conversation_id = :conversationId AND m.parent_id IS NULL AND m.id <= :upTo
+			""", nativeQuery = true)
+	int markReadInConversation(@Param("me") long me, @Param("conversationId") long conversationId,
+			@Param("upTo") long upTo);
+
+	// スレッドを開いた（NT-4、BR-15）：そのスレッドの返信の中の、自分あてのメンション
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query(value = """
+			UPDATE mentions mn SET is_read = true
+			FROM messages m
+			WHERE m.id = mn.message_id AND mn.user_id = :me AND NOT mn.is_read AND m.parent_id = :parentId
+			""", nativeQuery = true)
+	int markReadInThread(@Param("me") long me, @Param("parentId") long parentId);
+
 	@Modifying(flushAutomatically = true)
 	@Query("delete from Mention m where m.messageId = :messageId")
 	void deleteByMessageId(@Param("messageId") long messageId);

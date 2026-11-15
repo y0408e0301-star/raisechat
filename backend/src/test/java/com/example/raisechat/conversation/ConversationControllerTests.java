@@ -52,7 +52,7 @@ class ConversationControllerTests {
 	void 詳細は説明と人数と作った人も返す() {
 		when(this.conversationService.get(7, 12)).thenReturn(
 				new ConversationDetail(12, 3, Conversation.Type.CHANNEL, "general", Conversation.Visibility.PUBLIC,
-						true, null, true, false, 0, 0, true, null, 2, TARO, Instant.parse("2026-11-11T03:00:00Z")));
+						true, null, true, false, 0, 0, true, null, 2, TARO, Instant.parse("2026-11-11T03:00:00Z"), 0L));
 		assertThat(this.mvc.get().uri("/api/conversations/12").with(loggedIn(7))).hasStatusOk()
 			.bodyJson()
 			.isLenientlyEqualTo("""

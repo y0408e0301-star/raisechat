@@ -29,32 +29,53 @@ public class Mentions {
 		this.clock = clock;
 	}
 
-	// 送ったメッセージのメンションを記録する（3.2）。自分・いない人・その会話を見られない人は記録しない（MN-4）
-	public void record(long me, Conversation conversation, long messageId, String body) {
-		for (long userId : mentionable(me, conversation, body)) {
+	// 送ったメッセージのメンションを記録する（3.2）。自分・いない人・その会話を見られない人は記録しない（MN-4）。
+	// 記録した人を返す（知らせる相手。MN-5）
+	public Set<Long> record(long me, Conversation conversation, long messageId, String body) {
+		Set<Long> mentioned = mentionable(me, conversation, body);
+		for (long userId : mentioned) {
 			this.mentions.save(new Mention(messageId, userId, this.clock.instant()));
 		}
+		return mentioned;
 	}
 
 	// 編集したとき（MN-6、5 章の 4）。増えた人を足し、減った人を消す。残った人の「読んだか」は変えない
-	public void update(long me, Conversation conversation, long messageId, String body) {
+	public Change update(long me, Conversation conversation, long messageId, String body) {
 		Set<Long> now = mentionable(me, conversation, body);
-		Set<Long> before = new HashSet<>(
-				this.mentions.findByMessageId(messageId).stream().map(Mention::getUserId).toList());
+		Set<Long> before = userIdsOf(messageId);
 		List<Long> removed = before.stream().filter((id) -> !now.contains(id)).toList();
 		if (!removed.isEmpty()) {
 			this.mentions.deleteUsers(messageId, removed);
 		}
-		for (long userId : now) {
-			if (!before.contains(userId)) {
-				this.mentions.save(new Mention(messageId, userId, this.clock.instant()));
-			}
+		List<Long> added = now.stream().filter((id) -> !before.contains(id)).toList();
+		for (long userId : added) {
+			this.mentions.save(new Mention(messageId, userId, this.clock.instant()));
 		}
+		return new Change(Set.copyOf(added), Set.copyOf(removed));
+	}
+
+	// 編集で足した人・消した人
+	public record Change(Set<Long> added, Set<Long> removed) {
+	}
+
+	// そのメッセージでメンションされている人
+	public Set<Long> userIdsOf(long messageId) {
+		return new HashSet<>(this.mentions.findByMessageId(messageId).stream().map(Mention::getUserId).toList());
 	}
 
 	// メッセージを「削除されました」にするとき（MS-11、BR-8）。データごと消すときは ON DELETE CASCADE で消える
 	public void removeAllOf(long messageId) {
 		this.mentions.deleteByMessageId(messageId);
+	}
+
+	// 会話を読んだ：その会話の親メッセージのうち ID が upTo 以下のものの、自分あてのメンションを読んだことにする（BR-15）
+	public void markReadInConversation(long me, long conversationId, long upTo) {
+		this.mentions.markReadInConversation(me, conversationId, upTo);
+	}
+
+	// スレッドを開いた：そのスレッドの返信の中の、自分あてのメンションを読んだことにする（BR-15）
+	public void markReadInThread(long me, long parentId) {
+		this.mentions.markReadInThread(me, parentId);
 	}
 
 	// メッセージごとの、メンションした人（MessageView の mentions。画面はこの人の「@ユーザー ID」だけを目立たせる。5 章の 5）

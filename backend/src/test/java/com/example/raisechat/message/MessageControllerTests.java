@@ -46,7 +46,7 @@ class MessageControllerTests {
 
 	@Test
 	void 一覧は機能定義書の形で返す() {
-		when(this.messageService.list(7, 12, 40L, null, 20))
+		when(this.messageService.list(7, 12, 40L, null, null, 20))
 			.thenReturn(new MessageService.MessagePage(List.of(VIEW), true, false));
 		assertThat(this.mvc.get().uri("/api/conversations/12/messages?before=40&limit=20").with(loggedIn(7)))
 			.hasStatusOk()

@@ -37,13 +37,23 @@ class MessageController {
 	}
 
 	@Operation(summary = "会話のメッセージの一覧",
-			description = "親メッセージ（スレッドの返信でないもの）を古い順に返す。before（その ID より前）・after（その ID より後）のどちらか、"
-					+ "またはなし（最新）。limit は 1〜50（指定がなければ 50）。around はメッセージの位置を開く（1-15）で足す")
+			description = "親メッセージ（スレッドの返信でないもの）を古い順に返す。before（その ID より前）・after（その ID より後）・"
+					+ "around（そのメッセージと前後 25 件ずつ。スレッドの返信ならその親の前後。MS-14）のどれか、またはなし（最新）。"
+					+ "limit は 1〜50（指定がなければ 50。around とは一緒に使えない）")
 	@GetMapping("/api/conversations/{conversationId}/messages")
 	MessageService.MessagePage list(@AuthenticationPrincipal Jwt jwt, @PathVariable long conversationId,
 			@RequestParam(required = false) @Nullable Long before, @RequestParam(required = false) @Nullable Long after,
+			@RequestParam(required = false) @Nullable Long around,
 			@RequestParam(required = false) @Nullable Integer limit) {
-		return this.messageService.list(CurrentUser.id(jwt), conversationId, before, after, limit);
+		return this.messageService.list(CurrentUser.id(jwt), conversationId, before, after, around, limit);
+	}
+
+	@Operation(summary = "自分あてのメンションの一覧（FN-14）",
+			description = "そのワークスペースのいま見られる会話のものを、新しい順に 20 件ずつ。cursor は前回の nextCursor")
+	@GetMapping("/api/workspaces/{workspaceId}/mentions")
+	MessageService.MentionPage mentions(@AuthenticationPrincipal Jwt jwt, @PathVariable long workspaceId,
+			@RequestParam(required = false) @Nullable String cursor) {
+		return this.messageService.mentions(CurrentUser.id(jwt), workspaceId, cursor);
 	}
 
 	@Operation(summary = "1 件のメッセージ", description = "添付の署名付き URL の期限が切れたときに読み直す")

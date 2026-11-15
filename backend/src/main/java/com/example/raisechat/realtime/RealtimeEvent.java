@@ -36,7 +36,15 @@ public record RealtimeEvent(Type type, long workspaceId, @Nullable Long conversa
 		CONVERSATION_REMOVED("conversation.removed"),
 
 		// 本人あて。payload：{"workspaceId","name","reason"}（キックされた・退出した・ワークスペースが削除された。FN-03・FN-05）
-		WORKSPACE_REMOVED("workspace.removed");
+		WORKSPACE_REMOVED("workspace.removed"),
+
+		// 本人あて。payload：{"workspaceId","hasUnread","mentionCount"}（G-3
+		// の印とヘッダーの件数が変わったかもしれない。FN-14）
+		WORKSPACE_UPDATED("workspace.updated"),
+
+		// 本人あて。payload：{"kind","message","conversationName"}（メンションされた・DM
+		// が届いた。ブラウザの通知に使う。FN-14 NT-7）
+		NOTIFY("notify");
 
 		private final String value;
 
@@ -61,6 +69,22 @@ public record RealtimeEvent(Type type, long workspaceId, @Nullable Long conversa
 
 	// conversation.removed の payload
 	public record ConversationRemoved(long conversationId, RemovedReason reason) {
+	}
+
+	// workspace.updated の payload
+	public record WorkspaceUpdated(long workspaceId, boolean hasUnread, int mentionCount) {
+	}
+
+	// notify の payload。message は MessageView（mine・canDelete・reactedByMe は false）、
+	// conversationName はチャンネルなら「#名前」、DM なら「DM」
+	public record Notify(NotifyKind kind, Object message, String conversationName) {
+	}
+
+	// notify の種類。DM の中のメンションは DM として 1 つだけ送る（FN-14 5 章の 7）
+	public enum NotifyKind {
+
+		MENTION, DM
+
 	}
 
 	// workspace.removed の payload

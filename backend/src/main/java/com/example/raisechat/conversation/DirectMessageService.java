@@ -75,7 +75,7 @@ class DirectMessageService {
 			this.members.insertIfAbsent(dm.getId(), high, 0, now);
 		}
 		UserSummary createdBy = this.userSummaries.of(this.users.findById(dm.getCreatedBy()).orElseThrow(), now);
-		ConversationDetail detail = ConversationDetail.of(this.directMessages.summary(dm, me), dm, 2, createdBy);
+		ConversationDetail detail = ConversationDetail.of(this.directMessages.summary(dm, me), dm, 2, createdBy, null);
 		return new Started(detail, created);
 	}
 
