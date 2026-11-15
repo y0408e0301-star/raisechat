@@ -159,10 +159,20 @@ describe('付けた人（RE-4、TC-10-4）', () => {
   it('重ねると、付けた人の表示名を付けた順に出す', async () => {
     await open([message(1, '土曜の集合', { reactions: [reaction('👍', [hanako, jiro])] })])
     const target = chip('土曜の集合', '👍 2 件')
-    fireEvent.mouseEnter(target)
+    const user = userEvent.setup()
+    await user.hover(target)
     expect(screen.getByRole('tooltip')).toHaveTextContent('はなこ、じろう')
     expect(target).toHaveAccessibleDescription('はなこ、じろう')
-    fireEvent.mouseLeave(target)
+    await user.unhover(target)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('タッチで押したときは、重ねたことにならず付けた人を出さない', async () => {
+    await open([message(1, '土曜の集合', { reactions: [reaction('👍', [hanako])] })], {
+      'PUT /api/messages/1/reactions/%F0%9F%91%8D': () => json(200, { reactions: [reaction('👍', [hanako, taro])] }),
+    })
+    await userEvent.setup().pointer({ keys: '[TouchA]', target: chip('土曜の集合', '👍 1 件') })
+    expect(await screen.findByRole('button', { name: '👍 2 件、自分も付けた' })).toBeInTheDocument()
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
@@ -189,6 +199,9 @@ describe('付けた人（RE-4、TC-10-4）', () => {
       fireEvent.touchEnd(target)
       fireEvent.click(target)
       expect(chip('土曜の集合', '👍 1 件')).toHaveAttribute('aria-pressed', 'false')
+      // 指を離して少しすると消える
+      act(() => vi.advanceTimersByTime(2000))
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
     } finally {
       vi.useRealTimers()
     }
@@ -207,7 +220,7 @@ describe('付けられないとき（RE-7、TC-10-7）', () => {
     await userEvent.setup().click(target)
     expect(fetch.keys().some((k) => k.includes('/reactions/'))).toBe(false)
     // 付けた人は見られる
-    fireEvent.mouseEnter(target)
+    await userEvent.setup().hover(target)
     expect(screen.getByRole('tooltip')).toHaveTextContent('はなこ')
   })
 
