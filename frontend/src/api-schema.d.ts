@@ -774,6 +774,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workspaces/{workspaceId}/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * メッセージを探す
+         * @description そのワークスペースの、自分が見られる会話のメッセージとスレッドの返信から、q を空白で区切った言葉をすべて含むものを新しい順に 20 件ずつ（大文字・小文字を区別しない部分一致）。conversationId（会話）と from（送った人のユーザー ID）で絞り込める。cursor は前回の nextCursor
+         */
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -952,22 +972,22 @@ export interface components {
             member: boolean;
             user: components["schemas"]["UserSummary"];
         };
-        MentionConversation: {
-            dmPartner: components["schemas"]["UserSummary"] | null;
-            /** Format: int64 */
-            id: number;
-            name: string | null;
-            /** @enum {string} */
-            type: "CHANNEL" | "DM";
-        };
         MentionItem: {
-            conversation: components["schemas"]["MentionConversation"];
+            conversation: components["schemas"]["MessageConversation"];
             message: components["schemas"]["MessageView"];
             read: boolean;
         };
         MentionPage: {
             items: components["schemas"]["MentionItem"][];
             nextCursor: string | null;
+        };
+        MessageConversation: {
+            dmPartner: components["schemas"]["UserSummary"] | null;
+            /** Format: int64 */
+            id: number;
+            name: string | null;
+            /** @enum {string} */
+            type: "CHANNEL" | "DM";
         };
         MessagePage: {
             hasMoreAfter: boolean;
@@ -1038,6 +1058,14 @@ export interface components {
             hasMoreBefore: boolean;
             items: components["schemas"]["MessageView"][];
             parent: components["schemas"]["MessageView"];
+        };
+        SearchPage: {
+            items: components["schemas"]["SearchResult"][];
+            nextCursor: string | null;
+        };
+        SearchResult: {
+            conversation: components["schemas"]["MessageConversation"];
+            message: components["schemas"]["MessageView"];
         };
         SignupRequest: {
             /** @description 前後の空白を除いて 1〜30 文字（A-4） */
@@ -3169,6 +3197,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MentionPage"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query?: {
+                q?: string;
+                conversationId?: number;
+                from?: string;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                workspaceId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchPage"];
                 };
             };
             /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */

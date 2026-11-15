@@ -1,0 +1,25 @@
+/* 画面設計書 2.6 ヘッダーの検索欄。幅 320px */
+/* 狭いときは縮め、ワークスペースの名前の場所を残す */
+.form { display: flex; align-items: center; gap: 4px; flex: 0 1 320px; min-width: 120px; }
+.inner { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; }
+.input {
+  flex: 1; min-width: 0; height: 36px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: 8px; color: var(--text); background: var(--frame);
+}
+.input:focus { outline: 2px solid var(--primary); border-color: transparent; background: var(--bg); }
+.open, .close {
+  display: none; flex: none; width: 44px; height: 44px; border: none; border-radius: 8px;
+  background: none; cursor: pointer; font-size: 18px; color: var(--text);
+}
+.open:hover, .close:hover { background: var(--frame); }
+
+/* 画面の横幅が 600px 未満のときは虫めがねのボタンだけ。押すとヘッダーの全体が検索欄に変わる */
+@media (max-width: 599px) {
+  .open { display: inline-flex; align-items: center; justify-content: center; }
+  .form { display: none; }
+  .expanded {
+    display: flex; position: absolute; inset: 0; z-index: 1; width: auto; max-width: none;
+    padding: 0 8px; background: var(--bg);
+  }
+  .expanded .close { display: inline-flex; align-items: center; justify-content: center; }
+}

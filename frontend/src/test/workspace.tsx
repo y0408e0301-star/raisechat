@@ -11,6 +11,7 @@ import ConversationPage from '../workspace/ConversationPage'
 import InvitesPage from '../workspace/InvitesPage'
 import MembersPage from '../workspace/MembersPage'
 import MentionsPage from '../workspace/MentionsPage'
+import SearchPage from '../workspace/SearchPage'
 import WorkspaceHome from '../workspace/WorkspaceHome'
 import WorkspaceLayout from '../workspace/WorkspaceLayout'
 import CurrentLocation from './CurrentLocation'
@@ -50,6 +51,7 @@ export function renderAt(path: string) {
                 <Route index element={<WorkspaceHome />} />
                 <Route path="c/:conversationId" element={<ConversationPage />} />
                 <Route path="d/:conversationId" element={<ConversationPage />} />
+                <Route path="search" element={<SearchPage />} />
                 <Route path="mentions" element={<MentionsPage />} />
                 <Route path="channels" element={<ChannelsPage />} />
                 <Route path="members" element={<MembersPage />} />

@@ -6,6 +6,7 @@ import Avatar from './Avatar'
 import CountBadge from './CountBadge'
 import styles from './AppHeader.module.css'
 import Menu from './Menu'
+import SearchBox from './SearchBox'
 import OfflineNotice from './OfflineNotice'
 import ui from './ui.module.css'
 
@@ -23,7 +24,7 @@ function shorten(name: string): string {
 }
 
 // ヘッダー（画面設計書 2.6）と、そのすぐ下のお知らせ欄（2.4）。
-// ワークスペース用のヘッダーには「@」と読んでいないメンションの件数を出す（NT-2）。検索欄はメッセージ検索（開発計画書 1-16）で足す
+// ワークスペース用のヘッダーには、メッセージの検索欄（SR-1）と「@」と読んでいないメンションの件数（NT-2）を出す
 export default function AppHeader({ workspace }: Props) {
   const { me, signOut } = useAuth()
   const [sending, setSending] = useState(false)
@@ -49,6 +50,7 @@ export default function AppHeader({ workspace }: Props) {
             </>
           )}
         </div>
+        {workspace && <SearchBox workspaceId={workspace.id} />}
         <div className={styles.right}>
           {workspace && (
             // G-7（NT-5）
