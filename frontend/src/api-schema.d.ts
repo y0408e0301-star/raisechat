@@ -226,6 +226,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conversations/{conversationId}/mention-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * メンションの候補
+         * @description その会話を見られる人（自分を除く）のうち、表示名かユーザー ID に q（0〜30 文字）を含む人を、会話のメンバーを先にして 8 人まで
+         */
+        get: operations["mentionCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/conversations/{conversationId}/messages": {
         parameters: {
             query?: never;
@@ -886,6 +906,10 @@ export interface components {
             statusText: string | null;
             username: string;
         };
+        MentionCandidate: {
+            member: boolean;
+            user: components["schemas"]["UserSummary"];
+        };
         MessagePage: {
             hasMoreAfter: boolean;
             hasMoreBefore: boolean;
@@ -907,6 +931,7 @@ export interface components {
             id: number;
             /** Format: date-time */
             lastReplyAt: string | null;
+            mentions: components["schemas"]["UserName"][];
             mine: boolean;
             /** Format: int64 */
             parentId: number | null;
@@ -937,14 +962,10 @@ export interface components {
             count: number;
             emoji: string;
             reactedByMe: boolean;
-            users: components["schemas"]["Reactor"][];
+            users: components["schemas"]["UserName"][];
         };
         ReactionsResponse: {
             reactions: components["schemas"]["ReactionView"][];
-        };
-        Reactor: {
-            displayName: string;
-            username: string;
         };
         ReadRequest: {
             /**
@@ -993,6 +1014,10 @@ export interface components {
             putUrl: string;
             /** Format: int64 */
             uploadId: number;
+        };
+        UserName: {
+            displayName: string;
+            username: string;
         };
         UserSummary: {
             avatarUrl: string | null;
@@ -1549,6 +1574,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserSummary"][];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    mentionCandidates: {
+        parameters: {
+            query?: {
+                q?: string;
+            };
+            header?: never;
+            path: {
+                conversationId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentionCandidate"][];
                 };
             };
             /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */

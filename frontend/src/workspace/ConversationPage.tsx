@@ -357,7 +357,7 @@ function ConversationView({ conversationId }: { conversationId: number }) {
             onReactions={(id, reactions) => updateItems((items) => items.map((m) => (m.id === id ? { ...m, reactions } : m)))} />
           {loaded.conversation.canPost
             ? (
-              <Composer value={draft} onChange={setDraft} onSend={send} uploads={uploads}
+              <Composer value={draft} onChange={setDraft} onSend={send} uploads={uploads} conversationId={conversationId}
                 placeholder={loaded.conversation.dmPartner
                   ? `${loaded.conversation.dmPartner.displayName} へのメッセージ`
                   : `# ${loaded.conversation.name} へのメッセージ`} />

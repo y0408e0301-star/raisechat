@@ -257,7 +257,8 @@ export default function ThreadPanel({ conversation, parentId, viewer, onClose }:
             {pending.map((p) => <MessageItem key={p.clientId} entry={p} {...handlers} />)}
           </div>
           {conversation.canPost
-            ? <Composer value={draft} onChange={setDraft} onSend={send} uploads={uploads} placeholder="返信する…" />
+            ? <Composer value={draft} onChange={setDraft} onSend={send} uploads={uploads} placeholder="返信する…"
+              conversationId={conversation.id} />
             : (
               // 送れない会話では、入力欄の代わりに理由を出す（TH-8）
               <p className={styles.cannotPost}>

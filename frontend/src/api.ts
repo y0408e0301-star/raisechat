@@ -29,6 +29,8 @@ export type MyProfile = Schemas['MyProfile']
 export type AttachmentView = Schemas['AttachmentView']
 export type UploadTicket = Schemas['UploadTicket']
 export type ReactionView = Schemas['ReactionView']
+export type UserName = Schemas['UserName']
+export type MentionCandidate = Schemas['MentionCandidate']
 
 // API がエラーを返したとき（機能定義書 3.3）。message は画面にそのまま出せる文、
 // field があればその入力欄の下に出す
@@ -431,6 +433,14 @@ export async function removeReaction(messageId: number, emoji: string): Promise<
   const res = await requestJson<Schemas['ReactionsResponse']>('DELETE',
     `/api/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`)
   return res.reactions
+}
+
+// ---------------------------------------------------------------- FN-11 メンション
+
+// その会話を見られる人（自分を除く）のうち、表示名かユーザー ID に q を含む人を 8 人まで（会話のメンバーが先。MN-1）
+export function fetchMentionCandidates(conversationId: number, q: string): Promise<MentionCandidate[]> {
+  return requestJson<MentionCandidate[]>('GET',
+    `/api/conversations/${conversationId}/mention-candidates?q=${encodeURIComponent(q)}`)
 }
 
 // ---------------------------------------------------------------- FN-08 スレッド

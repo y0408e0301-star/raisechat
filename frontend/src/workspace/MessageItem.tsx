@@ -67,6 +67,8 @@ export default function MessageItem({
   const deleted = message?.deleted ?? false
   // 参加していない公開チャンネル・相手がいない DM・「削除されました」には付けられない（RE-7）
   const canReact = message !== null && !deleted && canPost
+  // 自分へのメンションを含む（MN-3。左の線と背景で目立たせる）
+  const mentionsMe = message?.mentions.some((m) => m.username === me?.username) ?? false
   // 本文が空でも、添付が残れば保存できる
   const savable = editing !== null && (isSendable(editing) || (messageLength(editing) === 0 && keep.length > 0))
 
@@ -118,7 +120,7 @@ export default function MessageItem({
   const edited = message?.editedAt && !deleted ? <span className={styles.edited}>（編集済み）</span> : null
 
   return (
-    <article className={`${styles.message} ${compact ? styles.compact : ''} ${entry.kind === 'pending' && !entry.failed ? styles.sending : ''}`}
+    <article className={`${styles.message} ${compact ? styles.compact : ''} ${entry.kind === 'pending' && !entry.failed ? styles.sending : ''} ${mentionsMe ? styles.toMe : ''}`}
       aria-label={`${author.displayName}のメッセージ`}>
       <div className={styles.side}>
         {compact
@@ -153,7 +155,7 @@ export default function MessageItem({
             ? (
               <div className={styles.editor}>
                 <MessageInput value={editing} onChange={setEditing} onSubmit={save} onCancel={() => setEditing(null)}
-                  label="メッセージを編集" textareaRef={editor} autoFocus />
+                  label="メッセージを編集" textareaRef={editor} autoFocus conversationId={message?.conversationId} />
                 {attachments.some((a) => keep.includes(a.id)) && (
                   // 添付は「×」で外せる（足すことはできない。AT-9）
                   <ul className={attachmentStyles.previews} aria-label="添付">
@@ -179,7 +181,7 @@ export default function MessageItem({
             )
             : (
               <>
-                {body && <MessageBody body={body} />}
+                {body && <MessageBody body={body} mentions={message?.mentions} me={me?.username} />}
                 {attachments.length > 0 && (
                   <AttachmentList attachments={attachments} onOpenImage={setViewing}
                     onExpired={() => { if (message) onExpired(message.id) }} />

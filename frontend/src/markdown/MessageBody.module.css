@@ -13,3 +13,6 @@
 }
 .body pre code { padding: 0; background: none; overflow-wrap: normal; white-space: pre; }
 .body a { text-decoration: underline; }
+/* メンション（画面設計書 2.10、MN-3）。主色の文字。自分あては主色の薄い背景もつける */
+.mention { color: var(--primary); font-weight: bold; }
+.toMe { background: var(--primary-bg); border-radius: 4px; padding: 0 2px; }

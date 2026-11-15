@@ -33,7 +33,7 @@ const reaction = (emoji: string, users: { username: string, displayName: string 
   ({ emoji, count: users.length, reactedByMe: users.some((u) => u.username === me.username), users, ...extra })
 
 const message = (id: number, body: string, extra: Partial<MessageView> = {}): MessageView => ({
-  id, conversationId: 10, parentId: null, author: { ...me, ...hanako }, body, attachments: [], reactions: [],
+  id, conversationId: 10, parentId: null, author: { ...me, ...hanako }, body, mentions: [], attachments: [], reactions: [],
   replyCount: 0, lastReplyAt: null, replyUsers: [], createdAt: '2026-11-11T01:00:00Z', editedAt: null, deleted: false,
   mine: false, canDelete: true, ...extra,
 })
