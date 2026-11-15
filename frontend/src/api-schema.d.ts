@@ -406,6 +406,30 @@ export interface paths {
         patch: operations["edit"];
         trace?: never;
     };
+    "/api/messages/{messageId}/reactions/{emoji}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * リアクションを付ける
+         * @description もう付けていれば何もしない。絵文字は Unicode の絵文字 1 つ（FN-10 4 章）。まだ付いていない絵文字で 50 種類を超えるときは 409 REACTION_LIMIT
+         */
+        put: operations["addReaction"];
+        post?: never;
+        /**
+         * 自分のリアクションを外す
+         * @description 付けていなければ何もしない
+         */
+        delete: operations["removeReaction"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/messages/{parentId}/replies": {
         parameters: {
             query?: never;
@@ -886,6 +910,7 @@ export interface components {
             mine: boolean;
             /** Format: int64 */
             parentId: number | null;
+            reactions: components["schemas"]["ReactionView"][];
             /** Format: int32 */
             replyCount: number;
             replyUsers: components["schemas"]["UserSummary"][];
@@ -906,6 +931,20 @@ export interface components {
             body: string;
             /** @description 画面が送信ごとに作る UUID。同じ送信を 2 回追加しないために使う */
             clientId: string;
+        };
+        ReactionView: {
+            /** Format: int32 */
+            count: number;
+            emoji: string;
+            reactedByMe: boolean;
+            users: components["schemas"]["Reactor"][];
+        };
+        ReactionsResponse: {
+            reactions: components["schemas"]["ReactionView"][];
+        };
+        Reactor: {
+            displayName: string;
+            username: string;
         };
         ReadRequest: {
             /**
@@ -2060,6 +2099,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageView"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    addReaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: number;
+                emoji: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionsResponse"];
+                };
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    removeReaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: number;
+                emoji: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionsResponse"];
                 };
             };
             /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */

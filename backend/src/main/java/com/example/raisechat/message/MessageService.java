@@ -32,6 +32,8 @@ import com.example.raisechat.conversation.Conversation;
 import com.example.raisechat.conversation.ConversationAccess;
 import com.example.raisechat.conversation.ConversationRepository;
 import com.example.raisechat.conversation.DirectMessages;
+import com.example.raisechat.reaction.ReactionView;
+import com.example.raisechat.reaction.Reactions;
 import com.example.raisechat.realtime.RealtimeEvent;
 import com.example.raisechat.realtime.RealtimeNotifier;
 import com.example.raisechat.user.User;
@@ -79,9 +81,12 @@ class MessageService {
 
 	private final DirectMessages directMessages;
 
+	private final Reactions reactions;
+
 	MessageService(MessageRepository messages, ConversationRepository conversations, ConversationAccess access,
 			Attachments attachments, WorkspaceAccess workspaceAccess, UserRepository users, UserSummaries userSummaries,
-			Clock clock, TransactionTemplate transaction, RealtimeNotifier notifier, DirectMessages directMessages) {
+			Clock clock, TransactionTemplate transaction, RealtimeNotifier notifier, DirectMessages directMessages,
+			Reactions reactions) {
 		this.messages = messages;
 		this.conversations = conversations;
 		this.access = access;
@@ -93,6 +98,7 @@ class MessageService {
 		this.transaction = transaction;
 		this.notifier = notifier;
 		this.directMessages = directMessages;
+		this.reactions = reactions;
 	}
 
 	// 会話のメッセージの一覧（MS-1・MS-2）。before・after のどちらか、またはなし（最新）。古い順に返す
@@ -393,6 +399,7 @@ class MessageService {
 		}
 		this.attachments.removeAllOf(messageId);
 		if (message.getReplyCount() > 0) {
+			this.reactions.removeAllOf(messageId);
 			message.markDeleted(this.clock.instant());
 			MessageView view = view(me, conversation, message);
 			notify(RealtimeEvent.Type.MESSAGE_UPDATED, conversation, view.forEveryone());
@@ -438,7 +445,7 @@ class MessageService {
 		return views(me, conversation, List.of(message)).getFirst();
 	}
 
-	// 送った人・返信した人・添付をまとめて読んでから MessageView にする
+	// 送った人・返信した人・添付・リアクションをまとめて読んでから MessageView にする
 	private List<MessageView> views(long me, Conversation conversation, List<Message> list) {
 		if (list.isEmpty()) {
 			return List.of();
@@ -451,9 +458,12 @@ class MessageService {
 		Map<Long, UserSummary> users = this.users.findAllById(userIds)
 			.stream()
 			.collect(Collectors.toMap(User::getId, (u) -> this.userSummaries.of(u, now)));
-		Map<Long, List<AttachmentView>> attached = this.attachments.views(list.stream().map(Message::getId).toList());
+		List<Long> ids = list.stream().map(Message::getId).toList();
+		Map<Long, List<AttachmentView>> attached = this.attachments.views(ids);
+		Map<Long, List<ReactionView>> reacted = this.reactions.views(me, ids);
 		return list.stream()
 			.map((m) -> MessageView.of(m, users.get(m.getUserId()), attached.getOrDefault(m.getId(), List.of()),
+					reacted.getOrDefault(m.getId(), List.of()),
 					repliers.getOrDefault(m.getId(), List.of()).stream().map(users::get).toList(), me, owner))
 			.toList();
 	}

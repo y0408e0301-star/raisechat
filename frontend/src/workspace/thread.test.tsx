@@ -16,7 +16,7 @@ const hanako = { username: 'hanako', displayName: 'はなこ', avatarUrl: null, 
 const jiro = { username: 'jiro', displayName: 'じろう', avatarUrl: null, statusEmoji: null, statusText: null }
 
 const message = (id: number, body: string, extra: Partial<MessageView> = {}): MessageView => ({
-  id, conversationId: 10, parentId: null, author: me, body, attachments: [], replyCount: 0, lastReplyAt: null,
+  id, conversationId: 10, parentId: null, author: me, body, attachments: [], reactions: [], replyCount: 0, lastReplyAt: null,
   replyUsers: [], createdAt: '2026-11-11T01:00:00Z', editedAt: null, deleted: false, mine: true, canDelete: true,
   ...extra,
 })
@@ -168,6 +168,23 @@ describe('スレッドのパネル（TH-3〜TH-8）', () => {
 
     expect(await within(panel()).findByText(M[30])).toBeInTheDocument()
     expect(within(panel()).queryByRole('textbox', { name: 'メッセージ' })).not.toBeInTheDocument()
+  })
+
+  // TC-10-7（返信にも付けられる）、RE-6
+  it('返信にリアクションを付けられ、ほかの人のリアクションもパネルに出す', async () => {
+    const taro = { username: me.username, displayName: me.displayName }
+    const hanakoReacted = { username: 'hanako', displayName: 'はなこ' }
+    const { client } = await open('/w/3/c/10?thread=1', {
+      'PUT /api/messages/2/reactions/%F0%9F%91%8D': () => json(200, {
+        reactions: [{ emoji: '👍', count: 2, reactedByMe: true, users: [hanakoReacted, taro] }],
+      }),
+    })
+    const replied = (await within(panel()).findByText('行きたい')).closest('article')!
+    act(() => client.deliver(conversationTopic(10), event('reaction.updated', {
+      messageId: 2, reactions: [{ emoji: '👍', count: 1, reactedByMe: false, users: [hanakoReacted] }],
+    })))
+    await userEvent.setup().click(within(replied).getByRole('button', { name: '👍 1 件' }))
+    expect(within(replied).getByRole('button', { name: '👍 2 件、自分も付けた' })).toBeInTheDocument()
   })
 
   // TC-08-8

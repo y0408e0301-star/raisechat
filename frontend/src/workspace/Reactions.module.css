@@ -1,0 +1,26 @@
+/* 画面設計書 2.11 リアクション */
+.reactions { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 0; padding: 0; list-style: none; }
+.wrap { position: relative; display: inline-block; }
+/* 高さ 24px・角の丸み 12px の枠に、絵文字（16px）と件数 */
+.chip {
+  display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--frame); color: var(--text);
+  font: inherit; font-size: 12px; cursor: pointer;
+}
+.chip:hover { border-color: var(--sub); }
+.chip[aria-disabled='true'] { cursor: default; }
+.chip[aria-disabled='true']:hover { border-color: var(--line); }
+/* 自分が付けたものは主色の枠・主色の薄い背景・主色の文字（RE-2） */
+.mine, .mine:hover { border-color: var(--primary); background: var(--primary-bg); color: var(--primary); font-weight: bold; }
+.emoji { font-size: 16px; line-height: 1; }
+/* 付けた人（RE-4）。絵文字の上に出す */
+.tooltip {
+  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 10; width: max-content; max-width: 280px;
+  padding: 6px 8px; border-radius: 6px; background: var(--text); color: var(--bg); font-size: 12px;
+  pointer-events: none;
+}
+
+/* スマートフォンでは押しやすいよう大きくする */
+@media (pointer: coarse) {
+  .chip { height: 32px; padding: 0 10px; }
+}

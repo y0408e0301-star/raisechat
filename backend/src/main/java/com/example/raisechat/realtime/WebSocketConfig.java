@@ -50,6 +50,9 @@ class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 			.setHeartbeatValue(new long[] { HEARTBEAT_MILLIS, HEARTBEAT_MILLIS })
 			.setTaskScheduler(this.scheduler);
 		registry.setUserDestinationPrefix("/user");
+		// 1 人の画面には送った順に届ける。既定では送り出しが並行するので、続けて送った通知（返信の削除と親の件数、
+		// 続けて変えたリアクションなど）の順が入れ替わり、古い状態が最後に出ることがある
+		registry.setPreservePublishOrder(true);
 	}
 
 	// つないだ・切れたことを記録し、JWT の期限が来たら切る（WebSocketSessions）

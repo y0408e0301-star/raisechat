@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-FD |
-| 版数 | 0.12 |
+| 版数 | 0.13 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-14 |
+| 最終更新日 | 2026-11-15 |
 | 作成者 | （氏名） |
 | 元にした文書 | [要件定義書](../requirements/requirements.md)（RC-REQ）版数 0.3 |
 | 状態 | 承認待ち |
@@ -26,6 +26,7 @@
 | 0.10 | 2026-11-14 | FN-02 を 0.2（アバターの画素数の上限・後始末、MemberView の消す時刻）、FN-05 を 0.3（MemberView の消す時刻）、FN-10 を 0.2（使える絵文字に component を足し、U+FE0F の違いを直す）にした | （氏名） |
 | 0.11 | 2026-11-14 | FN-07 を 0.3（編集の keepAttachmentIds、GET /api/messages/{id}）、FN-09 を 0.2（形式の確かめ方・縮小した画像・外し方など）にした。3.5 の MessageView の attachments に downloadUrl を足した | （氏名） |
 | 0.12 | 2026-11-14 | FN-08 を 0.3 にした（スレッドを作るときに決めたこと）。3.5 の MessageView に replyUsers を足した | （氏名） |
+| 0.13 | 2026-11-15 | FN-10 を 0.3 にした（リアクションを作るときに決めたこと）。3.5 の MessageView の reactions.users を、username だけから username と表示名（displayName）の組にした（RE-4 で付けた人の表示名を出すため） | （氏名） |
 
 ## 承認
 
@@ -229,7 +230,8 @@ statusEmoji・statusText は、ステータスがないか、消す日時を過�
       "downloadUrl": "https://…（元のファイル名で保存させる）", "expiresAt": "2026-11-10T07:30:00Z" }
   ],
   "reactions": [
-    { "emoji": "👍", "count": 3, "reactedByMe": true, "users": ["hana", "jiro", "taro_y"] }
+    { "emoji": "👍", "count": 3, "reactedByMe": true,
+      "users": [ { "username": "hana", "displayName": "はな" }, { "username": "jiro", "displayName": "じろう" }, { "username": "taro_y", "displayName": "たろう" } ] }
   ],
   "replyCount": 2,
   "lastReplyAt": "2026-11-10T01:07:00Z",
@@ -244,7 +246,7 @@ statusEmoji・statusText は、ステータスがないか、消す日時を過�
 
 - body は Markdown 記法のまま返す。飾りに変えるのは画面で行う（FN-07 5 章）
 - mentions は、本文のメンションのうち記録したもの（FN-11）の username。画面はこれに含まれる「@ユーザー ID」だけを目立たせる
-- reactions.users は、絵文字を付けた人の username を付けた順に最大 20 人まで返す（重ねたときに出す。FN-10）
+- reactions は、絵文字が最初に付けられた順。reactions.users は、絵文字を付けた人の username と表示名を、付けた順に最大 20 人まで返す（重ねたときに出す。FN-10）
 - deleted が true のとき（スレッドの返信がある親メッセージを削除したとき。FN-07 MS-11）は、body は空、attachments・reactions は空の並びにする
 - canDelete は、自分のメッセージか、自分がそのワークスペースのオーナーのときに true
 - replyUsers は、返信のある親メッセージの、最後に返信した人から 3 人（画面設計書 2.9 の返信した人のアバター）

@@ -1,4 +1,4 @@
-import type { ConversationSummary, MessageView } from '../api'
+import type { ConversationSummary, MessageView, ReactionView } from '../api'
 
 // リアルタイムの通知の形（機能定義書 4.3）。OpenAPI では書けないので、機能定義書 4.3 の表を正として手で書く。
 // サーバーの形（backend の RealtimeEvent）と同じにする。サーバーが実際に送った JSON の見本（docs/api/realtime-events.json）を
@@ -6,6 +6,9 @@ import type { ConversationSummary, MessageView } from '../api'
 
 // message.deleted の payload
 export type MessageDeleted = { id: number, parentId: number | null }
+
+// reaction.updated の payload。reactions はそのメッセージのリアクション全体（reactedByMe は false で届く。FN-10）
+export type ReactionUpdated = { messageId: number, reactions: ReactionView[] }
 
 // conversation.removed の payload。LEFT：抜けた、DELETED：チャンネルが削除された
 export type ConversationRemoved = { conversationId: number, reason: 'LEFT' | 'DELETED' }
@@ -21,11 +24,12 @@ type Event<Type extends string, Payload> = {
   sentAt: string
 }
 
-// payload の MessageView の mine・canDelete は false で届くので、受け取った画面で直す（4.3）
+// payload の MessageView の mine・canDelete・reactions の reactedByMe は false で届くので、受け取った画面で直す（4.3）
 export type RealtimeEvent =
   | Event<'message.created', MessageView>
   | Event<'message.updated', MessageView>
   | Event<'message.deleted', MessageDeleted>
+  | Event<'reaction.updated', ReactionUpdated>
   // 本人あて（/user/queue/events）
   | Event<'conversation.updated', ConversationSummary>
   | Event<'conversation.removed', ConversationRemoved>
@@ -37,14 +41,22 @@ const isObject = (v: unknown): v is Json => typeof v === 'object' && v !== null 
 const isId = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v > 0
 const isIdOrNull = (v: unknown) => v === null || isId(v)
 
+const isReaction = (v: unknown): v is ReactionView =>
+  isObject(v) && typeof v.emoji === 'string' && typeof v.count === 'number' && Array.isArray(v.users)
+  && v.users.every((u) => isObject(u) && typeof u.username === 'string' && typeof u.displayName === 'string')
+
 // 画面が使う項目がそろっているか（全部の項目は確かめない）
 function isMessageView(v: unknown): v is MessageView {
   return isObject(v) && isId(v.id) && isId(v.conversationId) && isIdOrNull(v.parentId)
     && isObject(v.author) && typeof v.author.username === 'string' && typeof v.body === 'string'
     && typeof v.createdAt === 'string' && typeof v.deleted === 'boolean'
+    && Array.isArray(v.reactions) && v.reactions.every(isReaction)
 }
 
 const isMessageDeleted = (v: unknown): v is MessageDeleted => isObject(v) && isId(v.id) && isIdOrNull(v.parentId)
+
+const isReactionUpdated = (v: unknown): v is ReactionUpdated =>
+  isObject(v) && isId(v.messageId) && Array.isArray(v.reactions) && v.reactions.every(isReaction)
 
 const isConversationSummary = (v: unknown): v is ConversationSummary =>
   isObject(v) && isId(v.id) && isId(v.workspaceId) && (v.type === 'CHANNEL' || v.type === 'DM')
@@ -61,6 +73,7 @@ const payloadCheck: Record<RealtimeEvent['type'], (payload: unknown) => boolean>
   'message.created': isMessageView,
   'message.updated': isMessageView,
   'message.deleted': isMessageDeleted,
+  'reaction.updated': isReactionUpdated,
   'conversation.updated': isConversationSummary,
   'conversation.removed': isConversationRemoved,
   'workspace.removed': isWorkspaceRemoved,

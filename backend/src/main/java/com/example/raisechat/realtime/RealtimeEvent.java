@@ -1,9 +1,11 @@
 package com.example.raisechat.realtime;
 
 import java.time.Instant;
+import java.util.List;
 
 import org.jspecify.annotations.Nullable;
 
+import com.example.raisechat.reaction.ReactionView;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 // リアルタイムの通知の形（機能定義書 4.3）。OpenAPI では書けないので、機能定義書 4.3 の表を正とし、
@@ -23,6 +25,9 @@ public record RealtimeEvent(Type type, long workspaceId, @Nullable Long conversa
 
 		// payload：{"id","parentId"}
 		MESSAGE_DELETED("message.deleted"),
+
+		// payload：{"messageId","reactions"}（そのメッセージの reactions 全体。FN-10）
+		REACTION_UPDATED("reaction.updated"),
 
 		// 本人あて。payload：ConversationSummary（会話に参加した・招待された・作った。FN-06）
 		CONVERSATION_UPDATED("conversation.updated"),
@@ -48,6 +53,10 @@ public record RealtimeEvent(Type type, long workspaceId, @Nullable Long conversa
 
 	// message.deleted の payload
 	public record MessageDeleted(long id, @Nullable Long parentId) {
+	}
+
+	// reaction.updated の payload
+	public record ReactionUpdated(long messageId, List<ReactionView> reactions) {
 	}
 
 	// conversation.removed の payload

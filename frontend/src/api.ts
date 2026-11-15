@@ -28,6 +28,7 @@ export type InvitePreview = Schemas['InvitePreview']
 export type MyProfile = Schemas['MyProfile']
 export type AttachmentView = Schemas['AttachmentView']
 export type UploadTicket = Schemas['UploadTicket']
+export type ReactionView = Schemas['ReactionView']
 
 // API がエラーを返したとき（機能定義書 3.3）。message は画面にそのまま出せる文、
 // field があればその入力欄の下に出す
@@ -415,6 +416,21 @@ export function fetchMessage(messageId: number): Promise<MessageView> {
 export async function deleteMessage(messageId: number): Promise<MessageView | null> {
   const res = await request('DELETE', `/api/messages/${messageId}`)
   return res.status === 204 ? null : res.json() as Promise<MessageView>
+}
+
+// ---------------------------------------------------------------- FN-10 リアクション
+
+// 付ける・外す。どちらもそのメッセージのリアクション全体を返す（何度送っても同じ結果になる。FN-10 5 章の 1）
+export async function addReaction(messageId: number, emoji: string): Promise<ReactionView[]> {
+  const res = await requestJson<Schemas['ReactionsResponse']>('PUT',
+    `/api/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`)
+  return res.reactions
+}
+
+export async function removeReaction(messageId: number, emoji: string): Promise<ReactionView[]> {
+  const res = await requestJson<Schemas['ReactionsResponse']>('DELETE',
+    `/api/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`)
+  return res.reactions
 }
 
 // ---------------------------------------------------------------- FN-08 スレッド

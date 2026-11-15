@@ -15,6 +15,7 @@
     },
     "body" : "土曜の集合は駅前で",
     "attachments" : [ ],
+    "reactions" : [ ],
     "replyCount" : 0,
     "lastReplyAt" : null,
     "replyUsers" : [ ],
@@ -23,6 +24,23 @@
     "deleted" : false,
     "mine" : false,
     "canDelete" : false
+  },
+  "sentAt" : "2026-11-10T01:02:00Z"
+}, {
+  "type" : "reaction.updated",
+  "workspaceId" : 1,
+  "conversationId" : 1,
+  "payload" : {
+    "messageId" : 1,
+    "reactions" : [ {
+      "emoji" : "👍",
+      "count" : 1,
+      "reactedByMe" : false,
+      "users" : [ {
+        "username" : "hanako",
+        "displayName" : "hanakoの名前"
+      } ]
+    } ]
   },
   "sentAt" : "2026-11-10T01:02:00Z"
 }, {
@@ -42,6 +60,15 @@
     },
     "body" : "土曜の集合は駅の北口で",
     "attachments" : [ ],
+    "reactions" : [ {
+      "emoji" : "👍",
+      "count" : 1,
+      "reactedByMe" : false,
+      "users" : [ {
+        "username" : "hanako",
+        "displayName" : "hanakoの名前"
+      } ]
+    } ],
     "replyCount" : 0,
     "lastReplyAt" : null,
     "replyUsers" : [ ],

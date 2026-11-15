@@ -353,7 +353,8 @@ function ConversationView({ conversationId }: { conversationId: number }) {
             loadingOlder={loadingOlder} onLoadOlder={loadOlder} onDelete={setDeleting}
             onEdited={(edited) => updateItems((items) => items.map((m) => (m.id === edited.id ? edited : m)))}
             onGone={(id) => updateItems((items) => items.filter((m) => m.id !== id))}
-            onRetry={retry} onCancel={cancel} onExpired={refreshMessage} onOpenThread={openThread} />
+            onRetry={retry} onCancel={cancel} onExpired={refreshMessage} onOpenThread={openThread}
+            onReactions={(id, reactions) => updateItems((items) => items.map((m) => (m.id === id ? { ...m, reactions } : m)))} />
           {loaded.conversation.canPost
             ? (
               <Composer value={draft} onChange={setDraft} onSend={send} uploads={uploads}

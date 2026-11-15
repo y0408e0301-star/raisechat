@@ -18,7 +18,7 @@ const member = (user: object, extra: object = {}) =>
   ({ statusExpiresAt: null, ...user, role: 'MEMBER', joinedAt: '2026-11-10T01:00:00Z', ...extra })
 
 const message = (id: number, author: object) => ({
-  id, conversationId: 10, parentId: null, author, body: `${id} 通目`, attachments: [], replyCount: 0, lastReplyAt: null, replyUsers: [],
+  id, conversationId: 10, parentId: null, author, body: `${id} 通目`, attachments: [], reactions: [], replyCount: 0, lastReplyAt: null, replyUsers: [],
   createdAt: '2026-11-11T01:00:00Z', editedAt: null, deleted: false, mine: false, canDelete: true,
 })
 

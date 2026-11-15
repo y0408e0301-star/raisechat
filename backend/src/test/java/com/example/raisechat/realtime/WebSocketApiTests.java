@@ -5,6 +5,7 @@ import static com.example.raisechat.ApiTestSupport.delete;
 import static com.example.raisechat.ApiTestSupport.join;
 import static com.example.raisechat.ApiTestSupport.patch;
 import static com.example.raisechat.ApiTestSupport.post;
+import static com.example.raisechat.ApiTestSupport.put;
 import static com.example.raisechat.ApiTestSupport.readLong;
 import static com.example.raisechat.ApiTestSupport.signup;
 import static com.example.raisechat.ApiTestSupport.userId;
@@ -57,6 +58,8 @@ class WebSocketApiTests {
 	private static final Path SAMPLES = Path.of("..", "docs", "api", "realtime-events.json");
 
 	private static final String ORIGIN = "http://localhost:5173";
+
+	private static final String THUMBS_UP = Character.toString(0x1F44D);
 
 	private static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
 
@@ -284,6 +287,9 @@ class WebSocketApiTests {
 
 		long id = send(this.taro, "土曜の集合は駅前で");
 		String created = hanakoClient.next();
+		// TC-10-3：リアクションを付けると、そのメッセージのリアクション全体が届く（FN-10 5 章の 3・4）
+		assertThat(put(this.mvc, this.hanako, "/api/messages/%d/reactions/%s".formatted(id, THUMBS_UP))).hasStatusOk();
+		String reacted = hanakoClient.next();
 		this.clock.advance(Duration.ofMinutes(1));
 		assertThat(patch(this.mvc, this.taro, "/api/messages/" + id, "{\"body\":\"土曜の集合は駅の北口で\"}")).hasStatusOk();
 		String updated = hanakoClient.next();
@@ -301,6 +307,17 @@ class WebSocketApiTests {
 		assertThat(createdJson.path("payload").path("mine").asBoolean()).isFalse();
 		assertThat(createdJson.path("payload").path("canDelete").asBoolean()).isFalse();
 		assertThat(createdJson.path("sentAt").asString()).isEqualTo("2026-11-10T01:02:00Z");
+
+		JsonNode reactedJson = JSON.readTree(reacted);
+		assertThat(reactedJson.path("type").asString()).isEqualTo("reaction.updated");
+		assertThat(reactedJson.path("conversationId").asLong()).isEqualTo(this.general);
+		assertThat(reactedJson.path("payload").path("messageId").asLong()).isEqualTo(id);
+		JsonNode reaction = reactedJson.path("payload").path("reactions").get(0);
+		assertThat(reaction.path("emoji").asString()).isEqualTo(THUMBS_UP);
+		assertThat(reaction.path("count").asInt()).isEqualTo(1);
+		// 付けた本人にも false で送り、受け取った画面が users で直す
+		assertThat(reaction.path("reactedByMe").asBoolean()).isFalse();
+		assertThat(reaction.path("users").get(0).path("username").asString()).isEqualTo("hanako");
 
 		JsonNode updatedJson = JSON.readTree(updated);
 		assertThat(updatedJson.path("type").asString()).isEqualTo("message.updated");
@@ -342,7 +359,7 @@ class WebSocketApiTests {
 		assertThat(kickedJson.path("payload").path("name").asString()).isEqualTo("仲間うち");
 		assertThat(kickedJson.path("payload").path("reason").asString()).isEqualTo("KICKED");
 
-		writeSamples(List.of(createdJson, updatedJson, deletedJson, joinedJson, removedJson, kickedJson));
+		writeSamples(List.of(createdJson, reactedJson, updatedJson, deletedJson, joinedJson, removedJson, kickedJson));
 	}
 
 	private long createChannel(Cookie user, String name, String visibility) {

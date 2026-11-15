@@ -1,5 +1,5 @@
 import { Fragment, useLayoutEffect, useRef, useState } from 'react'
-import type { ConversationDetail, MessageView } from '../api'
+import type { ConversationDetail, MessageView, ReactionView } from '../api'
 import Avatar from '../components/Avatar'
 import ui from '../components/ui.module.css'
 import { dayKey, formatDayDivider } from '../dates'
@@ -31,6 +31,8 @@ type Props = {
   onExpired: (messageId: number) => void
   // スレッドを開く（TH-1・TH-2）
   onOpenThread: (messageId: number) => void
+  // リアクションが変わった（FN-10）
+  onReactions: (messageId: number, reactions: ReactionView[]) => void
 }
 
 function info(e: Entry) {
