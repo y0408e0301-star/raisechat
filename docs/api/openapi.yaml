@@ -53,6 +53,7 @@ info:
     | EMOJI_INVALID | 400 | 入力が正しくありません。 |
     | REACTION_LIMIT | 409 | このメッセージにはこれ以上の種類のリアクションを付けられません。 |
     | MESSAGE_DELETED | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
+    | QUERY_REQUIRED | 400 | 検索する言葉を入力してください。 |
     | BAD_REQUEST | 400 | 入力が正しくありません。 |
     | FORBIDDEN | 403 | 操作に失敗しました。時間をおいてもう一度お試しください。 |
     | NOT_FOUND | 404 | 見つかりません。 |
@@ -1823,6 +1824,62 @@ paths:
       summary: 自分あてのメンションの一覧（FN-14）
       tags:
       - FN-07 メッセージ
+  /api/workspaces/{workspaceId}/search:
+    get:
+      description: そのワークスペースの、自分が見られる会話のメッセージとスレッドの返信から、q を空白で区切った言葉をすべて含むものを新しい順に
+        20 件ずつ（大文字・小文字を区別しない部分一致）。conversationId（会話）と from（送った人のユーザー ID）で絞り込める。cursor
+        は前回の nextCursor
+      operationId: search
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: conversationId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchPage"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: メッセージを探す
+      tags:
+      - FN-13 検索
 components:
   schemas:
     AttachmentView:
@@ -2295,7 +2352,34 @@ components:
       required:
       - member
       - user
-    MentionConversation:
+    MentionItem:
+      type: object
+      properties:
+        conversation:
+          $ref: "#/components/schemas/MessageConversation"
+        message:
+          $ref: "#/components/schemas/MessageView"
+        read:
+          type: boolean
+      required:
+      - conversation
+      - message
+      - read
+    MentionPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MentionItem"
+        nextCursor:
+          type:
+          - string
+          - "null"
+      required:
+      - items
+      - nextCursor
+    MessageConversation:
       type: object
       properties:
         dmPartner:
@@ -2319,33 +2403,6 @@ components:
       - id
       - name
       - type
-    MentionItem:
-      type: object
-      properties:
-        conversation:
-          $ref: "#/components/schemas/MentionConversation"
-        message:
-          $ref: "#/components/schemas/MessageView"
-        read:
-          type: boolean
-      required:
-      - conversation
-      - message
-      - read
-    MentionPage:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/MentionItem"
-        nextCursor:
-          type:
-          - string
-          - "null"
-      required:
-      - items
-      - nextCursor
     MessagePage:
       type: object
       properties:
@@ -2539,6 +2596,30 @@ components:
       - hasMoreBefore
       - items
       - parent
+    SearchPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchResult"
+        nextCursor:
+          type:
+          - string
+          - "null"
+      required:
+      - items
+      - nextCursor
+    SearchResult:
+      type: object
+      properties:
+        conversation:
+          $ref: "#/components/schemas/MessageConversation"
+        message:
+          $ref: "#/components/schemas/MessageView"
+      required:
+      - conversation
+      - message
     SignupRequest:
       type: object
       properties:
