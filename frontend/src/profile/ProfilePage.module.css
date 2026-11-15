@@ -38,3 +38,16 @@
 .placeholder { opacity: 0.4; filter: grayscale(1); }
 
 .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+
+/* 「通知」とブラウザの通知の切り替えスイッチ（画面設計書 12 章） */
+.section { margin: 24px 0 8px; font-size: 16px; }
+.switchRow { display: flex; align-items: center; gap: 12px; }
+.switchRow .label { margin-bottom: 0; }
+.switch {
+  display: inline-flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; min-height: 32px;
+  border: 1px solid var(--line); border-radius: 16px; background: var(--frame); color: var(--text); cursor: pointer;
+}
+.switch:disabled { opacity: 0.5; cursor: wait; }
+.switchOn { background: var(--primary); border-color: var(--primary); color: #fff; }
+.switchText { font-size: 14px; }
+.knob { width: 24px; height: 24px; border-radius: 50%; background: var(--bg); border: 1px solid var(--line); }

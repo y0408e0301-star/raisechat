@@ -4,11 +4,13 @@ import { vi } from 'vitest'
 import { AuthContext } from '../auth/AuthContext'
 import { ToastProvider } from '../components/ToastProvider'
 import { M } from '../messages'
+import BrowserNotifier from '../notifications/BrowserNotifier'
 import { RealtimeProvider } from '../realtime/RealtimeProvider'
 import ChannelsPage from '../workspace/ChannelsPage'
 import ConversationPage from '../workspace/ConversationPage'
 import InvitesPage from '../workspace/InvitesPage'
 import MembersPage from '../workspace/MembersPage'
+import MentionsPage from '../workspace/MentionsPage'
 import WorkspaceHome from '../workspace/WorkspaceHome'
 import WorkspaceLayout from '../workspace/WorkspaceLayout'
 import CurrentLocation from './CurrentLocation'
@@ -41,12 +43,14 @@ export function renderAt(path: string) {
         <ToastProvider>
           {/* WebSocket は偽物（src/test/fakeStomp.ts）。Client.latest() でつないだり通知を届けたりする */}
           <RealtimeProvider>
+            <BrowserNotifier />
             <Routes>
               <Route path="/" element={<p>G-3</p>} />
               <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
                 <Route index element={<WorkspaceHome />} />
                 <Route path="c/:conversationId" element={<ConversationPage />} />
                 <Route path="d/:conversationId" element={<ConversationPage />} />
+                <Route path="mentions" element={<MentionsPage />} />
                 <Route path="channels" element={<ChannelsPage />} />
                 <Route path="members" element={<MembersPage />} />
                 <Route path="invites" element={<InvitesPage />} />

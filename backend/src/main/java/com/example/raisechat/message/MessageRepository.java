@@ -13,6 +13,8 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.example.raisechat.conversation.ConversationRepository;
+
 import jakarta.persistence.LockModeType;
 
 // 会話のメッセージの一覧に出すのは親メッセージ（parent_id が null）だけ（FN-07 5 章の 3）
@@ -79,6 +81,27 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 	List<Replier> findRepliers(@Param("parentIds") Collection<Long> parentIds);
 
 	record Replier(long parentId, long userId, long lastReplyId) {
+	}
+
+	// 自分あてのメンション（G-7。FN-14 NT-5）：そのワークスペースのいま見られる会話のものを、メッセージの新しい順に。
+	// :before より前（最初は Long.MAX_VALUE）
+	@Query(value = """
+			SELECT mn.message_id AS "messageId", mn.is_read AS "read"
+			FROM mentions mn JOIN messages m ON m.id = mn.message_id JOIN conversations c ON c.id = m.conversation_id
+			WHERE mn.user_id = :me AND c.workspace_id = :workspaceId AND m.id < :before
+			  AND\s""" + ConversationRepository.VISIBLE_TO_ME + """
+			ORDER BY m.id DESC
+			LIMIT :limit
+			""", nativeQuery = true)
+	List<MentionRow> findMentions(@Param("me") long me, @Param("workspaceId") long workspaceId,
+			@Param("before") long before, @Param("limit") int limit);
+
+	interface MentionRow {
+
+		long getMessageId();
+
+		boolean getRead();
+
 	}
 
 	// 同じ人が同じ clientId で送ったもの（FN-07 5 章の 8）

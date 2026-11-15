@@ -3,6 +3,7 @@ package com.example.raisechat.workspace;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ import com.example.raisechat.conversation.ConversationRepository;
 import com.example.raisechat.realtime.RealtimeEvent;
 import com.example.raisechat.realtime.RealtimeNotifier;
 import com.example.raisechat.realtime.SubscriptionRevoker;
+import com.example.raisechat.unread.UnreadCounts;
 import com.example.raisechat.user.User;
 import com.example.raisechat.user.UserRepository;
 import com.example.raisechat.user.UserSummaries;
@@ -52,10 +54,12 @@ class WorkspaceService {
 
 	private final Clock clock;
 
+	private final UnreadCounts unreadCounts;
+
 	WorkspaceService(WorkspaceRepository workspaces, WorkspaceMemberRepository members, WorkspaceAccess access,
 			ConversationRepository conversations, ConversationMemberRepository conversationMembers,
 			UserRepository users, UserSummaries userSummaries, RealtimeNotifier notifier, SubscriptionRevoker revoker,
-			Attachments attachments, Clock clock) {
+			Attachments attachments, Clock clock, UnreadCounts unreadCounts) {
 		this.workspaces = workspaces;
 		this.members = members;
 		this.access = access;
@@ -67,14 +71,18 @@ class WorkspaceService {
 		this.revoker = revoker;
 		this.attachments = attachments;
 		this.clock = clock;
+		this.unreadCounts = unreadCounts;
 	}
 
-	// G-3 の一覧（W-1）
+	// G-3 の一覧（W-1）。未読・メンションの印も入れる（NT-3）
 	@Transactional(readOnly = true)
 	List<WorkspaceSummary> list(long userId) {
-		return this.workspaces.findAllByMember(userId)
-			.stream()
-			.map((m) -> WorkspaceSummary.of(m.workspace(), m.role()))
+		List<WorkspaceMembership> found = this.workspaces.findAllByMember(userId);
+		Map<Long, UnreadCounts.WorkspaceCounts> counts = this.unreadCounts.ofWorkspaces(userId,
+				found.stream().map((m) -> m.workspace().getId()).toList());
+		return found.stream()
+			.map((m) -> WorkspaceSummary.of(m.workspace(), m.role(),
+					counts.getOrDefault(m.workspace().getId(), UnreadCounts.WorkspaceCounts.NONE)))
 			.toList();
 	}
 
@@ -95,7 +103,7 @@ class WorkspaceService {
 		// まだメッセージがないので、最後に読んだメッセージは 0
 		this.conversationMembers.save(new ConversationMember(general.getId(), userId, 0, now));
 		return WorkspaceDetail.of(workspace, WorkspaceMember.Role.OWNER, this.userSummaries.of(owner, now), 1,
-				general.getId(), null);
+				general.getId(), null, UnreadCounts.WorkspaceCounts.NONE);
 	}
 
 	// G-5 を開くときの詳細。最後に開いた会話が見られなくなっていたら、なしとして返し、画面は general を開く（W-4）
@@ -111,7 +119,8 @@ class WorkspaceService {
 			lastOpened = null;
 		}
 		return WorkspaceDetail.of(workspace, member.getRole(), this.userSummaries.of(owner, this.clock.instant()),
-				this.members.countByWorkspaceId(workspaceId), generalId, lastOpened);
+				this.members.countByWorkspaceId(workspaceId), generalId, lastOpened,
+				this.unreadCounts.ofMember(userId, workspaceId));
 	}
 
 	// 削除する（W-6）。オーナーだけ。確認の名前がワークスペースの名前と同じときだけ。

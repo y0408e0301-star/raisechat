@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,8 @@ import com.example.raisechat.common.ErrorCode;
 import com.example.raisechat.conversation.Conversation;
 import com.example.raisechat.conversation.ConversationAccess;
 import com.example.raisechat.conversation.ConversationRepository;
+import com.example.raisechat.conversation.ConversationMemberRepository;
+import com.example.raisechat.conversation.CountNotices;
 import com.example.raisechat.conversation.DirectMessages;
 import com.example.raisechat.mention.Mentions;
 import com.example.raisechat.reaction.ReactionView;
@@ -49,12 +52,18 @@ import com.example.raisechat.workspace.WorkspaceMember;
 // 送信・編集・削除は、コミットの後に会話を見ている人へリアルタイムの通知を送る（FN-07 6 章）。
 // 添付（FN-09）は送信で結びつけ、編集で外し、削除で消す（S3 のファイルはコミットの後。BR-12）。
 // メンション（FN-11）は送信・編集で記録し、「削除されました」にしたら消す。
-// 未読・メンションの通知（conversation.updated・notify）は 1-15 で足す
+// 未読・メンションの件数が変わった人には件数を（FN-14 6 章）、メンションされた人・DM の相手にはブラウザの通知の元（notify）を送る
 @Service
 class MessageService {
 
 	// 1 回に読み込む件数の上限と、指定がないときの件数（FN-07 6 章）
 	static final int MAX_LIMIT = 50;
+
+	// メッセージの位置を開くときに、その前と後ろに読む件数（MS-14）
+	static final int AROUND = 25;
+
+	// メンションの一覧（G-7）で 1 回に読む件数（FN-14 NT-5）
+	static final int MENTION_PAGE = 20;
 
 	// 親メッセージの返信の件数の行に出す、返信した人の数（画面設計書 2.9）
 	static final int MAX_REPLY_USERS = 3;
@@ -82,6 +91,10 @@ class MessageService {
 
 	private final RealtimeNotifier notifier;
 
+	private final CountNotices countNotices;
+
+	private final ConversationMemberRepository conversationMembers;
+
 	private final DirectMessages directMessages;
 
 	private final Reactions reactions;
@@ -90,8 +103,9 @@ class MessageService {
 
 	MessageService(MessageRepository messages, ConversationRepository conversations, ConversationAccess access,
 			Attachments attachments, WorkspaceAccess workspaceAccess, UserRepository users, UserSummaries userSummaries,
-			Clock clock, TransactionTemplate transaction, RealtimeNotifier notifier, DirectMessages directMessages,
-			Reactions reactions, Mentions mentions) {
+			Clock clock, TransactionTemplate transaction, RealtimeNotifier notifier, CountNotices countNotices,
+			ConversationMemberRepository conversationMembers, DirectMessages directMessages, Reactions reactions,
+			Mentions mentions) {
 		this.messages = messages;
 		this.conversations = conversations;
 		this.access = access;
@@ -102,15 +116,23 @@ class MessageService {
 		this.clock = clock;
 		this.transaction = transaction;
 		this.notifier = notifier;
+		this.countNotices = countNotices;
+		this.conversationMembers = conversationMembers;
 		this.directMessages = directMessages;
 		this.reactions = reactions;
 		this.mentions = mentions;
 	}
 
-	// 会話のメッセージの一覧（MS-1・MS-2）。before・after のどちらか、またはなし（最新）。古い順に返す
+	// 会話のメッセージの一覧（MS-1・MS-2・MS-14）。before・after・around のどれか、またはなし（最新）。古い順に返す
 	@Transactional(readOnly = true)
-	MessagePage list(long me, long conversationId, @Nullable Long before, @Nullable Long after,
+	MessagePage list(long me, long conversationId, @Nullable Long before, @Nullable Long after, @Nullable Long around,
 			@Nullable Integer rawLimit) {
+		if (around != null) {
+			if (before != null || after != null || rawLimit != null) {
+				throw new ApiException(ErrorCode.BAD_REQUEST, "around");
+			}
+			return around(me, requireVisible(me, conversationId), around);
+		}
 		int limit = validLimit(before, after, rawLimit);
 		Conversation conversation = requireVisible(me, conversationId);
 		Paged paged = page(before, after, limit, new PageQueries() {
@@ -140,6 +162,75 @@ class MessageService {
 			}
 		});
 		return new MessagePage(views(me, conversation, paged.items()), paged.hasMoreBefore(), paged.hasMoreAfter());
+	}
+
+	// メッセージの位置を開く（MS-14）：そのメッセージと前後 AROUND 件ずつ。スレッドの返信なら、その親の前後
+	// （画面はスレッドのパネルも開く。FN-07 6 章）。その会話にないメッセージは 404
+	private MessagePage around(long me, Conversation conversation, long messageId) {
+		Message target = this.messages.findById(messageId)
+			.filter((m) -> m.getConversationId() == conversation.getId())
+			.orElseThrow(MessageService::notFound);
+		Long parentId = target.getParentId();
+		if (parentId != null) {
+			target = this.messages.findById(parentId).orElseThrow(MessageService::notFound);
+		}
+		Limit plusOne = Limit.of(AROUND + 1);
+		List<Message> before = this.messages.findBefore(conversation.getId(), target.getId(), plusOne);
+		List<Message> after = this.messages.findAfter(conversation.getId(), target.getId(), plusOne);
+		List<Message> items = new ArrayList<>(before.subList(0, Math.min(AROUND, before.size())));
+		Collections.reverse(items);
+		items.add(target);
+		items.addAll(after.subList(0, Math.min(AROUND, after.size())));
+		return new MessagePage(views(me, conversation, items), before.size() > AROUND, after.size() > AROUND);
+	}
+
+	// 自分あてのメンションの一覧（G-7。FN-14 NT-5）：そのワークスペースのいま見られる会話のものを、新しい順に 20 件ずつ（NT-11）。
+	// cursor は前回の最後のメッセージの ID
+	@Transactional(readOnly = true)
+	MentionPage mentions(long me, long workspaceId, @Nullable String cursor) {
+		this.workspaceAccess.requireMember(me, workspaceId);
+		long before = parseCursor(cursor);
+		List<MessageRepository.MentionRow> rows = this.messages.findMentions(me, workspaceId, before, MENTION_PAGE + 1);
+		List<MessageRepository.MentionRow> page = rows.subList(0, Math.min(MENTION_PAGE, rows.size()));
+		Map<Long, Message> found = this.messages
+			.findAllById(page.stream().map(MessageRepository.MentionRow::getMessageId).toList())
+			.stream()
+			.collect(Collectors.toMap(Message::getId, Function.identity()));
+		Map<Long, Conversation> conversations = this.conversations
+			.findAllById(found.values().stream().map(Message::getConversationId).distinct().toList())
+			.stream()
+			.collect(Collectors.toMap(Conversation::getId, Function.identity()));
+		// MessageView は会話ごとにまとめて作る（オーナーかどうかが会話の種類で変わるため）
+		Map<Long, MessageView> views = new HashMap<>();
+		found.values()
+			.stream()
+			.collect(Collectors.groupingBy(Message::getConversationId))
+			.forEach((conversationId, list) -> views(me, conversations.get(conversationId), list)
+				.forEach((v) -> views.put(v.id(), v)));
+		List<MentionItem> items = page.stream().map((row) -> {
+			MessageView view = views.get(row.getMessageId());
+			return new MentionItem(view,
+					MentionConversation.of(conversations.get(view.conversationId()), me, this.directMessages),
+					row.getRead());
+		}).toList();
+		String next = (rows.size() > MENTION_PAGE) ? String.valueOf(page.getLast().getMessageId()) : null;
+		return new MentionPage(items, next);
+	}
+
+	private static long parseCursor(@Nullable String cursor) {
+		if (cursor == null || cursor.isEmpty()) {
+			return Long.MAX_VALUE;
+		}
+		try {
+			long id = Long.parseLong(cursor);
+			if (id > 0) {
+				return id;
+			}
+		}
+		catch (NumberFormatException ex) {
+			// 下で 400 にする
+		}
+		throw new ApiException(ErrorCode.BAD_REQUEST, "cursor");
 	}
 
 	// スレッドの返信の一覧（TH-1、FN-08 6 章）。親メッセージと、返信を古い順に 50 件ずつ。
@@ -313,15 +404,13 @@ class MessageService {
 		this.access.requireCanPost(me, conversation);
 		Message reply = this.messages.saveAndFlush(Message.reply(parent, me, clientId, body, this.clock.instant()));
 		this.attachments.attach(me, conversation.getId(), reply.getId(), attachmentIds);
-		this.mentions.record(me, conversation, reply.getId(), body);
+		Set<Long> mentioned = this.mentions.record(me, conversation, reply.getId(), body);
 		parent.replyAdded(reply.getCreatedAt());
 		MessageView view = view(me, conversation, reply);
 		// スレッドを開いている人のパネルに返信を足し、会話を開いている人の親の件数と時刻を変える（TH-3）
 		notify(RealtimeEvent.Type.MESSAGE_CREATED, conversation, view.forEveryone());
 		notify(RealtimeEvent.Type.MESSAGE_UPDATED, conversation, view(me, conversation, parent).forEveryone());
-		if (conversation.getType() == Conversation.Type.DM) {
-			this.directMessages.messageSent(conversation);
-		}
+		sent(me, conversation, reply, view, mentioned);
 		return view;
 	}
 
@@ -343,13 +432,38 @@ class MessageService {
 		Message message = this.messages
 			.saveAndFlush(new Message(conversationId, me, clientId, body, this.clock.instant()));
 		this.attachments.attach(me, conversationId, message.getId(), attachmentIds);
-		this.mentions.record(me, conversation, message.getId(), body);
+		Set<Long> mentioned = this.mentions.record(me, conversation, message.getId(), body);
 		MessageView view = view(me, conversation, message);
 		notify(RealtimeEvent.Type.MESSAGE_CREATED, conversation, view.forEveryone());
-		if (conversation.getType() == Conversation.Type.DM) {
-			this.directMessages.messageSent(conversation);
-		}
+		sent(me, conversation, message, view, mentioned);
 		return view;
+	}
+
+	// 送ったメッセージで件数が変わった人に知らせ（FN-14 6 章）、メンションされた人・DM の相手にブラウザの通知の元を送る（NT-7）。
+	// 親メッセージは未読を増やすので、会話のメンバー（自分を除く）に件数を送る。DM は 2 人とも（サイドバーの並びも変わる。DM-1）。
+	// スレッドの返信は未読にならないので、メンションされた人だけ（NT-2）。DM の中のメンションは DM として 1 つだけ送る（5 章の 7）
+	private void sent(long me, Conversation conversation, Message message, MessageView view, Set<Long> mentioned) {
+		boolean dm = conversation.getType() == Conversation.Type.DM;
+		Set<Long> changed = new HashSet<>(mentioned);
+		if (dm || !message.isReply()) {
+			this.conversationMembers.findUserIds(conversation.getId())
+				.stream()
+				.filter((id) -> dm || id != me)
+				.forEach(changed::add);
+		}
+		this.countNotices.changed(conversation, changed);
+		if (dm) {
+			notifyUser(conversation.partnerOf(me), RealtimeEvent.NotifyKind.DM, conversation, view);
+			return;
+		}
+		mentioned.forEach((id) -> notifyUser(id, RealtimeEvent.NotifyKind.MENTION, conversation, view));
+	}
+
+	// ブラウザの通知の元（notify）。会話の名前はチャンネルなら「#名前」、DM なら「DM」（NT-7）
+	private void notifyUser(long userId, RealtimeEvent.NotifyKind kind, Conversation conversation, MessageView view) {
+		String name = (conversation.getType() == Conversation.Type.DM) ? "DM" : "#" + conversation.getName();
+		this.notifier.toUser(userId, RealtimeEvent.Type.NOTIFY, conversation.getWorkspaceId(), conversation.getId(),
+				new RealtimeEvent.Notify(kind, view.forEveryone(), name));
 	}
 
 	// 同じ clientId で前に送ったもの。同じ送信のやり直しなので、それを返す（その後で「削除されました」にしていれば、その状態で返す）。
@@ -383,9 +497,17 @@ class MessageService {
 			throw new ApiException(ErrorCode.MESSAGE_EMPTY, "body");
 		}
 		message.edit(body, this.clock.instant());
-		this.mentions.update(me, conversation, messageId, body);
+		Mentions.Change change = this.mentions.update(me, conversation, messageId, body);
 		MessageView view = view(me, conversation, message);
 		notify(RealtimeEvent.Type.MESSAGE_UPDATED, conversation, view.forEveryone());
+		// メンションを足した人・消した人の件数を変え、足した人にだけ知らせる（MN-6）。
+		// DM は送ったときに相手へ DM として知らせているので、もう知らせない（FN-14 5 章の 7）
+		Set<Long> changed = new HashSet<>(change.added());
+		changed.addAll(change.removed());
+		this.countNotices.changed(conversation, changed);
+		if (conversation.getType() != Conversation.Type.DM) {
+			change.added().forEach((id) -> notifyUser(id, RealtimeEvent.NotifyKind.MENTION, conversation, view));
+		}
 		return view;
 	}
 
@@ -406,6 +528,7 @@ class MessageService {
 		if (message.getUserId() != me && !isOwner(me, conversation)) {
 			throw new ApiException(ErrorCode.FORBIDDEN);
 		}
+		Set<Long> changed = affectedByDeletion(conversation, message);
 		this.attachments.removeAllOf(messageId);
 		if (message.getReplyCount() > 0) {
 			this.reactions.removeAllOf(messageId);
@@ -413,16 +536,30 @@ class MessageService {
 			message.markDeleted(this.clock.instant());
 			MessageView view = view(me, conversation, message);
 			notify(RealtimeEvent.Type.MESSAGE_UPDATED, conversation, view.forEveryone());
+			this.countNotices.changed(conversation, changed);
 			return Optional.of(view);
 		}
 		this.messages.delete(message);
 		this.messages.flush();
 		notify(RealtimeEvent.Type.MESSAGE_DELETED, conversation,
 				new RealtimeEvent.MessageDeleted(message.getId(), message.getParentId()));
+		this.countNotices.changed(conversation, changed);
 		if (parent != null) {
 			replyRemoved(me, conversation, parent);
 		}
 		return Optional.empty();
+	}
+
+	// 消すと件数が変わるかもしれない人：メンションされている人と、親メッセージなら送った人のほかの会話のメンバー（未読から外れる）
+	private Set<Long> affectedByDeletion(Conversation conversation, Message message) {
+		Set<Long> changed = this.mentions.userIdsOf(message.getId());
+		if (!message.isReply()) {
+			this.conversationMembers.findUserIds(conversation.getId())
+				.stream()
+				.filter((id) -> id != message.getUserId())
+				.forEach(changed::add);
+		}
+		return changed;
 	}
 
 	private void replyRemoved(long me, Conversation conversation, Message parent) {
@@ -540,6 +677,25 @@ class MessageService {
 
 	// メッセージの一覧の結果（FN-07 6 章）
 	record MessagePage(List<MessageView> items, boolean hasMoreBefore, boolean hasMoreAfter) {
+	}
+
+	// メンションの一覧の結果（FN-14 6 章）
+	record MentionPage(List<MentionItem> items, @Nullable String nextCursor) {
+	}
+
+	// メンションの一覧の 1 行。read は読んだか（読んでいなければ印を付ける。NT-5）
+	record MentionItem(MessageView message, MentionConversation conversation, boolean read) {
+	}
+
+	// メンションの一覧の会話。チャンネルは名前、DM は相手（FN-14 6 章）
+	record MentionConversation(long id, Conversation.Type type, @Nullable String name,
+			@Nullable UserSummary dmPartner) {
+
+		static MentionConversation of(Conversation c, long me, DirectMessages directMessages) {
+			return new MentionConversation(c.getId(), c.getType(), c.getName(),
+					(c.getType() == Conversation.Type.DM) ? directMessages.partner(c, me) : null);
+		}
+
 	}
 
 	// スレッドの返信の一覧の結果（FN-08 6 章）

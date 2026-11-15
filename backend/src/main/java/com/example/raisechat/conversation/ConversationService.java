@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -11,14 +12,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.example.raisechat.common.ApiException;
 import com.example.raisechat.common.ErrorCode;
+import com.example.raisechat.mention.Mentions;
+import com.example.raisechat.message.Message;
 import com.example.raisechat.message.MessageRepository;
+import com.example.raisechat.unread.UnreadCounts;
 import com.example.raisechat.user.UserRepository;
 import com.example.raisechat.user.UserSummaries;
 import com.example.raisechat.user.UserSummary;
 import com.example.raisechat.workspace.WorkspaceAccess;
 import com.example.raisechat.workspace.WorkspaceMember;
 
-// サイドバーの会話の一覧・会話の詳細（FN-06）と、会話を開いたときの記録（FN-14・FN-03 5 章の 4）。
+// サイドバーの会話の一覧・会話の詳細（FN-06）と、会話・スレッドを読んだときの記録（FN-14・FN-03 5 章の 4）。
 // チャンネルの作成・参加などは ChannelService、DM を始めるのは DirectMessageService
 @Service
 class ConversationService {
@@ -39,9 +43,16 @@ class ConversationService {
 
 	private final Clock clock;
 
+	private final UnreadCounts unreadCounts;
+
+	private final CountNotices countNotices;
+
+	private final Mentions mentions;
+
 	ConversationService(ConversationRepository conversations, ConversationMemberRepository members,
 			MessageRepository messages, WorkspaceAccess workspaceAccess, UserRepository users,
-			UserSummaries userSummaries, DirectMessages directMessages, Clock clock) {
+			UserSummaries userSummaries, DirectMessages directMessages, Clock clock, UnreadCounts unreadCounts,
+			CountNotices countNotices, Mentions mentions) {
 		this.conversations = conversations;
 		this.members = members;
 		this.messages = messages;
@@ -50,15 +61,22 @@ class ConversationService {
 		this.userSummaries = userSummaries;
 		this.directMessages = directMessages;
 		this.clock = clock;
+		this.unreadCounts = unreadCounts;
+		this.countNotices = countNotices;
+		this.mentions = mentions;
 	}
 
-	// サイドバーに出す会話：自分が入っているチャンネル（general が先頭、名前の順）と、DM（DM-1。最後のメッセージの新しい順）
+	// サイドバーに出す会話：自分が入っているチャンネル（general が先頭、名前の順）と、DM（DM-1。最後のメッセージの新しい順）。
+	// 未読・メンションの件数も入れる（NT-1・NT-2）
 	@Transactional(readOnly = true)
 	List<ConversationSummary> listForSidebar(long userId, long workspaceId) {
 		this.workspaceAccess.requireMember(userId, workspaceId);
 		List<ConversationSummary> list = new ArrayList<>();
-		this.conversations.findJoinedChannels(userId, workspaceId)
-			.forEach((c) -> list.add(ConversationSummary.of(c, true)));
+		List<Conversation> channels = this.conversations.findJoinedChannels(userId, workspaceId);
+		Map<Long, UnreadCounts.Counts> counts = this.unreadCounts.ofConversations(userId,
+				channels.stream().map(Conversation::getId).toList());
+		channels.forEach((c) -> list
+			.add(ConversationSummary.of(c, true).withCounts(counts.getOrDefault(c.getId(), UnreadCounts.Counts.NONE))));
 		list.addAll(this.directMessages.summaries(this.conversations.findSidebarDms(userId, workspaceId), userId));
 		return list;
 	}
@@ -71,17 +89,22 @@ class ConversationService {
 		UserSummary createdBy = this.userSummaries.of(this.users.findById(conversation.getCreatedBy()).orElseThrow(),
 				now);
 		long memberCount = this.members.countByConversationId(conversationId);
+		Long lastRead = this.members.findById(new ConversationMember.Key(conversationId, userId))
+			.map(ConversationMember::getLastReadMessageId)
+			.orElse(null);
 		if (conversation.getType() == Conversation.Type.DM) {
 			return ConversationDetail.of(this.directMessages.summary(conversation, userId), conversation, memberCount,
-					createdBy);
+					createdBy, lastRead);
 		}
-		boolean joined = this.members.existsById(new ConversationMember.Key(conversationId, userId));
-		return ConversationDetail.of(conversation, joined, memberCount, createdBy);
+		ConversationSummary summary = ConversationSummary.of(conversation, lastRead != null)
+			.withCounts(this.unreadCounts.ofConversation(userId, conversationId));
+		return ConversationDetail.of(summary, conversation, memberCount, createdBy, lastRead);
 	}
 
-	// 会話を開いた・読んだ（FN-14 6 章の read）。最後に読んだメッセージを進め、最後に開いた会話（W-4）を記録する。
+	// 会話を開いた・読んだ（FN-14 6 章の read）。最後に読んだメッセージを進め、そこまでの親メッセージの中の自分あての
+	// メンションを読んだことにし（BR-15）、最後に開いた会話（W-4）を記録する。
 	// lastMessageId はその会話の親メッセージの ID（FN-14 4 章）。メッセージがまだない会話では 0。
-	// メンションを読んだことにするのは、メンション・通知（開発計画書 1-14・1-15）で足す
+	// ほかのタブ・ブラウザの表示を消すため、自分に件数を送る（NT-6）
 	@Transactional
 	void read(long userId, long conversationId, @Nullable Long lastMessageId) {
 		if (lastMessageId == null || lastMessageId < 0) {
@@ -93,9 +116,23 @@ class ConversationService {
 				throw new ApiException(ErrorCode.BAD_REQUEST, "lastMessageId");
 			}
 			this.members.advanceLastRead(conversationId, userId, lastMessageId);
+			this.mentions.markReadInConversation(userId, conversationId, lastMessageId);
 		}
 		WorkspaceMember member = this.workspaceAccess.requireMember(userId, conversation.getWorkspaceId());
 		member.openConversation(conversationId);
+		this.countNotices.changed(conversation, List.of(userId));
+	}
+
+	// スレッドを開いた（FN-14 6 章の thread-read）：そのスレッドの返信の中の自分あてのメンションを読んだことにする（BR-15）
+	@Transactional
+	void readThread(long userId, long parentId) {
+		Message parent = this.messages.findById(parentId)
+			.filter((m) -> m.getParentId() == null)
+			.orElseThrow(() -> new ApiException(ErrorCode.MESSAGE_NOT_FOUND));
+		Conversation conversation = this.conversations.findVisible(userId, parent.getConversationId())
+			.orElseThrow(() -> new ApiException(ErrorCode.MESSAGE_NOT_FOUND));
+		this.mentions.markReadInThread(userId, parentId);
+		this.countNotices.changed(conversation, List.of(userId));
 	}
 
 	private Conversation requireVisible(long userId, long conversationId) {

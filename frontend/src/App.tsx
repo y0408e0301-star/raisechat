@@ -4,6 +4,7 @@ import { AuthProvider } from './auth/AuthProvider'
 import { GuestOnly, RequireAuth } from './auth/guards'
 import Layout from './components/Layout'
 import { ToastProvider } from './components/ToastProvider'
+import BrowserNotifier from './notifications/BrowserNotifier'
 import { RealtimeProvider } from './realtime/RealtimeProvider'
 import InvitePage from './pages/InvitePage'
 import LoginPage from './pages/LoginPage'
@@ -14,17 +15,20 @@ import ChannelsPage from './workspace/ChannelsPage'
 import ConversationPage from './workspace/ConversationPage'
 import InvitesPage from './workspace/InvitesPage'
 import MembersPage from './workspace/MembersPage'
+import MentionsPage from './workspace/MentionsPage'
 import WorkspaceHome from './workspace/WorkspaceHome'
 import WorkspaceLayout from './workspace/WorkspaceLayout'
 
 // 画面と URL（画面一覧 1 章）。BrowserRouter（テストでは MemoryRouter）の中で使う。
-// G-6・G-7 は、それぞれの機能を作るときに足す（開発計画書 3 章）
+// G-6 は、メッセージ検索を作るときに足す（開発計画書 3 章）
 export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
         {/* ログインしている間、WebSocket でつなぐ（機能定義書 4 章） */}
         <RealtimeProvider>
+          {/* メンション・DM のブラウザの通知（FN-14 NT-7） */}
+          <BrowserNotifier />
           <Routes>
             <Route element={<GuestOnly />}>
               <Route path="/login" element={<LoginPage />} />
@@ -43,6 +47,7 @@ export default function App() {
                 <Route index element={<WorkspaceHome />} />
                 <Route path="c/:conversationId" element={<ConversationPage />} />
                 <Route path="d/:conversationId" element={<ConversationPage />} />
+                <Route path="mentions" element={<MentionsPage />} />
                 <Route path="channels" element={<ChannelsPage />} />
                 <Route path="members" element={<MembersPage />} />
                 <Route path="invites" element={<InvitesPage />} />

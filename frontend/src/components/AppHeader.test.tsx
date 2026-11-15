@@ -9,11 +9,11 @@ import AppHeader from './AppHeader'
 
 // ヘッダー（画面設計書 2.6）。簡単なヘッダー（G-3・G-10）とワークスペース用のヘッダー（G-5 など）
 
-function renderHeader(workspace?: { id: number, name: string }, signOut = vi.fn(async () => {})) {
+function renderHeader(workspace?: { id: number, name: string, mentionCount?: number }, signOut = vi.fn(async () => {})) {
   render(
     <MemoryRouter>
       <AuthContext value={{ me, signedIn: vi.fn(), signOut }}>
-        <AppHeader workspace={workspace} />
+        <AppHeader workspace={workspace && { mentionCount: 0, ...workspace }} />
       </AuthContext>
     </MemoryRouter>,
   )
@@ -30,6 +30,13 @@ describe('AppHeader', () => {
   it('W-9：ワークスペース用のヘッダーには名前を出し、押すと G-5（最後に開いた会話）', () => {
     renderHeader({ id: 3, name: '仲間うち' })
     expect(screen.getByRole('link', { name: '仲間うち' })).toHaveAttribute('href', '/w/3')
+  })
+
+  it('ワークスペース用のヘッダーには「@」と読んでいないメンションの件数を出し、押すと G-7（NT-2・NT-5）', () => {
+    renderHeader({ id: 3, name: '仲間うち', mentionCount: 120 })
+    const link = screen.getByRole('link', { name: 'メンション 120 件' })
+    expect(link).toHaveAttribute('href', '/w/3/mentions')
+    expect(link).toHaveTextContent('99+')
   })
 
   it('ワークスペースの名前は 20 文字を超えたら「…」で省く（絵文字も 1 文字）', () => {

@@ -24,3 +24,8 @@
   padding: 2px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg);
   font-size: 13px; font-weight: bold; color: var(--text);
 }
+
+/* 「新着」の線（画面設計書 2.9、MS-1）。新着の線の色の線と右端に「新着」 */
+.newLine { display: flex; align-items: center; gap: 4px; margin: 8px 16px; }
+.newRule { flex: 1; margin: 0; border: none; border-top: 1px solid var(--danger); }
+.newLine span { color: var(--danger); font-size: 12px; font-weight: bold; }

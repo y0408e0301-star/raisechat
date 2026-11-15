@@ -25,6 +25,8 @@ import com.example.raisechat.attachment.Attachments;
 import com.example.raisechat.conversation.Conversation;
 import com.example.raisechat.conversation.ConversationAccess;
 import com.example.raisechat.conversation.ConversationRepository;
+import com.example.raisechat.conversation.ConversationMemberRepository;
+import com.example.raisechat.conversation.CountNotices;
 import com.example.raisechat.conversation.DirectMessages;
 import com.example.raisechat.mention.Mentions;
 import com.example.raisechat.reaction.Reactions;
@@ -68,6 +70,12 @@ class MessageServiceTests {
 	DirectMessages directMessages;
 
 	@Mock
+	CountNotices countNotices;
+
+	@Mock
+	ConversationMemberRepository conversationMembers;
+
+	@Mock
 	Reactions reactions;
 
 	@Mock
@@ -79,7 +87,8 @@ class MessageServiceTests {
 	void setUp() {
 		this.service = new MessageService(this.messages, this.conversations, this.access, this.attachments,
 				this.workspaceAccess, this.users, TestEntities.userSummaries(), TestEntities.fixedClock(),
-				TestEntities.immediateTransaction(), this.notifier, this.directMessages, this.reactions, this.mentions);
+				TestEntities.immediateTransaction(), this.notifier, this.countNotices, this.conversationMembers,
+				this.directMessages, this.reactions, this.mentions);
 		when(this.access.requireVisible(TARO, CONVERSATION))
 			.thenReturn(TestEntities.withId(Conversation.general(3, TARO, TestEntities.NOW), CONVERSATION));
 	}

@@ -255,7 +255,7 @@ export interface paths {
         };
         /**
          * 会話のメッセージの一覧
-         * @description 親メッセージ（スレッドの返信でないもの）を古い順に返す。before（その ID より前）・after（その ID より後）のどちらか、またはなし（最新）。limit は 1〜50（指定がなければ 50）。around はメッセージの位置を開く（1-15）で足す
+         * @description 親メッセージ（スレッドの返信でないもの）を古い順に返す。before（その ID より前）・after（その ID より後）・around（そのメッセージと前後 25 件ずつ。スレッドの返信ならその親の前後。MS-14）のどれか、またはなし（最新）。limit は 1〜50（指定がなければ 50。around とは一緒に使えない）
          */
         get: operations["list_3"];
         put?: never;
@@ -468,6 +468,26 @@ export interface paths {
          * @description 送り方・clientId・添付は会話への送信と同じ。返信への返信は 400 CANNOT_REPLY_TO_REPLY
          */
         post: operations["reply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{parentId}/thread-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * スレッドを読んだ（FN-14）
+         * @description そのスレッドの返信の中の、自分あてのメンションを読んだことにする
+         */
+        post: operations["readThread"];
         delete?: never;
         options?: never;
         head?: never;
@@ -734,6 +754,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workspaces/{workspaceId}/mentions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 自分あてのメンションの一覧（FN-14）
+         * @description そのワークスペースのいま見られる会話のものを、新しい順に 20 件ずつ。cursor は前回の nextCursor
+         */
+        get: operations["mentions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -784,6 +824,8 @@ export interface components {
             /** Format: int64 */
             id: number;
             joined: boolean;
+            /** Format: int64 */
+            lastReadMessageId: number | null;
             /** Format: int64 */
             memberCount: number;
             /** Format: int32 */
@@ -909,6 +951,23 @@ export interface components {
         MentionCandidate: {
             member: boolean;
             user: components["schemas"]["UserSummary"];
+        };
+        MentionConversation: {
+            dmPartner: components["schemas"]["UserSummary"] | null;
+            /** Format: int64 */
+            id: number;
+            name: string | null;
+            /** @enum {string} */
+            type: "CHANNEL" | "DM";
+        };
+        MentionItem: {
+            conversation: components["schemas"]["MentionConversation"];
+            message: components["schemas"]["MessageView"];
+            read: boolean;
+        };
+        MentionPage: {
+            items: components["schemas"]["MentionItem"][];
+            nextCursor: string | null;
         };
         MessagePage: {
             hasMoreAfter: boolean;
@@ -1643,6 +1702,7 @@ export interface operations {
             query?: {
                 before?: number;
                 after?: number;
+                around?: number;
                 limit?: number;
             };
             header?: never;
@@ -2358,6 +2418,44 @@ export interface operations {
             };
         };
     };
+    readThread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                parentId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 記録した */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     cancel: {
         parameters: {
             query?: never;
@@ -3030,6 +3128,48 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 思いがけない失敗 */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    mentions: {
+        parameters: {
+            query?: {
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                workspaceId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentionPage"];
+                };
             };
             /** @description 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧） */
             "4XX": {

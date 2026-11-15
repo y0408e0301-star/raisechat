@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
-  ApiError, conversationUrl, fetchConversation, fetchMessage, fetchMessages, joinChannel, markRead, sendMessage,
-  type AttachmentView, type ConversationDetail, type MessageView,
+  ApiError, conversationUrl, fetchConversation, fetchMessage, fetchMessages, fetchMessagesAround, fetchNewerMessages,
+  joinChannel, markRead, sendMessage, type AttachmentView, type ConversationDetail, type Me, type MessageView,
 } from '../api'
 import attachmentStyles from '../attachments/Attachments.module.css'
 import { useUploads } from '../attachments/uploads'
@@ -15,6 +15,7 @@ import { loadDraft, saveDraft } from '../drafts'
 import { M, M28, M36 } from '../messages'
 import type { RealtimeEvent } from '../realtime/events'
 import { useRealtime } from '../realtime/RealtimeContext'
+import { usePageVisible } from '../visibility'
 import ChannelDetailsDialog from './ChannelDetailsDialog'
 import Composer from './Composer'
 import styles from './ConversationPage.module.css'
@@ -26,18 +27,44 @@ import ThreadPanel from './ThreadPanel'
 import { useWorkspace } from './WorkspaceContext'
 
 // G-5 の会話（画面設計書 7.1）。会話を切り替えたら読み込み直すよう、ID ごとに作り直す。
-// 開いている間はその会話の通知を購読し、ほかの人の送信・編集・削除を開き直さずに出す（MS-5、機能定義書 4.2）
+// 開いている間はその会話の通知を購読し、ほかの人の送信・編集・削除を開き直さずに出す（MS-5、機能定義書 4.2）。
+// 画面が見えている間は、読み込んだ最後のメッセージまで読んだことにする（FN-14 NT-4）。
+// ?message={ID} で開いたときは、そのメッセージの前後を読み込んで目立たせ、URL から外す（MS-14）
 export default function ConversationPage() {
   const { conversationId } = useParams()
   return <ConversationView key={conversationId} conversationId={Number(conversationId)} />
 }
 
-type Loaded = { conversation: ConversationDetail, items: MessageView[], hasMoreBefore: boolean }
+type Loaded = {
+  conversation: ConversationDetail
+  items: MessageView[]
+  hasMoreBefore: boolean
+  // 後ろにまだ読んでいないメッセージがある（メッセージの位置を開いたとき。MS-14）
+  hasMoreAfter: boolean
+  // 「新着」の線を上に出すメッセージ（開いたときの最初の未読。MS-1）
+  newSince: number | null
+  // 目立たせるメッセージ（MS-14）と、あわせて開くスレッド（スレッドの返信を開いたとき）
+  highlightId: number | null
+  threadOf: number | null
+}
 
 type Pending = Extract<Entry, { kind: 'pending' }>
 
 // 読み込んだメッセージの最後のもの（既読の位置。メッセージがなければ 0）
 const lastId = (items: MessageView[]) => items.at(-1)?.id ?? 0
+
+// 最初の未読（最後に読んだものより後で、ほかの人が送り、削除されていないもの。FN-14 5 章の 1）。
+// 会話のメンバーでなければ（lastReadMessageId が null）出さない
+function firstUnread(items: MessageView[], lastRead: number | null | undefined, me: Me | null | undefined) {
+  if (lastRead === null || lastRead === undefined) return null
+  return items.find((m) => m.id > lastRead && !m.deleted && m.author.username !== me?.username)?.id ?? null
+}
+
+// URL の ?message= の ID。なければ null
+function messageParam(value: string | null): number | null {
+  const id = Number(value)
+  return value !== null && Number.isSafeInteger(id) && id > 0 ? id : null
+}
 
 function ConversationView({ conversationId }: { conversationId: number }) {
   const { workspace, showSidebar, upsertConversation, removeConversation } = useWorkspace()
@@ -49,6 +76,7 @@ function ConversationView({ conversationId }: { conversationId: number }) {
   const [loaded, setLoaded] = useState<Loaded | 'failed' | 'notFound' | undefined>(undefined)
   const [pending, setPending] = useState<Pending[]>([])
   const [loadingOlder, setLoadingOlder] = useState(false)
+  const [loadingNewer, setLoadingNewer] = useState(false)
   const [olderFailed, setOlderFailed] = useState(false)
   const [deleting, setDeleting] = useState<MessageView | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -65,6 +93,7 @@ function ConversationView({ conversationId }: { conversationId: number }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const threadParam = Number(searchParams.get('thread'))
   const threadId = Number.isInteger(threadParam) && threadParam > 0 ? threadParam : null
+  const openingMessage = messageParam(searchParams.get('message'))
   const openThread = useCallback((messageId: number) => {
     setSearchParams((params) => {
       params.set('thread', String(messageId))
@@ -83,41 +112,83 @@ function ConversationView({ conversationId }: { conversationId: number }) {
     saveDraft(conversationId, text)
   }, [conversationId])
 
-  const load = useCallback(async (): Promise<Loaded | 'failed' | 'notFound'> => {
+  // 最新の 50 件か、around（そのメッセージの前後。MS-14）を読む。around のメッセージがもうなければ最新を読む。
+  // スレッドの返信を開いたときは、その親を目立たせてスレッドも開く（FN-07 6 章）
+  const load = useCallback(async (around: number | null = null): Promise<Loaded | 'failed' | 'notFound'> => {
     try {
-      const [conversation, page] = await Promise.all([fetchConversation(conversationId), fetchMessages(conversationId)])
+      const latest = () => fetchMessages(conversationId)
+      const [conversation, page] = await Promise.all([fetchConversation(conversationId), around === null
+        ? latest()
+        : fetchMessagesAround(conversationId, around).catch((e: unknown) => {
+          if (e instanceof ApiError && e.status === 404) return latest()
+          throw e
+        })])
       // ほかのワークスペースの会話の ID を URL に入れられても、このワークスペースの中では見られないものとして扱う
       if (conversation.workspaceId !== workspace.id) return 'notFound'
-      return { conversation, items: page.items, hasMoreBefore: page.hasMoreBefore }
+      let highlightId: number | null = null
+      let threadOf: number | null = null
+      if (around !== null && page.items.some((m) => m.id === around)) {
+        highlightId = around
+      } else if (around !== null) {
+        const parentId = await fetchMessage(around).then((m) => m.parentId, () => null)
+        if (parentId !== null && page.items.some((m) => m.id === parentId)) {
+          highlightId = parentId
+          threadOf = parentId
+        }
+      }
+      return {
+        conversation, items: page.items, hasMoreBefore: page.hasMoreBefore, hasMoreAfter: page.hasMoreAfter,
+        newSince: firstUnread(page.items, conversation.lastReadMessageId, me), highlightId, threadOf,
+      }
     } catch (e) {
       return e instanceof ApiError && e.status === 404 ? 'notFound' : 'failed'
     }
-  }, [conversationId, workspace.id])
+  }, [conversationId, workspace.id, me])
 
   const show = useCallback((result: Loaded | 'failed' | 'notFound') => {
     setLoaded(result)
     // 見られない会話は M-27 を出して general を開く（画面設計書 7.1）
     if (result === 'notFound') toast(M[27])
-    // 開いた会話と、読んだところを記録する（W-4、FN-14）
-    if (typeof result === 'object') markRead(conversationId, lastId(result.items)).catch(() => {})
-  }, [conversationId, toast])
+  }, [toast])
 
+  // 開いたとき、または ?message= が付いたとき（開いている会話の通知を押したときなど）に読み込む。
+  // ?message= は読み込んだら URL から外す。外しただけでは読み直さない
+  const opened = useRef(false)
   useEffect(() => {
-    let active = true
-    async function first() {
-      const result = await load()
-      if (active) show(result)
+    if (opened.current && openingMessage === null) return
+    opened.current = true
+    async function open() {
+      const result = await load(openingMessage)
+      show(result)
+      if (openingMessage === null) return
+      setSearchParams((params) => {
+        params.delete('message')
+        if (typeof result === 'object' && result.threadOf !== null) params.set('thread', String(result.threadOf))
+        return params
+      }, { replace: true })
     }
-    void first()
-    return () => {
-      active = false
-    }
-  }, [load, show])
+    void open()
+  }, [load, show, openingMessage, setSearchParams])
 
   async function reload() {
     setLoaded(undefined)
     show(await load())
   }
+
+  // 見えている間は、読み込んだ最後のメッセージまで読んだことにする。開いた会話も記録する（NT-4、W-4）。
+  // 届いた・送った・タブが前に来たときにも記録する（TC-14-4）
+  const visible = usePageVisible()
+  const readUpTo = typeof loaded === 'object' ? lastId(loaded.items) : null
+  useEffect(() => {
+    if (!visible || readUpTo === null) return
+    markRead(conversationId, readUpTo).catch(() => {})
+  }, [visible, readUpTo, conversationId])
+
+  // 後ろにまだ読んでいないメッセージがある間は、届いたメッセージを足さない（間が抜けるため。下へ読み進めると出る）
+  const hasMoreAfter = useRef(false)
+  useEffect(() => {
+    hasMoreAfter.current = typeof loaded === 'object' && loaded.hasMoreAfter
+  }, [loaded])
 
   const updateItems = useCallback((change: (items: MessageView[]) => MessageView[]) => {
     setLoaded((current) => (typeof current === 'object' ? { ...current, items: change(current.items) } : current))
@@ -133,6 +204,7 @@ function ConversationView({ conversationId }: { conversationId: number }) {
     return subscribeConversation(conversationId, (event: RealtimeEvent) => {
       if (event.conversationId !== conversationId) return
       setPending((list) => settlePending(list, event, viewer))
+      if (event.type === 'message.created' && hasMoreAfter.current) return
       updateItems((items) => applyEvent(items, event, viewer))
     })
   }, [subscribeConversation, conversationId, viewer, updateItems])
@@ -165,7 +237,8 @@ function ConversationView({ conversationId }: { conversationId: number }) {
     const result = await load()
     if (result === 'failed') return
     if (result === 'notFound') show(result)
-    else setLoaded(result)
+    // 「新着」の線は開き直すまで残す
+    else setLoaded((current) => (typeof current === 'object' ? { ...result, newSince: current.newSince } : result))
   }), [onReconnect, load, show])
 
   // 送る。返ってきたら「送信中」を普通の表示に替える。同じメッセージを 2 つ出さないよう ID で見分ける（FN-07 5 章の 7）
@@ -173,13 +246,20 @@ function ConversationView({ conversationId }: { conversationId: number }) {
     try {
       const sent = await sendMessage(conversationId, body, clientId, attachments.map((a) => a.id))
       setPending((list) => list.filter((p) => p.clientId !== clientId))
-      updateItems((items) => addMessage(items, sent))
-      markRead(conversationId, sent.id).catch(() => {})
+      if (!hasMoreAfter.current) {
+        updateItems((items) => addMessage(items, sent))
+        return
+      }
+      // メッセージの位置を開いて上の方を見ていたときは、送ったものが見えるよう最新を読み直す
+      const latest = await load()
+      if (typeof latest === 'object') {
+        setLoaded((current) => (typeof current === 'object' ? { ...latest, newSince: current.newSince } : latest))
+      }
     } catch {
       // 送れなかったものは一覧に残し、M-34 と「もう一度送る」「取り消す」を出す（MS-13）
       setPending((list) => list.map((p) => (p.clientId === clientId ? { ...p, failed: true } : p)))
     }
-  }, [conversationId, updateItems])
+  }, [conversationId, updateItems, load])
 
   function send(body: string, attachments: AttachmentView[]) {
     if (!me) return
@@ -272,6 +352,23 @@ function ConversationView({ conversationId }: { conversationId: number }) {
     }
   }
 
+  // メッセージの位置を開いた後で下まで来たら、後ろを読み込む（MS-14）
+  async function loadNewer() {
+    if (typeof loaded !== 'object' || !loaded.hasMoreAfter || loadingNewer) return
+    setLoadingNewer(true)
+    try {
+      const page = await fetchNewerMessages(conversationId, lastId(loaded.items))
+      setLoaded((current) => (typeof current === 'object'
+        ? { ...current, items: [...current.items, ...page.items.filter((m) => m.id > lastId(current.items))],
+            hasMoreAfter: page.hasMoreAfter }
+        : current))
+    } catch {
+      toast(M[48])
+    } finally {
+      setLoadingNewer(false)
+    }
+  }
+
   if (loaded === 'notFound') {
     // general も見られないとき（ワークスペースから外されたなど）は G-3 に戻す
     const general = workspace.generalConversationId
@@ -349,8 +446,10 @@ function ConversationView({ conversationId }: { conversationId: number }) {
               <button type="button" className={ui.secondary} onClick={loadOlder}>再読み込み</button>
             </div>
           )}
-          <MessageList conversation={loaded.conversation} entries={entries} hasMoreBefore={loaded.hasMoreBefore}
-            loadingOlder={loadingOlder} onLoadOlder={loadOlder} onDelete={setDeleting}
+          <MessageList key={loaded.highlightId ?? 'latest'} conversation={loaded.conversation} entries={entries}
+            hasMoreBefore={loaded.hasMoreBefore} loadingOlder={loadingOlder} onLoadOlder={loadOlder}
+            hasMoreAfter={loaded.hasMoreAfter} loadingNewer={loadingNewer} onLoadNewer={loadNewer}
+            newSince={loaded.newSince} highlightId={loaded.highlightId} onDelete={setDeleting}
             onEdited={(edited) => updateItems((items) => items.map((m) => (m.id === edited.id ? edited : m)))}
             onGone={(id) => updateItems((items) => items.filter((m) => m.id !== id))}
             onRetry={retry} onCancel={cancel} onExpired={refreshMessage} onOpenThread={openThread}

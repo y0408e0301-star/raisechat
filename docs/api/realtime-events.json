@@ -28,6 +28,35 @@
   },
   "sentAt" : "2026-11-10T01:02:00Z"
 }, {
+  "type" : "conversation.updated",
+  "workspaceId" : 1,
+  "conversationId" : 1,
+  "payload" : {
+    "id" : 1,
+    "workspaceId" : 1,
+    "type" : "CHANNEL",
+    "name" : "general",
+    "visibility" : "PUBLIC",
+    "general" : true,
+    "dmPartner" : null,
+    "joined" : true,
+    "hasUnread" : true,
+    "unreadCount" : 1,
+    "mentionCount" : 0,
+    "canPost" : true
+  },
+  "sentAt" : "2026-11-10T01:02:00Z"
+}, {
+  "type" : "workspace.updated",
+  "workspaceId" : 1,
+  "conversationId" : null,
+  "payload" : {
+    "workspaceId" : 1,
+    "hasUnread" : true,
+    "mentionCount" : 0
+  },
+  "sentAt" : "2026-11-10T01:02:00Z"
+}, {
   "type" : "reaction.updated",
   "workspaceId" : 1,
   "conversationId" : 1,
@@ -88,6 +117,42 @@
   "payload" : {
     "id" : 1,
     "parentId" : null
+  },
+  "sentAt" : "2026-11-10T01:03:00Z"
+}, {
+  "type" : "notify",
+  "workspaceId" : 1,
+  "conversationId" : 1,
+  "payload" : {
+    "kind" : "MENTION",
+    "message" : {
+      "id" : 2,
+      "conversationId" : 1,
+      "parentId" : null,
+      "author" : {
+        "username" : "taro_y",
+        "displayName" : "taro_yの名前",
+        "avatarUrl" : null,
+        "statusEmoji" : null,
+        "statusText" : null
+      },
+      "body" : "@hanako 見て",
+      "mentions" : [ {
+        "username" : "hanako",
+        "displayName" : "hanakoの名前"
+      } ],
+      "attachments" : [ ],
+      "reactions" : [ ],
+      "replyCount" : 0,
+      "lastReplyAt" : null,
+      "replyUsers" : [ ],
+      "createdAt" : "2026-11-10T01:03:00Z",
+      "editedAt" : null,
+      "deleted" : false,
+      "mine" : false,
+      "canDelete" : false
+    },
+    "conversationName" : "#general"
   },
   "sentAt" : "2026-11-10T01:03:00Z"
 }, {

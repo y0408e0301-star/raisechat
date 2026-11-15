@@ -287,6 +287,9 @@ class WebSocketApiTests {
 
 		long id = send(this.taro, "土曜の集合は駅前で");
 		String created = hanakoClient.next();
+		// TC-14-1：会話のほかのメンバーに、未読の件数とワークスペースの合計が届く（FN-14 6 章）
+		JsonNode unreadJson = JSON.readTree(hanakoClient.next());
+		JsonNode workspaceJson = JSON.readTree(hanakoClient.next());
 		// TC-10-3：リアクションを付けると、そのメッセージのリアクション全体が届く（FN-10 5 章の 3・4）
 		assertThat(put(this.mvc, this.hanako, "/api/messages/%d/reactions/%s".formatted(id, THUMBS_UP))).hasStatusOk();
 		String reacted = hanakoClient.next();
@@ -295,6 +298,9 @@ class WebSocketApiTests {
 		String updated = hanakoClient.next();
 		assertThat(delete(this.mvc, this.taro, "/api/messages/" + id)).hasStatus(HttpStatus.NO_CONTENT);
 		String deleted = hanakoClient.next();
+		// 消したメッセージは未読から外れる
+		JsonNode unreadAfterDelete = JSON.readTree(hanakoClient.next());
+		assertThat(JSON.readTree(hanakoClient.next()).path("type").asString()).isEqualTo("workspace.updated");
 
 		JsonNode createdJson = JSON.readTree(created);
 		assertThat(createdJson.path("type").asString()).isEqualTo("message.created");
@@ -307,6 +313,17 @@ class WebSocketApiTests {
 		assertThat(createdJson.path("payload").path("mine").asBoolean()).isFalse();
 		assertThat(createdJson.path("payload").path("canDelete").asBoolean()).isFalse();
 		assertThat(createdJson.path("sentAt").asString()).isEqualTo("2026-11-10T01:02:00Z");
+
+		assertThat(unreadJson.path("type").asString()).isEqualTo("conversation.updated");
+		assertThat(unreadJson.path("conversationId").asLong()).isEqualTo(this.general);
+		assertThat(unreadJson.path("payload").path("hasUnread").asBoolean()).isTrue();
+		assertThat(unreadJson.path("payload").path("unreadCount").asInt()).isEqualTo(1);
+		assertThat(workspaceJson.path("type").asString()).isEqualTo("workspace.updated");
+		assertThat(workspaceJson.path("conversationId").isNull()).isTrue();
+		assertThat(workspaceJson.path("payload").path("workspaceId").asLong()).isEqualTo(this.workspace);
+		assertThat(workspaceJson.path("payload").path("hasUnread").asBoolean()).isTrue();
+		assertThat(workspaceJson.path("payload").path("mentionCount").asInt()).isZero();
+		assertThat(unreadAfterDelete.path("payload").path("unreadCount").asInt()).isZero();
 
 		JsonNode reactedJson = JSON.readTree(reacted);
 		assertThat(reactedJson.path("type").asString()).isEqualTo("reaction.updated");
@@ -332,6 +349,18 @@ class WebSocketApiTests {
 		// 自分の操作の通知も、自分の画面に届く（4.3）
 		assertThat(taroClient.next()).isEqualTo(created);
 
+		// TC-14-9：メンションされると、件数とブラウザの通知の元（notify）が届く（FN-11 MN-5、FN-14 NT-7）
+		long mentioned = send(this.taro, "@hanako 見て");
+		assertThat(JSON.readTree(hanakoClient.next()).path("type").asString()).isEqualTo("message.created");
+		assertThat(JSON.readTree(hanakoClient.next()).path("payload").path("mentionCount").asInt()).isEqualTo(1);
+		assertThat(JSON.readTree(hanakoClient.next()).path("payload").path("mentionCount").asInt()).isEqualTo(1);
+		JsonNode notifyJson = JSON.readTree(hanakoClient.next());
+		assertThat(notifyJson.path("type").asString()).isEqualTo("notify");
+		assertThat(notifyJson.path("conversationId").asLong()).isEqualTo(this.general);
+		assertThat(notifyJson.path("payload").path("kind").asString()).isEqualTo("MENTION");
+		assertThat(notifyJson.path("payload").path("conversationName").asString()).isEqualTo("#general");
+		assertThat(notifyJson.path("payload").path("message").path("id").asLong()).isEqualTo(mentioned);
+
 		// 招待されると本人に conversation.updated、退出すると conversation.removed（FN-06）
 		long secret = createChannel(this.taro, "運営", "PRIVATE");
 		assertThat(post(this.mvc, this.taro, "/api/conversations/%d/members".formatted(secret),
@@ -348,6 +377,8 @@ class WebSocketApiTests {
 		assertThat(removedJson.path("type").asString()).isEqualTo("conversation.removed");
 		assertThat(removedJson.path("payload").path("conversationId").asLong()).isEqualTo(secret);
 		assertThat(removedJson.path("payload").path("reason").asString()).isEqualTo("LEFT");
+		// 抜けたチャンネルを数えない合計も届く（NT-11）
+		assertThat(JSON.readTree(hanakoClient.next()).path("type").asString()).isEqualTo("workspace.updated");
 
 		// キックされると本人に workspace.removed（FN-05）
 		assertThat(delete(this.mvc, this.taro, "/api/workspaces/%d/members/hanako".formatted(this.workspace)))
@@ -359,7 +390,8 @@ class WebSocketApiTests {
 		assertThat(kickedJson.path("payload").path("name").asString()).isEqualTo("仲間うち");
 		assertThat(kickedJson.path("payload").path("reason").asString()).isEqualTo("KICKED");
 
-		writeSamples(List.of(createdJson, reactedJson, updatedJson, deletedJson, joinedJson, removedJson, kickedJson));
+		writeSamples(List.of(createdJson, unreadJson, workspaceJson, reactedJson, updatedJson, deletedJson, notifyJson,
+				joinedJson, removedJson, kickedJson));
 	}
 
 	private long createChannel(Cookie user, String name, String visibility) {
@@ -537,8 +569,18 @@ class WebSocketApiTests {
 		assertThat(toHanako.path("conversationId").asLong()).isEqualTo(dm);
 		assertThat(toHanako.path("payload").path("dmPartner").path("username").asString()).isEqualTo("taro_y");
 		assertThat(toHanako.path("payload").path("canPost").asBoolean()).isTrue();
-		assertThat(JSON.readTree(taroClient.next()).path("payload").path("dmPartner").path("username").asString())
-			.isEqualTo("hanako");
+		// DM は未読の件数を出す（NT-1）。合計と、ブラウザの通知の元（kind は DM）も届く
+		assertThat(toHanako.path("payload").path("unreadCount").asInt()).isEqualTo(1);
+		assertThat(JSON.readTree(hanakoClient.next()).path("type").asString()).isEqualTo("workspace.updated");
+		JsonNode notifyDm = JSON.readTree(hanakoClient.next());
+		assertThat(notifyDm.path("type").asString()).isEqualTo("notify");
+		assertThat(notifyDm.path("payload").path("kind").asString()).isEqualTo("DM");
+		assertThat(notifyDm.path("payload").path("conversationName").asString()).isEqualTo("DM");
+		// 送った本人のサイドバーにも出す（未読にはならない）
+		JsonNode toTaroSent = JSON.readTree(taroClient.next());
+		assertThat(toTaroSent.path("payload").path("dmPartner").path("username").asString()).isEqualTo("hanako");
+		assertThat(toTaroSent.path("payload").path("unreadCount").asInt()).isZero();
+		assertThat(JSON.readTree(taroClient.next()).path("type").asString()).isEqualTo("workspace.updated");
 		// ほかの人には届かない
 		assertThat(jiroClient.nothingWithin(500)).isTrue();
 
@@ -622,7 +664,8 @@ class WebSocketApiTests {
 
 		this.revoker.revoke(userId(this.jdbc, "hanako"), this.general);
 		awaitSubscribers(topic(this.general), 0);
-		send(this.taro, "抜けた後");
+		this.notifier.toConversation(RealtimeEvent.Type.MESSAGE_DELETED, this.workspace, this.general,
+				new RealtimeEvent.MessageDeleted(1, null));
 
 		assertThat(client.nothingWithin(500)).isTrue();
 		assertThat(client.isConnected()).isTrue();

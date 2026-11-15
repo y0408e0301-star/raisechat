@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import com.example.raisechat.message.MessageRepository;
 import com.example.raisechat.realtime.RealtimeEvent;
 import com.example.raisechat.realtime.RealtimeNotifier;
+import com.example.raisechat.unread.UnreadCounts;
 
 // 招待リンクでワークスペースに参加した人の会話（FN-04 I-5・I-8、BR-6）。
 // general に入れ、前に入っていた DM（キック・退出しても行が残る。FN-05 MB-7）とあわせて、
@@ -29,14 +30,18 @@ public class WorkspaceEntry {
 
 	private final Clock clock;
 
+	private final UnreadCounts unreadCounts;
+
 	WorkspaceEntry(ConversationRepository conversations, ConversationMemberRepository members,
-			MessageRepository messages, RealtimeNotifier notifier, DirectMessages directMessages, Clock clock) {
+			MessageRepository messages, RealtimeNotifier notifier, DirectMessages directMessages, Clock clock,
+			UnreadCounts unreadCounts) {
 		this.conversations = conversations;
 		this.members = members;
 		this.messages = messages;
 		this.notifier = notifier;
 		this.directMessages = directMessages;
 		this.clock = clock;
+		this.unreadCounts = unreadCounts;
 	}
 
 	// 呼ぶ側のトランザクションの中で使う。general の ID を返す
@@ -46,7 +51,8 @@ public class WorkspaceEntry {
 		long latest = this.messages.findLatestId(general.getId());
 		this.members.insertIfAbsent(general.getId(), userId, latest, this.clock.instant());
 		List<ConversationSummary> joined = new ArrayList<>();
-		joined.add(ConversationSummary.of(general, true));
+		joined.add(ConversationSummary.of(general, true)
+			.withCounts(this.unreadCounts.ofConversation(userId, general.getId())));
 		// サイドバーに出る DM だけ（メッセージがないものは、作った人のサイドバーにだけ出す）
 		List<Conversation> dms = this.conversations.findJoinedDms(userId, workspaceId)
 			.stream()

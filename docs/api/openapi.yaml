@@ -537,8 +537,9 @@ paths:
       - FN-11 メンション
   /api/conversations/{conversationId}/messages:
     get:
-      description: 親メッセージ（スレッドの返信でないもの）を古い順に返す。before（その ID より前）・after（その ID より後）のどちらか、またはなし（最新）。limit
-        は 1〜50（指定がなければ 50）。around はメッセージの位置を開く（1-15）で足す
+      description: 親メッセージ（スレッドの返信でないもの）を古い順に返す。before（その ID より前）・after（その ID より後）・around（そのメッセージと前後
+        25 件ずつ。スレッドの返信ならその親の前後。MS-14）のどれか、またはなし（最新）。limit は 1〜50（指定がなければ 50。around
+        とは一緒に使えない）
       operationId: list_3
       parameters:
       - in: path
@@ -555,6 +556,12 @@ paths:
           format: int64
       - in: query
         name: after
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: around
         required: false
         schema:
           type: integer
@@ -1157,6 +1164,35 @@ paths:
       summary: スレッドに返信する（FN-08）
       tags:
       - FN-07 メッセージ
+  /api/messages/{parentId}/thread-read:
+    post:
+      description: そのスレッドの返信の中の、自分あてのメンションを読んだことにする
+      operationId: readThread
+      parameters:
+      - in: path
+        name: parentId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: 記録した
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: スレッドを読んだ（FN-14）
+      tags:
+      - FN-06 チャンネル
   /api/uploads/{uploadId}:
     delete:
       description: 自分の、まだ送っていないものだけ。S3 のファイルも消す
@@ -1749,6 +1785,44 @@ paths:
       summary: 1 人のメンバー
       tags:
       - FN-05 メンバー管理
+  /api/workspaces/{workspaceId}/mentions:
+    get:
+      description: そのワークスペースのいま見られる会話のものを、新しい順に 20 件ずつ。cursor は前回の nextCursor
+      operationId: mentions
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MentionPage"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: 自分あてのメンションの一覧（FN-14）
+      tags:
+      - FN-07 メッセージ
 components:
   schemas:
     AttachmentView:
@@ -1872,6 +1946,11 @@ components:
           format: int64
         joined:
           type: boolean
+        lastReadMessageId:
+          type:
+          - integer
+          - "null"
+          format: int64
         memberCount:
           type: integer
           format: int64
@@ -1910,6 +1989,7 @@ components:
       - hasUnread
       - id
       - joined
+      - lastReadMessageId
       - memberCount
       - mentionCount
       - name
@@ -2215,6 +2295,57 @@ components:
       required:
       - member
       - user
+    MentionConversation:
+      type: object
+      properties:
+        dmPartner:
+          oneOf:
+          - $ref: "#/components/schemas/UserSummary"
+          - type: "null"
+        id:
+          type: integer
+          format: int64
+        name:
+          type:
+          - string
+          - "null"
+        type:
+          type: string
+          enum:
+          - CHANNEL
+          - DM
+      required:
+      - dmPartner
+      - id
+      - name
+      - type
+    MentionItem:
+      type: object
+      properties:
+        conversation:
+          $ref: "#/components/schemas/MentionConversation"
+        message:
+          $ref: "#/components/schemas/MessageView"
+        read:
+          type: boolean
+      required:
+      - conversation
+      - message
+      - read
+    MentionPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MentionItem"
+        nextCursor:
+          type:
+          - string
+          - "null"
+      required:
+      - items
+      - nextCursor
     MessagePage:
       type: object
       properties:

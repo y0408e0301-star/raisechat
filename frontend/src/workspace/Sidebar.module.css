@@ -34,7 +34,7 @@
 /* 未読は太字・強い文字（NT-1。色だけで区別しない N-30） */
 .unread { font-weight: bold; color: var(--sidebar-strong); }
 .mark { flex: none; width: 16px; text-align: center; }
-.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 600px 以上 1024px 未満は 220px、600px 未満は画面いっぱい（2.19） */
 @media (max-width: 1023px) {

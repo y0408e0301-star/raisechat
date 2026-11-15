@@ -11,6 +11,13 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .right { margin-left: auto; display: flex; align-items: center; gap: 12px; flex: none; }
+/* 「@」とメンションの件数（2.6）。件数の丸は右上に重ねる */
+.mentions {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px;
+  border-radius: 8px; color: var(--text); font-size: 20px; font-weight: bold;
+}
+.mentions:hover { background: var(--frame); text-decoration: none; }
+.mentionCount { position: absolute; top: -4px; right: -6px; }
 /* 自分のアバターのボタン（枠なし） */
 .me { display: inline-flex; padding: 0; border: none; border-radius: 50%; background: none; cursor: pointer; }
 

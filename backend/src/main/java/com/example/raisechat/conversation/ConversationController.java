@@ -52,6 +52,14 @@ class ConversationController {
 		this.conversationService.read(CurrentUser.id(jwt), conversationId, request.lastMessageId());
 	}
 
+	@Operation(summary = "スレッドを読んだ（FN-14）", description = "そのスレッドの返信の中の、自分あてのメンションを読んだことにする")
+	@ApiResponse(responseCode = "204", description = "記録した")
+	@PostMapping("/api/messages/{parentId}/thread-read")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void readThread(@AuthenticationPrincipal Jwt jwt, @PathVariable long parentId) {
+		this.conversationService.readThread(CurrentUser.id(jwt), parentId);
+	}
+
 	record ReadRequest(@Schema(requiredMode = Schema.RequiredMode.REQUIRED,
 			description = "画面に出したいちばん新しい親メッセージの ID。メッセージがまだない会話では 0（FN-14 4 章）") @Nullable Long lastMessageId) {
 	}

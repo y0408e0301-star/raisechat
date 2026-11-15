@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
-  ApiError, fetchReplies, sendReply, type AttachmentView, type ConversationDetail, type MessageView, type ReactionView,
+  ApiError, fetchReplies, markThreadRead, sendReply, type AttachmentView, type ConversationDetail, type MessageView, type ReactionView,
 } from '../api'
 import { useUploads } from '../attachments/uploads'
 import { useToast } from '../components/ToastContext'
@@ -8,6 +8,7 @@ import ui from '../components/ui.module.css'
 import { M, M36 } from '../messages'
 import type { RealtimeEvent } from '../realtime/events'
 import { useRealtime } from '../realtime/RealtimeContext'
+import { usePageVisible } from '../visibility'
 import Composer from './Composer'
 import DeleteMessageDialog from './DeleteMessageDialog'
 import type { Entry } from './entries'
@@ -89,6 +90,14 @@ export default function ThreadPanel({ conversation, parentId, viewer, onClose }:
     const result = await load()
     if (result !== 'failed') show(result)
   }), [onReconnect, load, show])
+
+  // 見えている間は、返信の中の自分あてのメンションを読んだことにする。開いたとき・返信が届いたとき・タブが前に来たとき（NT-4）
+  const visible = usePageVisible()
+  const lastReply = typeof loaded === 'object' ? (loaded.items.at(-1)?.id ?? 0) : null
+  useEffect(() => {
+    if (!visible || lastReply === null) return
+    markThreadRead(parentId).catch(() => {})
+  }, [visible, lastReply, parentId])
 
   const update = useCallback((change: (current: Loaded) => Loaded) => {
     setLoaded((current) => (typeof current === 'object' ? change(current) : current))

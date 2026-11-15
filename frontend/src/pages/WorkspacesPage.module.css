@@ -12,9 +12,3 @@
 .unread .name { font-weight: bold; }
 /* 自分がオーナーのときの小さな枠 */
 .owner { flex: none; font-size: 12px; color: var(--sub); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; }
-/* 2.1 件数の丸 */
-.count {
-  flex: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
-  background: var(--danger); color: #fff; font-size: 12px; font-weight: bold;
-  display: inline-flex; align-items: center; justify-content: center;
-}
