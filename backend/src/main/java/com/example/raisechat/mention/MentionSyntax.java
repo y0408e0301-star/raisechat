@@ -9,13 +9,17 @@ import java.util.regex.Pattern;
 // 本文から「@ユーザー ID」を探す（機能定義書 FN-11 5 章の 1）。
 // 「@」に続く 3〜15 文字の半角英数字と「_」で、「@」の前は本文の始まりか英数字・「_」以外の文字。
 // ユーザー ID の後ろに英数字・「_」が続くもの（16 文字以上）はメンションにしない。
-// コード（` で囲んだ所）とコードブロック（``` の行で囲んだ所）の中は探さない
+// コード（` で囲んだ所）とコードブロックの中は探さない。コードブロックは、画面の Markdown（CommonMark）がコードとして出すもの：
+// ``` か ~~~ の行で囲んだ所（閉じていなければ本文の終わりまで）と、空白 4 つかタブで始まる行（段落の続きを除く）
 final class MentionSyntax {
 
 	private static final Pattern MENTION = Pattern.compile("(?<![A-Za-z0-9_])@([A-Za-z0-9_]{3,15})(?![A-Za-z0-9_])");
 
-	// コードブロックの始まりと終わりの行（行頭の空白は 3 つまで。CommonMark と同じ）
-	private static final Pattern FENCE = Pattern.compile("^ {0,3}```.*$");
+	// コードブロックの始まりと終わりの行（行頭の空白は 3 つまで。CommonMark と同じ）。group(1) は ` か ~ の並び
+	private static final Pattern FENCE = Pattern.compile("^ {0,3}(`{3,}|~{3,})(.*)$");
+
+	// 空白 4 つかタブで始まる行
+	private static final Pattern INDENTED = Pattern.compile("^( {4}|\\t)");
 
 	private MentionSyntax() {
 	}
@@ -32,24 +36,35 @@ final class MentionSyntax {
 
 	// コードとコードブロックの中を空白に置き換える（前後の文字がつながってメンションにならないよう、消さずに空白にする）
 	static String withoutCode(String body) {
-		StringBuilder out = new StringBuilder();
-		boolean inBlock = false;
-		for (String line : body.split("\n", -1)) {
-			if (!out.isEmpty()) {
-				out.append('\n');
+		String[] lines = body.split("\n", -1);
+		// 開いているコードブロックの印（``` など）。開いていなければ null
+		String fence = null;
+		// 次の行が空白 4 つで始まればコードブロックになるか（本文の始まり・空行・コードの後。段落の続きはならない）
+		boolean indentedCodeAllowed = true;
+		for (int i = 0; i < lines.length; i++) {
+			String line = lines[i];
+			Matcher marker = FENCE.matcher(line);
+			boolean code;
+			if (fence != null) {
+				code = true;
+				if (marker.matches() && marker.group(1).charAt(0) == fence.charAt(0)
+						&& marker.group(1).length() >= fence.length() && marker.group(2).isBlank()) {
+					fence = null;
+				}
 			}
-			if (FENCE.matcher(line).matches()) {
-				inBlock = !inBlock;
-				out.append(" ".repeat(line.length()));
-			}
-			else if (inBlock) {
-				out.append(" ".repeat(line.length()));
+			else if (marker.matches() && !(marker.group(1).charAt(0) == '`' && marker.group(2).contains("`"))) {
+				fence = marker.group(1);
+				code = true;
 			}
 			else {
-				out.append(line);
+				code = indentedCodeAllowed && !line.isBlank() && INDENTED.matcher(line).find();
 			}
+			if (code) {
+				lines[i] = " ".repeat(line.length());
+			}
+			indentedCodeAllowed = code || line.isBlank();
 		}
-		return withoutCodeSpans(out.toString());
+		return withoutCodeSpans(String.join("\n", lines));
 	}
 
 	// ` の並び（同じ数の ` で閉じたもの）の中を空白にする。閉じていない ` は文字のまま

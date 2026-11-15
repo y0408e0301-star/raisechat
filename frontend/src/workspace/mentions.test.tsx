@@ -58,7 +58,8 @@ describe('メッセージの中のメンション（MN-3、TC-11-4〜6）', () =
 
   it('コード・コードブロック・リンクの中は目立たせない', () => {
     const { container } = renderComponent(
-      <MessageBody body={'`@hanako` と https://example.com/@hanako\n```\n@hanako\n```'} mentions={mentions} />,
+      <MessageBody body={'`@hanako` と https://example.com/@hanako\n```\n@hanako\n```\n~~~\n@hanako\n~~~\n\n    @hanako'}
+        mentions={mentions} />,
     )
     expect(container.querySelectorAll('[class*="mention"]')).toHaveLength(0)
   })

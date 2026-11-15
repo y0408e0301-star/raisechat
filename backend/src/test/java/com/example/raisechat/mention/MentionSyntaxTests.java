@@ -34,6 +34,19 @@ class MentionSyntaxTests {
 	}
 
 	@Test
+	void チルダのコードブロックと空白4つで始まるコードブロックの中は探さない() {
+		assertThat(MentionSyntax.usernames("~~~\n@taro_y\n~~~\n@hanako")).containsExactly("hanako");
+		assertThat(MentionSyntax.usernames("前の段落\n\n    @taro_y\n\n@hanako")).containsExactly("hanako");
+		assertThat(MentionSyntax.usernames("    @taro_y")).isEmpty();
+		assertThat(MentionSyntax.usernames("\t@taro_y")).isEmpty();
+		// 段落の続きの行は、空白 4 つで始まってもコードにならない
+		assertThat(MentionSyntax.usernames("段落\n    @taro_y")).containsExactly("taro_y");
+		// 違う印や短い印では閉じない
+		assertThat(MentionSyntax.usernames("````\n```\n@taro_y\n````\n@hanako")).containsExactly("hanako");
+		assertThat(MentionSyntax.usernames("```\n~~~\n@taro_y")).isEmpty();
+	}
+
+	@Test
 	void コードの前後はつながらない() {
 		assertThat(MentionSyntax.usernames("`x`@taro_y と `y` @hanako")).containsExactly("taro_y", "hanako");
 	}

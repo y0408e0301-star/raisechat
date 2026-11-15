@@ -61,7 +61,9 @@ class MentionService {
 			.stream()
 			.collect(Collectors.toMap(User::getId, Function.identity()));
 		Instant now = this.clock.instant();
+		// 読む間に消えた人は出さない（ふだんはユーザーを消さないので起きない）
 		return rows.stream()
+			.filter((row) -> found.containsKey(row.getId()))
 			.map((row) -> new MentionCandidate(this.userSummaries.of(found.get(row.getId()), now), row.getMember()))
 			.toList();
 	}
