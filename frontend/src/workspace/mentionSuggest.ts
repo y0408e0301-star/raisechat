@@ -27,7 +27,7 @@ export function insertMention(value: string, caret: number, start: number, usern
 // 読み込みに失敗したとき・一致する人がいないときは出さない（FN-11 9 章）
 export function useMentionCandidates(conversationId: number | undefined, start: number | null,
   text: string | null): MentionCandidate[] {
-  const [loaded, setLoaded] = useState<{ start: number, candidates: MentionCandidate[] } | null>(null)
+  const [loaded, setLoaded] = useState<Loaded | null>(null)
 
   useEffect(() => {
     if (conversationId === undefined || start === null || text === null) return
@@ -39,7 +39,7 @@ export function useMentionCandidates(conversationId: number | undefined, start: 
       } catch {
         // 候補を出さない
       }
-      if (active) setLoaded({ start, candidates })
+      if (active) setLoaded({ conversationId, start, text, candidates })
     }, SUGGEST_DELAY_MS)
     return () => {
       active = false
@@ -47,6 +47,11 @@ export function useMentionCandidates(conversationId: number | undefined, start: 
     }
   }, [conversationId, start, text])
 
-  // 同じ「@」の後を打っている間は、次を読み終わるまで前の候補を出したままにする（1 文字ごとに消えてちらつかないように）
-  return start !== null && loaded?.start === start ? loaded.candidates : []
+  // 同じ会話の同じ「@」の後に打ち足している間は、次を読み終わるまで前の候補を出したままにする（1 文字ごとに消えてちらつかないように）。
+  // ほかの会話や、前より短くしたとき（消したとき・送った後にまた打った「@」）は、前の候補を出さない
+  const continues = loaded !== null && loaded.conversationId === conversationId && loaded.start === start
+    && text !== null && text.startsWith(loaded.text)
+  return continues ? loaded.candidates : []
 }
+
+type Loaded = { conversationId: number, start: number, text: string, candidates: MentionCandidate[] }

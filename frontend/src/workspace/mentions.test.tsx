@@ -166,6 +166,19 @@ describe('入力欄の候補（MN-1、TC-11-1）', () => {
     ])
   })
 
+  it('文字を消したときは、前の候補を出したままにしない', async () => {
+    await open({
+      'GET /api/conversations/10/mention-candidates?q=ha': () => json(200, [candidates[1]]),
+      // 消した後の候補はまだ届かない
+      'GET /api/conversations/10/mention-candidates?q=': () => new Promise<Response>(() => {}),
+    })
+    const user = userEvent.setup()
+    await user.type(screen.getByRole('textbox', { name: 'メッセージ' }), '@ha')
+    await screen.findByRole('option', { name: /はなこ/ })
+    await user.keyboard('{Backspace}{Backspace}')
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+  })
+
   it('候補を読めなかったときは出さない', async () => {
     await open({ 'GET /api/conversations/10/mention-candidates?q=': () => json(500, { code: 'INTERNAL_ERROR', message: 'x' }) })
     const input = screen.getByRole('textbox', { name: 'メッセージ' })
