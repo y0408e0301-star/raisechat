@@ -3,7 +3,7 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-FD |
-| 版数 | 0.13 |
+| 版数 | 0.14 |
 | 作成日 | 2026-11-10 |
 | 最終更新日 | 2026-11-15 |
 | 作成者 | （氏名） |
@@ -27,6 +27,7 @@
 | 0.11 | 2026-11-14 | FN-07 を 0.3（編集の keepAttachmentIds、GET /api/messages/{id}）、FN-09 を 0.2（形式の確かめ方・縮小した画像・外し方など）にした。3.5 の MessageView の attachments に downloadUrl を足した | （氏名） |
 | 0.12 | 2026-11-14 | FN-08 を 0.3 にした（スレッドを作るときに決めたこと）。3.5 の MessageView に replyUsers を足した | （氏名） |
 | 0.13 | 2026-11-15 | FN-10 を 0.3 にした（リアクションを作るときに決めたこと）。3.5 の MessageView の reactions.users を、username だけから username と表示名（displayName）の組にした（RE-4 で付けた人の表示名を出すため） | （氏名） |
+| 0.14 | 2026-11-15 | FN-11 を 0.2 にした（メンションを作るときに決めたこと）。3.5 の MessageView の mentions を、username だけから username と表示名の組にした（MN-7 で「@ユーザー ID」を押して G-16 を出すため） | （氏名） |
 
 ## 承認
 
@@ -223,7 +224,7 @@ statusEmoji・statusText は、ステータスがないか、消す日時を過�
   "parentId": null,
   "author": { "username": "taro_y", "displayName": "たろう", "avatarUrl": null, "statusEmoji": null, "statusText": null },
   "body": "**土曜**の集合は駅前で @hana",
-  "mentions": ["hana"],
+  "mentions": [ { "username": "hana", "displayName": "はな" } ],
   "attachments": [
     { "id": 77, "kind": "IMAGE", "contentType": "image/png", "fileName": "photo.png", "size": 204800,
       "width": 1600, "height": 1200, "url": "https://…（署名付き URL）", "thumbnailUrl": "https://…",
@@ -245,7 +246,7 @@ statusEmoji・statusText は、ステータスがないか、消す日時を過�
 ```
 
 - body は Markdown 記法のまま返す。飾りに変えるのは画面で行う（FN-07 5 章）
-- mentions は、本文のメンションのうち記録したもの（FN-11）の username。画面はこれに含まれる「@ユーザー ID」だけを目立たせる
+- mentions は、本文のメンションのうち記録したもの（FN-11）の username と表示名。画面はこれに含まれる「@ユーザー ID」だけを目立たせる。deleted が true のときは空の並び
 - reactions は、絵文字が最初に付けられた順。reactions.users は、絵文字を付けた人の username と表示名を、付けた順に最大 20 人まで返す（重ねたときに出す。FN-10）
 - deleted が true のとき（スレッドの返信がある親メッセージを削除したとき。FN-07 MS-11）は、body は空、attachments・reactions は空の並びにする
 - canDelete は、自分のメッセージか、自分がそのワークスペースのオーナーのときに true
