@@ -494,6 +494,47 @@ paths:
       summary: プライベートチャンネルに招待する
       tags:
       - FN-06 チャンネル
+  /api/conversations/{conversationId}/mention-candidates:
+    get:
+      description: その会話を見られる人（自分を除く）のうち、表示名かユーザー ID に q（0〜30 文字）を含む人を、会話のメンバーを先にして
+        8 人まで
+      operationId: mentionCandidates
+      parameters:
+      - in: path
+        name: conversationId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MentionCandidate"
+          description: OK
+        "4XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 入力の誤り・ログインが必要・見つからないなど（code は API の説明のエラーの一覧）
+        "5XX":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 思いがけない失敗
+      summary: メンションの候補
+      tags:
+      - FN-11 メンション
   /api/conversations/{conversationId}/messages:
     get:
       description: 親メッセージ（スレッドの返信でないもの）を古い順に返す。before（その ID より前）・after（その ID より後）のどちらか、またはなし（最新）。limit
@@ -2164,6 +2205,16 @@ components:
       - statusExpiresAt
       - statusText
       - username
+    MentionCandidate:
+      type: object
+      properties:
+        member:
+          type: boolean
+        user:
+          $ref: "#/components/schemas/UserSummary"
+      required:
+      - member
+      - user
     MessagePage:
       type: object
       properties:
@@ -2213,6 +2264,10 @@ components:
           - string
           - "null"
           format: date-time
+        mentions:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserName"
         mine:
           type: boolean
         parentId:
@@ -2242,6 +2297,7 @@ components:
       - editedAt
       - id
       - lastReplyAt
+      - mentions
       - mine
       - parentId
       - reactions
@@ -2310,7 +2366,7 @@ components:
         users:
           type: array
           items:
-            $ref: "#/components/schemas/Reactor"
+            $ref: "#/components/schemas/UserName"
       required:
       - count
       - emoji
@@ -2325,16 +2381,6 @@ components:
             $ref: "#/components/schemas/ReactionView"
       required:
       - reactions
-    Reactor:
-      type: object
-      properties:
-        displayName:
-          type: string
-        username:
-          type: string
-      required:
-      - displayName
-      - username
     ReadRequest:
       type: object
       properties:
@@ -2424,6 +2470,16 @@ components:
       - headers
       - putUrl
       - uploadId
+    UserName:
+      type: object
+      properties:
+        displayName:
+          type: string
+        username:
+          type: string
+      required:
+      - displayName
+      - username
     UserSummary:
       type: object
       properties:

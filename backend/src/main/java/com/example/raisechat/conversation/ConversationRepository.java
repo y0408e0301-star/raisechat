@@ -25,6 +25,20 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 			)
 			""";
 
+	// 上と同じ決まりを、ユーザー u について書いたもの。会話 c を見られる人を探す（メンションの記録と候補。FN-11 5 章の 2）。
+	// 決まりを変えるときは、両方を同じに直す
+	String VISIBLE_TO_USER = """
+			EXISTS (SELECT 1 FROM workspace_members wm
+			        WHERE wm.workspace_id = c.workspace_id AND wm.user_id = u.id)
+			AND (
+			      (c.type = 'CHANNEL' AND c.visibility = 'PUBLIC')
+			   OR (c.type = 'CHANNEL' AND c.visibility = 'PRIVATE'
+			       AND EXISTS (SELECT 1 FROM conversation_members cm
+			                   WHERE cm.conversation_id = c.id AND cm.user_id = u.id))
+			   OR (c.type = 'DM' AND u.id IN (c.dm_user_low, c.dm_user_high))
+			)
+			""";
+
 	@Query(value = "SELECT c.* FROM conversations c WHERE c.id = :id AND " + VISIBLE_TO_ME, nativeQuery = true)
 	Optional<Conversation> findVisible(@Param("me") long me, @Param("id") long id);
 
