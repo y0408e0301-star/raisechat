@@ -9,3 +9,16 @@
 /* 残りの文字数は入力欄の右下 */
 .remaining { margin: 0; text-align: right; font-size: 14px; color: var(--sub); }
 .over { color: var(--danger); }
+
+/* メンションの候補（画面設計書 2.16）。入力欄の上に、幅 320px で最大 8 人 */
+.wrap { position: relative; }
+.candidates {
+  position: absolute; bottom: 100%; left: 0; z-index: 10; width: 320px; max-width: 100%;
+  margin: 0 0 8px; padding: 4px 0; list-style: none;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 12px rgb(0 0 0 / 12%);
+}
+.candidate { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 12px; cursor: pointer; }
+.selected { background: var(--primary-bg); }
+.candidateName { font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.candidateSub, .candidateNote { color: var(--sub); font-size: 13px; white-space: nowrap; }
+.candidateNote { margin-left: auto; }

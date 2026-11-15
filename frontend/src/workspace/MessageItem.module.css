@@ -16,6 +16,9 @@
 .compact .side .time { visibility: hidden; padding-top: 4px; font-size: 11px; }
 .compact:hover .side .time, .compact:focus-within .side .time { visibility: visible; }
 
+/* 自分へのメンションを含む（画面設計書 2.9、MN-3）。左端に主色の 3px の線、背景は主色の薄い背景 */
+.toMe, .toMe:hover, .toMe:focus-within { background: var(--primary-bg); box-shadow: inset 3px 0 0 var(--primary); }
+
 /* 削除された親メッセージ（MS-11） */
 .deletedAvatar { width: 36px; height: 36px; border-radius: 50%; background: var(--frame); }
 .deletedText { margin: 0; color: var(--sub); }

@@ -8,6 +8,8 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
+import com.example.raisechat.user.UserName;
+
 // メッセージ（FN-07）から使うリアクションの操作（FN-10）。呼ぶ側のトランザクションの中で使う
 @Component
 public class Reactions {
@@ -50,13 +52,13 @@ public class Reactions {
 
 		private boolean mine;
 
-		private final List<ReactionView.Reactor> users = new ArrayList<>();
+		private final List<UserName> users = new ArrayList<>();
 
 		void add(ReactionRepository.Row row, long me) {
 			this.count++;
 			this.mine |= row.userId() == me;
 			if (this.users.size() < ReactionView.MAX_USERS) {
-				this.users.add(new ReactionView.Reactor(row.username(), row.displayName()));
+				this.users.add(new UserName(row.username(), row.displayName()));
 			}
 		}
 

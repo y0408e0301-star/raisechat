@@ -28,13 +28,13 @@ import com.example.raisechat.user.UserSummary;
 class MessageControllerTests {
 
 	private static final MessageView VIEW = new MessageView(30, 12, null,
-			new UserSummary("taro_y", "たろう", null, null, null), "**土曜**", List.of(), List.of(), 0, null, List.of(),
-			Instant.parse("2026-11-11T03:00:00Z"), null, false, true, true);
+			new UserSummary("taro_y", "たろう", null, null, null), "**土曜**", List.of(), List.of(), List.of(), 0, null,
+			List.of(), Instant.parse("2026-11-11T03:00:00Z"), null, false, true, true);
 
 	private static final String VIEW_JSON = """
 			{"id":30,"conversationId":12,"parentId":null,
 			 "author":{"username":"taro_y","displayName":"たろう","avatarUrl":null,"statusEmoji":null,"statusText":null},
-			 "body":"**土曜**","attachments":[],"reactions":[],"replyCount":0,"lastReplyAt":null,"replyUsers":[],"createdAt":"2026-11-11T03:00:00Z","editedAt":null,
+			 "body":"**土曜**","mentions":[],"attachments":[],"reactions":[],"replyCount":0,"lastReplyAt":null,"replyUsers":[],"createdAt":"2026-11-11T03:00:00Z","editedAt":null,
 			 "deleted":false,"mine":true,"canDelete":true}
 			""";
 
