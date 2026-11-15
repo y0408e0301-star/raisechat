@@ -16,12 +16,23 @@ const LOAD_OLDER_AT = 80
 // いちばん下からこの距離までなら「いちばん下を見ている」とみなす（MS-5）
 const AT_BOTTOM = 40
 
+// いちばん下からこの距離まで来たら、後ろを読み込む（メッセージの位置を開いた後。MS-14）
+const LOAD_NEWER_AT = 80
+
 type Props = {
   conversation: ConversationDetail
   entries: Entry[]
   hasMoreBefore: boolean
   loadingOlder: boolean
   onLoadOlder: () => void
+  // まだ読んでいない後ろがあるか（メッセージの位置を開いたとき。MS-14）
+  hasMoreAfter: boolean
+  loadingNewer: boolean
+  onLoadNewer: () => void
+  // 「新着」の線を上に出すメッセージ（開いたときの最初の未読。MS-1）
+  newSince: number | null
+  // 目立たせるメッセージ（メッセージの位置を開いたとき。MS-14）
+  highlightId: number | null
   onDelete: (message: MessageView) => void
   onEdited: (message: MessageView) => void
   onGone: (messageId: number) => void
@@ -50,17 +61,23 @@ function continues(prev: Entry | undefined, current: Entry): boolean {
     && Date.parse(b.createdAt) - Date.parse(a.createdAt) <= GROUP_MS
 }
 
-// G-5 の会話のメッセージの一覧（MS-1・MS-2・MS-12、画面設計書 2.9・7.1）。
-// 開いたときと、自分が送ったときは、いちばん下を出す。前を読み込んだときは、見ていた位置を保つ。
+// G-5 の会話のメッセージの一覧（MS-1・MS-2・MS-12・MS-14、画面設計書 2.9・7.1）。
+// 開いたときは、目立たせるメッセージ（MS-14）か「新着」の線（MS-1）があればそこを、なければいちばん下を出す。
+// 自分が送ったときは、いちばん下を出す。前を読み込んだとき・後ろを読み込んだときは、見ていた位置を保つ。
 // ほかの人のメッセージが届いたときは、いちばん下を見ていれば下まで送り、上の方を見ていれば送らずに
-// 「新しいメッセージ」のボタンを出す（MS-5）。「新着」の線は通知（開発計画書 1-15）で足す
-export default function MessageList({ conversation, entries, hasMoreBefore, loadingOlder, onLoadOlder, ...handlers }: Props) {
+// 「新しいメッセージ」のボタンを出す（MS-5）
+export default function MessageList({
+  conversation, entries, hasMoreBefore, loadingOlder, onLoadOlder, hasMoreAfter, loadingNewer, onLoadNewer, newSince,
+  highlightId, ...handlers
+}: Props) {
   const list = useRef<HTMLDivElement>(null)
   // 前を読み込む前の高さと位置
   const anchor = useRef<{ height: number, top: number } | null>(null)
   const lastKey = useRef<string | null>(null)
   // 最後にスクロールしたときに、いちばん下を見ていたか（中身が増える前の位置で決める）
   const atBottom = useRef(true)
+  // 後ろを読み込んだ（下に足したのはスクロールで読み進めたもので、届いたものではない）
+  const appendingNewer = useRef(false)
   const [newArrived, setNewArrived] = useState(false)
 
   const last = entries.at(-1)
@@ -82,14 +99,26 @@ export default function MessageList({ conversation, entries, hasMoreBefore, load
   useLayoutEffect(() => {
     const el = list.current
     if (!el || currentLastKey === lastKey.current) return
-    if (lastKey.current === null || atBottom.current || !fromOthers) {
+    if (lastKey.current === null) {
+      // 開いたとき：目立たせるメッセージか「新着」の線が見える位置、なければいちばん下
+      const target = el.querySelector(highlightId !== null ? `[data-message-id="${highlightId}"]` : '[data-new-line]')
+      if (target && typeof target.scrollIntoView === 'function') {
+        target.scrollIntoView({ block: highlightId !== null ? 'center' : 'start' })
+        atBottom.current = false
+      } else {
+        el.scrollTop = el.scrollHeight
+        atBottom.current = true
+      }
+    } else if (appendingNewer.current) {
+      appendingNewer.current = false
+    } else if (atBottom.current || !fromOthers) {
       el.scrollTop = el.scrollHeight
       atBottom.current = true
     } else {
       setNewArrived(true)
     }
     lastKey.current = currentLastKey
-  }, [currentLastKey, fromOthers])
+  }, [currentLastKey, fromOthers, highlightId])
 
   function scrollToBottom() {
     const el = list.current
@@ -103,6 +132,10 @@ export default function MessageList({ conversation, entries, hasMoreBefore, load
     if (!el) return
     atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight <= AT_BOTTOM
     if (atBottom.current && newArrived) setNewArrived(false)
+    if (hasMoreAfter && !loadingNewer && el.scrollHeight - el.scrollTop - el.clientHeight <= LOAD_NEWER_AT) {
+      appendingNewer.current = true
+      onLoadNewer()
+    }
     if (!hasMoreBefore || loadingOlder || el.scrollTop > LOAD_OLDER_AT) return
     anchor.current = { height: el.scrollHeight, top: el.scrollTop }
     onLoadOlder()
@@ -137,6 +170,8 @@ export default function MessageList({ conversation, entries, hasMoreBefore, load
           const prev = entries[i - 1]
           const createdAt = info(entry).createdAt
           const newDay = !prev || dayKey(info(prev).createdAt) !== dayKey(createdAt)
+          const isNewLine = entry.kind === 'sent' && entry.message.id === newSince
+          const isHighlighted = entry.kind === 'sent' && entry.message.id === highlightId
           return (
             <Fragment key={entryKey(entry)}>
               {newDay && (
@@ -145,11 +180,19 @@ export default function MessageList({ conversation, entries, hasMoreBefore, load
                   <span>{formatDayDivider(createdAt)}</span>
                 </div>
               )}
-              <MessageItem entry={entry} compact={!newDay && continues(prev, entry)} canPost={conversation.canPost}
-                {...handlers} />
+              {isNewLine && (
+                // 「新着」の線（MS-1）。会話を開き直すまで残す
+                <div className={styles.newLine} data-new-line>
+                  <hr className={styles.newRule} aria-label="ここから新着" />
+                  <span aria-hidden="true">新着</span>
+                </div>
+              )}
+              <MessageItem entry={entry} compact={!newDay && !isNewLine && continues(prev, entry)}
+                canPost={conversation.canPost} highlighted={isHighlighted} {...handlers} />
             </Fragment>
           )
         })}
+        {loadingNewer && <p className={styles.loading}>読み込み中…</p>}
       </div>
       {newArrived && (
         // 入力欄のすぐ上の中央（画面設計書 7.1）

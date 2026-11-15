@@ -1,8 +1,9 @@
 import { NavLink } from 'react-router'
 import {
-  channelsUrl, conversationUrl, dmUrl, invitesUrl, membersUrl, type ConversationSummary, type WorkspaceDetail,
+  channelsUrl, conversationUrl, dmUrl, invitesUrl, membersUrl, mentionsUrl, type ConversationSummary, type WorkspaceDetail,
 } from '../api'
 import Avatar from '../components/Avatar'
+import CountBadge from '../components/CountBadge'
 import Menu from '../components/Menu'
 import styles from './Sidebar.module.css'
 
@@ -19,8 +20,8 @@ type Props = {
 
 const itemClass = ({ isActive }: { isActive: boolean }) => `${styles.item} ${isActive ? styles.active : ''}`
 
-// G-5 のサイドバー（画面設計書 2.8）。
-// 「メンション」と件数の丸は通知（開発計画書 1-15）で足す
+// G-5 のサイドバー（画面設計書 2.8）。未読の会話は太字にし（NT-1）、チャンネルはメンションの件数、DM は未読の件数を
+// 丸で出す（NT-1・NT-2）。「メンション」にはワークスペースの読んでいないメンションの合計を出す
 export default function Sidebar({ workspace, conversations, onSelect, onCreateChannel, onStartDm }: Props) {
   const channels = conversations.filter((c) => c.type === 'CHANNEL')
   const dms = conversations.filter((c) => c.type === 'DM')
@@ -38,6 +39,14 @@ export default function Sidebar({ workspace, conversations, onSelect, onCreateCh
         <span aria-hidden="true">▾</span>
       </Menu>
       <ul className={`${styles.list} ${styles.links}`}>
+        <li>
+          {/* G-7（NT-5） */}
+          <NavLink to={mentionsUrl(workspace.id)} onClick={onSelect} className={itemClass}>
+            <span aria-hidden="true" className={styles.mark}>@</span>
+            <span className={styles.name}>メンション</span>
+            <CountBadge count={workspace.mentionCount} label="メンション" />
+          </NavLink>
+        </li>
         <li>
           {/* G-8（CH-3） */}
           <NavLink to={channelsUrl(workspace.id)} onClick={onSelect} className={itemClass}>
@@ -58,6 +67,7 @@ export default function Sidebar({ workspace, conversations, onSelect, onCreateCh
               className={({ isActive }) => `${itemClass({ isActive })} ${c.hasUnread ? styles.unread : ''}`}>
               <span aria-hidden="true" className={styles.mark}>{c.visibility === 'PRIVATE' ? '🔒' : '#'}</span>
               <span className={styles.name}>{c.name}</span>
+              <CountBadge count={c.mentionCount} label="メンション" />
             </NavLink>
           </li>
         ))}
@@ -77,6 +87,7 @@ export default function Sidebar({ workspace, conversations, onSelect, onCreateCh
               <span className={styles.name}>
                 {c.dmPartner.displayName}{c.dmPartner.statusEmoji ? ` ${c.dmPartner.statusEmoji}` : ''}
               </span>
+              <CountBadge count={c.unreadCount} label="未読" />
             </NavLink>
           </li>
         ))}

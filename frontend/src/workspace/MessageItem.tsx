@@ -39,11 +39,14 @@ type Props = {
   onReactions: (messageId: number, reactions: ReactionView[]) => void
   // 送れる会話か。送れない会話では「リアクション」「スレッドで返信」を出さない（画面設計書 2.9）
   canPost?: boolean
+  // 検索・メンション・通知から開いたメッセージ。背景を主色の薄い背景にし、3 秒かけて戻す（MS-14）
+  highlighted?: boolean
 }
 
 // メッセージ（画面設計書 2.9）と添付（2.12）・リアクション（2.11）
 export default function MessageItem({
   entry, compact, onDelete, onEdited, onGone, onRetry, onCancel, onExpired, onOpenThread, onReactions, canPost = true,
+  highlighted = false,
 }: Props) {
   const toast = useToast()
   const { me } = useAuth()
@@ -120,7 +123,8 @@ export default function MessageItem({
   const edited = message?.editedAt && !deleted ? <span className={styles.edited}>（編集済み）</span> : null
 
   return (
-    <article className={`${styles.message} ${compact ? styles.compact : ''} ${entry.kind === 'pending' && !entry.failed ? styles.sending : ''} ${mentionsMe ? styles.toMe : ''}`}
+    <article className={`${styles.message} ${compact ? styles.compact : ''} ${entry.kind === 'pending' && !entry.failed ? styles.sending : ''} ${mentionsMe ? styles.toMe : ''} ${highlighted ? styles.highlight : ''}`}
+      data-message-id={message?.id}
       aria-label={`${author.displayName}のメッセージ`}>
       <div className={styles.side}>
         {compact

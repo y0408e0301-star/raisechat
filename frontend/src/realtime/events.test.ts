@@ -21,7 +21,7 @@ describe('parseEvent', () => {
     const types = events.map((e) => (e as { type: string }).type)
     expect(types).toEqual(expect.arrayContaining([
       'message.created', 'message.updated', 'message.deleted', 'reaction.updated', 'conversation.updated',
-      'conversation.removed',
+      'conversation.removed', 'workspace.updated', 'notify',
     ]))
   })
 

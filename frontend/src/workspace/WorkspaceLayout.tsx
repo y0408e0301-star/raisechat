@@ -67,12 +67,13 @@ function WorkspaceView({ workspaceId }: { workspaceId: number }) {
     }
   }, [load, toast])
 
-  // つなぎ直したら、切れていた間の変化を反映するためサイドバーの会話を取り直す（機能定義書 4.4）。
+  // つなぎ直したら、切れていた間の変化（未読・メンションの件数を含む。FN-14 5 章の 8）を反映するため、
+  // ワークスペースとサイドバーの会話を取り直す（機能定義書 4.4）。
   // ワークスペースから外されていたら、開いたときと同じく M-13 を出して G-3 に移す
   useEffect(() => onReconnect(async () => {
     try {
-      const conversations = await fetchConversations(workspaceId)
-      setLoaded((current) => (typeof current === 'object' ? { ...current, conversations } : current))
+      const [workspace, conversations] = await Promise.all([fetchWorkspace(workspaceId), fetchConversations(workspaceId)])
+      setLoaded((current) => (typeof current === 'object' ? { workspace, conversations } : current))
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) {
         toast(M[13])
@@ -104,6 +105,13 @@ function WorkspaceView({ workspaceId }: { workspaceId: number }) {
       return
     }
     if (event.type === 'conversation.updated') changeConversations((list) => upsertConversation(list, event.payload))
+    // ヘッダー・サイドバーの「メンション」の件数（NT-2・NT-6）
+    if (event.type === 'workspace.updated') {
+      const { hasUnread, mentionCount } = event.payload
+      setLoaded((current) => (typeof current === 'object'
+        ? { ...current, workspace: { ...current.workspace, hasUnread, mentionCount } }
+        : current))
+    }
     if (event.type === 'conversation.removed') {
       const removedId = event.payload.conversationId
       changeConversations((list) => removeConversation(list, removedId))

@@ -1,0 +1,6 @@
+/* 画面設計書 2.1 件数の丸。白い数字 */
+.count {
+  flex: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
+  background: var(--danger); color: #fff; font-size: 12px; font-weight: bold;
+  display: inline-flex; align-items: center; justify-content: center;
+}

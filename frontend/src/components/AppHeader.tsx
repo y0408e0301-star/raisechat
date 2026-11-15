@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { PROFILE_URL, workspaceUrl } from '../api'
+import { PROFILE_URL, mentionsUrl, workspaceUrl } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import Avatar from './Avatar'
+import CountBadge from './CountBadge'
 import styles from './AppHeader.module.css'
 import Menu from './Menu'
 import OfflineNotice from './OfflineNotice'
@@ -13,7 +14,7 @@ const WORKSPACE_NAME_SHOWN = 20
 
 type Props = {
   // ワークスペース用のヘッダー（G-5〜G-9・G-11）のときに渡す。なければ簡単なヘッダー（G-3・G-10）
-  workspace?: { id: number, name: string }
+  workspace?: { id: number, name: string, mentionCount: number }
 }
 
 function shorten(name: string): string {
@@ -22,7 +23,7 @@ function shorten(name: string): string {
 }
 
 // ヘッダー（画面設計書 2.6）と、そのすぐ下のお知らせ欄（2.4）。
-// ワークスペース用のヘッダーの検索欄はメッセージ検索（開発計画書 1-16）、「@」とメンションの件数は通知（1-15）で足す
+// ワークスペース用のヘッダーには「@」と読んでいないメンションの件数を出す（NT-2）。検索欄はメッセージ検索（開発計画書 1-16）で足す
 export default function AppHeader({ workspace }: Props) {
   const { me, signOut } = useAuth()
   const [sending, setSending] = useState(false)
@@ -49,6 +50,14 @@ export default function AppHeader({ workspace }: Props) {
           )}
         </div>
         <div className={styles.right}>
+          {workspace && (
+            // G-7（NT-5）
+            <Link to={mentionsUrl(workspace.id)} className={styles.mentions} title="メンション"
+              aria-label={workspace.mentionCount > 0 ? `メンション ${workspace.mentionCount} 件` : 'メンション'}>
+              <span aria-hidden="true">@</span>
+              <CountBadge count={workspace.mentionCount} label="メンション" className={styles.mentionCount} />
+            </Link>
+          )}
           {me && (
             // 自分のアバターを押すとメニュー（W-5）
             <Menu label={`${me.displayName}（@${me.username}）のメニュー`} buttonClassName={styles.me} alignRight

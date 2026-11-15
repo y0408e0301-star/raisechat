@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { conversationUrl, fetchWorkspaces, workspaceUrl, type WorkspaceSummary } from '../api'
+import CountBadge from '../components/CountBadge'
 import ui from '../components/ui.module.css'
 import { M } from '../messages'
 import { useRealtime } from '../realtime/RealtimeContext'
@@ -8,7 +9,7 @@ import CreateWorkspaceDialog from './CreateWorkspaceDialog'
 import styles from './WorkspacesPage.module.css'
 
 // G-3 ワークスペースの一覧画面（W-1〜W-3、画面設計書 5 章）。
-// 未読の太字とメンションの件数は、API が数えるようになる通知（開発計画書 1-15）から出る。
+// 未読の太字とメンションの件数（NT-3）は、通知（workspace.updated）で開き直さずに変える（NT-6）。
 // 外れたワークスペースは通知（workspace.removed）で一覧から消す
 export default function WorkspacesPage() {
   const navigate = useNavigate()
@@ -24,8 +25,13 @@ export default function WorkspacesPage() {
 
   // キック・退出・削除されたワークスペースは、開き直さずに一覧から消す（W-7）
   useEffect(() => subscribeUser((event) => {
-    if (event.type !== 'workspace.removed') return
-    setWorkspaces((list) => list?.filter((w) => w.id !== event.workspaceId))
+    if (event.type === 'workspace.removed') {
+      setWorkspaces((list) => list?.filter((w) => w.id !== event.workspaceId))
+    }
+    if (event.type === 'workspace.updated') {
+      const { workspaceId, hasUnread, mentionCount } = event.payload
+      setWorkspaces((list) => list?.map((w) => (w.id === workspaceId ? { ...w, hasUnread, mentionCount } : w)))
+    }
   }), [subscribeUser])
 
   useEffect(() => {
@@ -56,11 +62,7 @@ export default function WorkspacesPage() {
               <Link to={workspaceUrl(w.id)} className={`${styles.row} ${w.hasUnread ? styles.unread : ''}`}>
                 <span className={styles.name}>{w.name}</span>
                 {w.role === 'OWNER' && <span className={styles.owner}>オーナー</span>}
-                {w.mentionCount > 0 && (
-                  <span className={styles.count} aria-label={`メンション ${w.mentionCount} 件`}>
-                    {w.mentionCount > 99 ? '99+' : w.mentionCount}
-                  </span>
-                )}
+                <CountBadge count={w.mentionCount} label="メンション" />
               </Link>
             </li>
           ))}

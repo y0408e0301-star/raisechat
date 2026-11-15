@@ -31,6 +31,8 @@ export type UploadTicket = Schemas['UploadTicket']
 export type ReactionView = Schemas['ReactionView']
 export type UserName = Schemas['UserName']
 export type MentionCandidate = Schemas['MentionCandidate']
+export type MentionPage = Schemas['MentionPage']
+export type MentionItem = Schemas['MentionItem']
 
 // API がエラーを返したとき（機能定義書 3.3）。message は画面にそのまま出せる文、
 // field があればその入力欄の下に出す
@@ -266,6 +268,16 @@ export async function markRead(conversationId: number, lastMessageId: number): P
     { lastMessageId } satisfies Schemas['ReadRequest'])
 }
 
+// スレッドを開いた：そのスレッドの返信の中の、自分あてのメンションを読んだことにする（FN-14 NT-4）
+export async function markThreadRead(parentId: number): Promise<void> {
+  await request('POST', `/api/messages/${parentId}/thread-read`)
+}
+
+// 自分あてのメンション（G-7。FN-14 NT-5）。新しい順に 20 件ずつ
+export function fetchMentions(workspaceId: number, cursor?: string | null): Promise<MentionPage> {
+  return requestJson<MentionPage>('GET', `/api/workspaces/${workspaceId}/mentions${queryString({ cursor })}`)
+}
+
 // ---------------------------------------------------------------- FN-06 チャンネル
 
 // クエリを組み立てる（値がないものは付けない）
@@ -395,6 +407,16 @@ export function fetchMessages(conversationId: number, before?: number): Promise<
   return requestJson<MessagePage>('GET', `/api/conversations/${conversationId}/messages${query}`)
 }
 
+// after（その ID より後）を古い順に。メッセージの位置を開いた後で、下へ読み進める（MS-14）
+export function fetchNewerMessages(conversationId: number, after: number): Promise<MessagePage> {
+  return requestJson<MessagePage>('GET', `/api/conversations/${conversationId}/messages?after=${after}`)
+}
+
+// そのメッセージと前後 25 件ずつ（MS-14）。スレッドの返信なら、その親の前後
+export function fetchMessagesAround(conversationId: number, messageId: number): Promise<MessagePage> {
+  return requestJson<MessagePage>('GET', `/api/conversations/${conversationId}/messages?around=${messageId}`)
+}
+
 // clientId は送信ごとに作る UUID。もう一度送るときは同じものを使い、2 回追加されないようにする（FN-07 5 章の 8）。
 // attachmentIds は complete を済ませた添付（0〜4 個。FN-09）
 export function sendMessage(conversationId: number, body: string, clientId: string,
@@ -469,6 +491,11 @@ export const dmUrl = (workspaceId: number, conversationId: number) => `/w/${work
 // 会話の種類で URL を分ける
 export const conversationPath = (c: { workspaceId: number, id: number, type: ConversationSummary['type'] }) =>
   (c.type === 'DM' ? dmUrl(c.workspaceId, c.id) : conversationUrl(c.workspaceId, c.id))
+// メッセージの位置を開く（MS-14）。開いたら URL から外す（画面設計書 7 章）
+export const messagePath = (c: { workspaceId: number, id: number, type: ConversationSummary['type'] }, messageId: number) =>
+  `${conversationPath(c)}?message=${messageId}`
+// G-7 メンション一覧画面
+export const mentionsUrl = (workspaceId: number) => `/w/${workspaceId}/mentions`
 // G-8 チャンネル一覧画面
 export const channelsUrl = (workspaceId: number) => `/w/${workspaceId}/channels`
 // G-9 メンバー一覧画面

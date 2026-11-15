@@ -8,6 +8,7 @@ import ui from '../components/ui.module.css'
 import { formatUntil } from '../dates'
 import { M } from '../messages'
 import { DISPLAY_NAME_MAX, STATUS_TEXT_MAX, isValidDisplayName, limitChars } from '../validation'
+import NotificationSwitch from './NotificationSwitch'
 import styles from './ProfilePage.module.css'
 import { EXPIRY_LABELS, expiresAt, type Expiry } from './status'
 
@@ -252,6 +253,8 @@ function ProfileForm({ profile, onAvatarSaved, onSaved }: FormProps) {
             </button>
           </div>
         </div>
+
+        <NotificationSwitch />
 
         <div className={styles.actions}>
           <button type="button" className={ui.secondary} onClick={back}>キャンセル</button>

@@ -19,6 +19,16 @@
 /* 自分へのメンションを含む（画面設計書 2.9、MN-3）。左端に主色の 3px の線、背景は主色の薄い背景 */
 .toMe, .toMe:hover, .toMe:focus-within { background: var(--primary-bg); box-shadow: inset 3px 0 0 var(--primary); }
 
+/* 検索・メンション・通知から開いたメッセージ（画面設計書 2.9、MS-14）。主色の薄い背景から 3 秒かけて戻す */
+.highlight { animation: highlight 3s ease-out; }
+@keyframes highlight {
+  from { background: var(--primary-bg); }
+  to { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .highlight { animation: none; background: var(--primary-bg); }
+}
+
 /* 削除された親メッセージ（MS-11） */
 .deletedAvatar { width: 36px; height: 36px; border-radius: 50%; background: var(--frame); }
 .deletedText { margin: 0; color: var(--sub); }

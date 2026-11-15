@@ -13,6 +13,12 @@ export type ReactionUpdated = { messageId: number, reactions: ReactionView[] }
 // conversation.removed の payload。LEFT：抜けた、DELETED：チャンネルが削除された
 export type ConversationRemoved = { conversationId: number, reason: 'LEFT' | 'DELETED' }
 
+// workspace.updated の payload（G-3 の印とヘッダーの「@」の件数。FN-14 NT-2・NT-3）
+export type WorkspaceUpdated = { workspaceId: number, hasUnread: boolean, mentionCount: number }
+
+// notify の payload（ブラウザの通知の元。FN-14 NT-7）。conversationName はチャンネルなら「#名前」、DM なら「DM」
+export type Notify = { kind: 'MENTION' | 'DM', message: MessageView, conversationName: string }
+
 // workspace.removed の payload。KICKED：キックされた、LEFT：退出した、DELETED：ワークスペースが削除された
 export type WorkspaceRemoved = { workspaceId: number, name: string, reason: 'KICKED' | 'LEFT' | 'DELETED' }
 
@@ -34,6 +40,8 @@ export type RealtimeEvent =
   | Event<'conversation.updated', ConversationSummary>
   | Event<'conversation.removed', ConversationRemoved>
   | Event<'workspace.removed', WorkspaceRemoved>
+  | Event<'workspace.updated', WorkspaceUpdated>
+  | Event<'notify', Notify>
 
 type Json = Record<string, unknown>
 
@@ -69,6 +77,13 @@ const isWorkspaceRemoved = (v: unknown): v is WorkspaceRemoved =>
   isObject(v) && isId(v.workspaceId) && typeof v.name === 'string'
   && (v.reason === 'KICKED' || v.reason === 'LEFT' || v.reason === 'DELETED')
 
+const isWorkspaceUpdated = (v: unknown): v is WorkspaceUpdated =>
+  isObject(v) && isId(v.workspaceId) && typeof v.hasUnread === 'boolean' && typeof v.mentionCount === 'number'
+
+const isNotify = (v: unknown): v is Notify =>
+  isObject(v) && (v.kind === 'MENTION' || v.kind === 'DM') && isMessageView(v.message)
+  && typeof v.conversationName === 'string'
+
 const payloadCheck: Record<RealtimeEvent['type'], (payload: unknown) => boolean> = {
   'message.created': isMessageView,
   'message.updated': isMessageView,
@@ -77,6 +92,8 @@ const payloadCheck: Record<RealtimeEvent['type'], (payload: unknown) => boolean>
   'conversation.updated': isConversationSummary,
   'conversation.removed': isConversationRemoved,
   'workspace.removed': isWorkspaceRemoved,
+  'workspace.updated': isWorkspaceUpdated,
+  'notify': isNotify,
 }
 
 // 届いた本文（JSON の文字列）を読む。形が違う・知らない種類の通知は null（無視する）
