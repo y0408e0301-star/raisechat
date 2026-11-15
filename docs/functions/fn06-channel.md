@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-FD-06 |
-| 版数 | 0.2 |
+| 版数 | 0.3 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-13 |
+| 最終更新日 | 2026-11-16 |
 | 作成者 | （氏名） |
 | 上位文書 | [機能定義書](function-definition.md)（RC-FD） |
 | 状態 | 承認待ち |
@@ -16,6 +16,7 @@
 | --- | --- | --- | --- |
 | 0.1 | 2026-11-10 | 初版 | （氏名） |
 | 0.2 | 2026-11-13 | チャンネルを作るとき（開発計画書 1-6）に決めたことを足した：招待の候補を返す API（GET /api/conversations/{id}/candidates。ワークスペースのメンバーの一覧（FN-05）は 1-8 で作るため）、参加・退出をもう一度送ったときは何もしない、DM にチャンネルの操作を送ったときは 403 FORBIDDEN、一覧のカーソルの中身 | （氏名） |
+| 0.3 | 2026-11-16 | 通知（開発計画書 1-15）で、ConversationDetail に lastReadMessageId（最後に読んだメッセージ。会話のメンバーでなければ null）を足した。「新着」の線（FN-07 MS-1）に使う | （氏名） |
 
 本書は機能定義書の一部である。承認は[機能定義書](function-definition.md)で一括して行う。API・リアルタイムの通知・メッセージの共通の決まりは機能定義書 3 章〜5 章のとおり。
 
@@ -144,7 +145,7 @@ sequenceDiagram
 - チャンネルの一覧・会話のメンバーの一覧のカーソルは「最後に出した行の ID:名前（表示名）」（機能定義書 3.4）。名前・表示名・ユーザー ID の絞り込みは、大文字・小文字を区別せずに、その文字を含むもの（%・_ も文字として探す）
 - 参加（join）をもう入っているチャンネルに、退出（leave）を入っていないチャンネルに送ったときは、何もせずに成功を返す
 - DM に参加・退出・招待・削除を送ったときは 403 FORBIDDEN（DM の操作は FN-12）
-- ConversationDetail：ConversationSummary（機能定義書 3.5）に description・memberCount・createdBy（UserSummary）・createdAt を足したもの
+- ConversationDetail：ConversationSummary（機能定義書 3.5）に description・memberCount・createdBy（UserSummary）・createdAt・lastReadMessageId（最後に読んだメッセージ。会話のメンバーでなければ null。画面は開いたときに、これより後のほかの人のメッセージの上に「新着」の線を出す。FN-07 MS-1）を足したもの
 
 リアルタイムの通知：
 

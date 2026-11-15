@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-BD-DATA |
-| 版数 | 0.3 |
+| 版数 | 0.4 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-14 |
+| 最終更新日 | 2026-11-16 |
 | 作成者 | （氏名） |
 | 上位文書 | [基本設計書](basic-design.md)（RC-BD） |
 | 元にした文書 | [データ要件定義書](../requirements/data-requirements.md)（RC-REQ-DATA）版数 0.2、[機能定義書](../functions/function-definition.md)（RC-FD）版数 0.3、[技術スタック定義書](../tech-stack.md)（RC-TECH）版数 0.2 |
@@ -18,6 +18,7 @@
 | 0.1 | 2026-11-10 | 初版。構成は BookLog のデータ設計書と同じにした | （氏名） |
 | 0.2 | 2026-11-13 | 招待リンクを作るとき（開発計画書 1-7）に、30 日たったものを消すための索引を (expires_at) から (created_at) にした（消す条件を「作ってから 30 日」で書くため。期限は 7 日なので、どれも期限切れか取り消し済み） | （氏名） |
 | 0.3 | 2026-11-14 | 添付を作るとき（開発計画書 1-11）に決めたことを 4.8 に足した：縮小した画像の置き場所。CHECK 制約は、形式・種類・状態・大きさ（種類ごとの上限）・並び順（0〜3、送ったものだけが持つ）にかけた | （氏名） |
+| 0.4 | 2026-11-16 | 通知を作るとき（開発計画書 1-15）に、8.2 の未読・メンションの件数の SQL を要件定義書 11.1 の件数で測った。メッセージを送ったときにワークスペースの合計を数える SQL が 3〜12 秒かかったので、SQL を書き換え、6 章に索引を 2 つ足した（messages の親メッセージだけの部分索引、mentions の読んでいないものだけの部分索引）。8.2 に書き換えた SQL と測った結果を書いた | （氏名） |
 
 本書は基本設計書の一部である。承認は[基本設計書](basic-design.md)で一括して行う。表記のルールは基本設計書 1.3 のとおり。
 
@@ -380,8 +381,10 @@ DM の行は、ワークスペースを抜けても消さない（BR-9）。
 | attachments | (message_id, sort_order) の一意の索引 | メッセージの添付 |
 | attachments | (conversation_id) | チャンネル・ワークスペースの削除で一緒に消すとき（全件を読まないため） |
 | attachments | (created_at) WHERE message_id IS NULL | 送らなかったものをまとめて消す（BR-13） |
+| messages | (conversation_id, id) WHERE parent_id IS NULL | 未読の件数（8.2）。返信の多い会話でも返信を読まずに、最後に読んだものより後の親メッセージを数える |
 | reactions | (message_id, created_at) | メッセージのリアクション（RE-5） |
-| mentions | (user_id, message_id DESC) | 読んでいないメンションの件数（8.2）、メンションの一覧（NT-5） |
+| mentions | (user_id, message_id DESC) | メンションの一覧（NT-5） |
+| mentions | (user_id) WHERE NOT is_read | 読んでいないメンションの件数（8.2） |
 | refresh_tokens | (user_id) | その人のリフレッシュトークンをすべて無効にする（BR-11） |
 | refresh_tokens | (expires_at) | 有効期限を過ぎたものをまとめて消す（BR-11） |
 
@@ -430,29 +433,58 @@ WHERE c.workspace_id = :ws
 
 ### 8.2 サイドバーの未読・メンションの件数（NT-1・NT-2）
 
+会話の件数（サイドバー。ConversationSummary）と、ワークスペースの合計（G-3・ヘッダー。WorkspaceSummary）を、それぞれ 1 つの SQL で、何人分でもまとめて数える（メッセージを送ったときは、会話のメンバー全員の分を数えて送る。FN-14 6 章）。
+
 ```sql
+-- 会話の件数：会話のメンバー cm ごとの未読（100 件で数えるのをやめる）と、読んでいないメンション
 -- キック・退出した人の DM の行が残っているため（BR-9）、workspace_members でいまのメンバーかを確かめる（8.1 と同じ条件）
--- 自分が入っている会話ごとの未読の件数（100 件で数えるのをやめる）と、読んでいないメンションの件数
-SELECT cm.conversation_id,
+SELECT cm.conversation_id, cm.user_id,
        (SELECT count(*) FROM (
             SELECT 1 FROM messages m
-            WHERE m.conversation_id = cm.conversation_id
-              AND m.parent_id IS NULL
-              AND m.deleted_at IS NULL
-              AND m.id > cm.last_read_message_id
-              AND m.user_id <> :me
-            LIMIT 100) u) AS unread_count,
+            WHERE m.conversation_id = cm.conversation_id AND m.parent_id IS NULL AND m.deleted_at IS NULL
+              AND m.id > cm.last_read_message_id AND m.user_id <> cm.user_id
+            LIMIT 100) x) AS unread_count,
        (SELECT count(*) FROM mentions mn
-            JOIN messages m ON m.id = mn.message_id
-            WHERE mn.user_id = :me AND NOT mn.is_read
-              AND m.conversation_id = cm.conversation_id) AS mention_count
-FROM conversation_members cm
-JOIN conversations c ON c.id = cm.conversation_id
-JOIN workspace_members wm ON wm.workspace_id = c.workspace_id AND wm.user_id = :me  -- いまのメンバーだけ（BR-2）
-WHERE cm.user_id = :me AND c.workspace_id = :ws;
+        CROSS JOIN LATERAL (SELECT 1 FROM messages m
+                            WHERE m.id = mn.message_id AND m.conversation_id = cm.conversation_id LIMIT 1) x
+        WHERE mn.user_id = cm.user_id AND NOT mn.is_read) AS mention_count
+FROM conversation_members cm JOIN conversations c ON c.id = cm.conversation_id
+WHERE EXISTS (SELECT 1 FROM workspace_members wm WHERE wm.workspace_id = c.workspace_id AND wm.user_id = cm.user_id)
+  AND cm.user_id = :me AND cm.conversation_id IN (:ids);          -- 会話のメンバーを数えるときは cm.conversation_id = :c AND cm.user_id IN (:users)
+
+-- ワークスペースの合計：メンバー wm ごとの、未読のある会話があるかと、読んでいないメンションの合計
+-- 参加していない公開チャンネルの読んでいないメンションも数える（FN-14 の 5 章の 4）。見られるかは 8.1 の条件を u について書いたもの
+SELECT wm.workspace_id, wm.user_id,
+       EXISTS (SELECT 1 FROM conversation_members cm JOIN conversations c ON c.id = cm.conversation_id
+               CROSS JOIN LATERAL (
+                   SELECT 1 FROM messages m
+                   WHERE m.conversation_id = cm.conversation_id AND m.parent_id IS NULL AND m.deleted_at IS NULL
+                     AND m.id > cm.last_read_message_id AND m.user_id <> cm.user_id
+                   LIMIT 1) unread
+               WHERE cm.user_id = wm.user_id AND c.workspace_id = wm.workspace_id) AS has_unread,
+       (SELECT count(*) FROM mentions mn
+        CROSS JOIN LATERAL (
+            SELECT 1 FROM messages m JOIN conversations c ON c.id = m.conversation_id JOIN users u ON u.id = mn.user_id
+            WHERE m.id = mn.message_id AND c.workspace_id = wm.workspace_id AND （8.1 の条件）
+            LIMIT 1) x
+        WHERE mn.user_id = wm.user_id AND NOT mn.is_read) AS mention_count
+FROM workspace_members wm
+WHERE wm.workspace_id = :ws AND wm.user_id IN (:users);    -- G-3 は wm.user_id = :me AND wm.workspace_id IN (:ids)
 ```
 
-mention_count はスレッドの返信の中のメンションも数える（unread_count は親メッセージだけ。FN-14 NT-1・NT-2）。参加していない公開チャンネルの読んでいないメンション（FN-14 の 5 章の 4）は、別に mentions から 8.1 の見られる会話に絞って数え、ヘッダーの合計に足す。DM のうち、相手が作ってまだメッセージのないもの（FN-12 の 5 章の 4）は、サイドバーに出さない。
+mention_count はスレッドの返信の中のメンションも数える（unread_count は親メッセージだけ。FN-14 NT-1・NT-2）。DM のうち、相手が作ってまだメッセージのないもの（FN-12 の 5 章の 4）は、サイドバーに出さない。
+
+LIMIT 1 の LATERAL は、PostgreSQL が副問い合わせを結合にまとめないようにするためのもの。まとめると、ユーザーごとに messages を全部読む（ハッシュ・マージ結合）計画になる。
+
+要件定義書 11.1 の件数（ユーザー 1,000 人・ワークスペース 100・メッセージ 50 万件（うち返信 10 万件）・メンション 5 万件。測るワークスペースはメンバー 200 人・チャンネル 50・メッセージ 10 万件）を手元の PostgreSQL 17 に作って測った結果（実行時間。3 回とも同じくらい）：
+
+| 場面 | はじめの SQL | 書き換え・索引の後 |
+| --- | --- | --- |
+| サイドバー（1 人の、入っている会話ごと） | 4ms | 2ms |
+| general に送ったときの、メンバー 200 人の会話の件数 | 240ms | 13ms |
+| general に送ったときの、メンバー 200 人のワークスペースの合計 | 3,000〜12,000ms | 44ms |
+
+はじめの SQL では、未読を数えるときに返信も入った索引（conversation_id, id）を読むため、返信の多い会話では 1 人あたり約 2 万行を読んでいた。親メッセージだけの部分索引（6 章）を足し、メンションは読んでいないものから 1 件ずつ主キーで引く形にした。公開先（AWS）での測定は、開発計画書 2-x の性能の確認で行う。
 
 ### 8.3 検索（FN-13）
 
