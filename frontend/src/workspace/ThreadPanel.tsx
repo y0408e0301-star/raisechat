@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
-  ApiError, fetchReplies, sendReply, type AttachmentView, type ConversationDetail, type MessageView,
+  ApiError, fetchReplies, sendReply, type AttachmentView, type ConversationDetail, type MessageView, type ReactionView,
 } from '../api'
 import { useUploads } from '../attachments/uploads'
 import { useToast } from '../components/ToastContext'
@@ -11,7 +11,7 @@ import { useRealtime } from '../realtime/RealtimeContext'
 import Composer from './Composer'
 import DeleteMessageDialog from './DeleteMessageDialog'
 import type { Entry } from './entries'
-import { addMessage, forViewer, settlePending, type Viewer } from './liveMessages'
+import { addMessage, forViewer, replaceReactions, settlePending, type Viewer } from './liveMessages'
 import MessageItem from './MessageItem'
 import styles from './ThreadPanel.module.css'
 
@@ -105,11 +105,20 @@ export default function ThreadPanel({ conversation, parentId, viewer, onClose }:
       setPending((items) => settlePending(items, event, viewer))
       update((current) => ({ ...current, items: addMessage(current.items, created) }))
     } else if (event.type === 'message.updated') {
-      const updated = forViewer(event.payload, viewer)
-      if (updated.id === parentId) update((current) => ({ ...current, parent: updated }))
+      const updated = event.payload
+      if (updated.id === parentId) update((current) => ({ ...current, parent: forViewer(updated, viewer, current.parent) }))
       else if (updated.parentId === parentId) {
-        update((current) => ({ ...current, items: current.items.map((m) => (m.id === updated.id ? updated : m)) }))
+        update((current) => ({
+          ...current, items: current.items.map((m) => (m.id === updated.id ? forViewer(updated, viewer, m) : m)),
+        }))
       }
+    } else if (event.type === 'reaction.updated') {
+      const { messageId, reactions } = event.payload
+      update((current) => ({
+        ...current,
+        parent: current.parent.id === messageId ? replaceReactions(current.parent, reactions, viewer) : current.parent,
+        items: current.items.map((m) => (m.id === messageId ? replaceReactions(m, reactions, viewer) : m)),
+      }))
     } else if (event.type === 'message.deleted') {
       if (event.payload.id === parentId) close.current()
       else if (event.payload.parentId === parentId) {
@@ -208,6 +217,11 @@ export default function ThreadPanel({ conversation, parentId, viewer, onClose }:
   const handlers = {
     compact: false, canPost: conversation.canPost, onDelete: setDeleting, onEdited: replace, onGone: remove,
     onRetry: retry, onCancel: cancel, onExpired: () => {},
+    onReactions: (messageId: number, reactions: ReactionView[]) => update((current) => ({
+      ...current,
+      parent: current.parent.id === messageId ? { ...current.parent, reactions } : current.parent,
+      items: current.items.map((m) => (m.id === messageId ? { ...m, reactions } : m)),
+    })),
   }
   const where = conversation.dmPartner ? conversation.dmPartner.displayName : `# ${conversation.name ?? ''}`
 

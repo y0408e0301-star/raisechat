@@ -77,7 +77,7 @@ const attachment = (id: number, extra: Partial<AttachmentView> = {}): Attachment
 })
 
 const message = (id: number, attachments: AttachmentView[], extra: Partial<MessageView> = {}): MessageView => ({
-  id, conversationId: 10, parentId: null, author: me, body: '', attachments, replyCount: 0, lastReplyAt: null, replyUsers: [],
+  id, conversationId: 10, parentId: null, author: me, body: '', attachments, reactions: [], replyCount: 0, lastReplyAt: null, replyUsers: [],
   createdAt: '2026-11-11T01:00:00Z', editedAt: null, deleted: false, mine: true, canDelete: true, ...extra,
 })
 

@@ -20,7 +20,8 @@ describe('parseEvent', () => {
   it('画面で使う通知の種類（機能定義書 4.3）が、見本にそろっている', () => {
     const types = events.map((e) => (e as { type: string }).type)
     expect(types).toEqual(expect.arrayContaining([
-      'message.created', 'message.updated', 'message.deleted', 'conversation.updated', 'conversation.removed',
+      'message.created', 'message.updated', 'message.deleted', 'reaction.updated', 'conversation.updated',
+      'conversation.removed',
     ]))
   })
 

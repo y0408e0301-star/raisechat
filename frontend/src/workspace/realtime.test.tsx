@@ -14,7 +14,7 @@ import { conversations, detail, opened, renderAt, summary, workspace } from '../
 const hanako = { username: 'hanako', displayName: 'はなこ', avatarUrl: null, statusEmoji: null, statusText: null }
 
 const message = (id: number, body: string, extra: object = {}) => ({
-  id, conversationId: 10, parentId: null, author: me, body, attachments: [], replyCount: 0, lastReplyAt: null, replyUsers: [],
+  id, conversationId: 10, parentId: null, author: me, body, attachments: [], reactions: [], replyCount: 0, lastReplyAt: null, replyUsers: [],
   createdAt: '2026-11-11T01:00:00Z', editedAt: null, deleted: false, mine: true, canDelete: true, ...extra,
 })
 

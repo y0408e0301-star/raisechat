@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react'
-import { ApiError, editMessage, type MessageView } from '../api'
+import { Suspense, lazy, useRef, useState } from 'react'
+import { addReaction, ApiError, editMessage, removeReaction, type MessageView, type ReactionView } from '../api'
 import AttachmentList from '../attachments/AttachmentList'
 import attachmentStyles from '../attachments/Attachments.module.css'
 import ImageViewer from '../attachments/ImageViewer'
+import { useAuth } from '../auth/AuthContext'
 import Avatar from '../components/Avatar'
 import ProfileButton from '../profile/ProfileButton'
 import { useToast } from '../components/ToastContext'
@@ -14,6 +15,11 @@ import styles from './MessageItem.module.css'
 import type { Entry } from './entries'
 import MessageInput from './MessageInput'
 import { isSendable, messageLength } from './messageText'
+import { sameEmoji, toggled } from './reactionState'
+import Reactions from './Reactions'
+
+// 絵文字の一覧（emoji-picker-element）は大きいので、初めて開くときに読み込む
+const EmojiPicker = lazy(() => import('../components/EmojiPicker'))
 
 type Props = {
   entry: Entry
@@ -29,15 +35,18 @@ type Props = {
   onExpired: (messageId: number) => void
   // スレッドを開く（TH-1・TH-2）。スレッドのパネルの中では渡さない（返信への返信はできない。TH-5）
   onOpenThread?: (messageId: number) => void
-  // 送れる会話か。送れない会話では「スレッドで返信」を出さない（画面設計書 2.9）
+  // リアクションが変わった（押してすぐの表示・API の応答・失敗して戻したとき。FN-10）
+  onReactions: (messageId: number, reactions: ReactionView[]) => void
+  // 送れる会話か。送れない会話では「リアクション」「スレッドで返信」を出さない（画面設計書 2.9）
   canPost?: boolean
 }
 
-// メッセージ（画面設計書 2.9）と添付（2.12）。リアクション・スレッドは、それぞれの段階（1-12・1-13）で足す
+// メッセージ（画面設計書 2.9）と添付（2.12）・リアクション（2.11）
 export default function MessageItem({
-  entry, compact, onDelete, onEdited, onGone, onRetry, onCancel, onExpired, onOpenThread, canPost = true,
+  entry, compact, onDelete, onEdited, onGone, onRetry, onCancel, onExpired, onOpenThread, onReactions, canPost = true,
 }: Props) {
   const toast = useToast()
+  const { me } = useAuth()
   const [editing, setEditing] = useState<string | null>(null)
   // 編集で残す添付の ID（AT-9。外すことだけができる）
   const [keep, setKeep] = useState<number[]>([])
@@ -45,6 +54,10 @@ export default function MessageItem({
   // G-17 で出している画像（画像の中の何番目か）
   const [viewing, setViewing] = useState<number | null>(null)
   const editor = useRef<HTMLTextAreaElement>(null)
+  // 絵文字の一覧を出している（押したボタンの近くに出す。RE-1）
+  const [pickerAnchor, setPickerAnchor] = useState<HTMLElement | null>(null)
+  // API の応答を待っている絵文字。続けて押しても、応答が届くまでは送らない
+  const reacting = useRef<string[]>([])
 
   const message = entry.kind === 'sent' ? entry.message : null
   const author = entry.kind === 'sent' ? entry.message.author : entry.author
@@ -52,6 +65,8 @@ export default function MessageItem({
   const createdAt = entry.kind === 'sent' ? entry.message.createdAt : entry.createdAt
   const attachments = entry.kind === 'sent' ? entry.message.attachments : entry.attachments
   const deleted = message?.deleted ?? false
+  // 参加していない公開チャンネル・相手がいない DM・「削除されました」には付けられない（RE-7）
+  const canReact = message !== null && !deleted && canPost
   // 本文が空でも、添付が残れば保存できる
   const savable = editing !== null && (isSendable(editing) || (messageLength(editing) === 0 && keep.length > 0))
 
@@ -73,6 +88,22 @@ export default function MessageItem({
       if (e instanceof ApiError && e.status === 404) onGone(message.id)
     } finally {
       setSaving(false)
+    }
+  }
+
+  // 付ける・外す（RE-1・RE-3）。すぐに表示を変え、失敗したら戻して M-49（種類の上限なら M-42）を出す
+  async function react(emoji: string, on: boolean) {
+    if (!message || !me || reacting.current.some((e) => sameEmoji(e, emoji))) return
+    reacting.current = [...reacting.current, emoji]
+    const before = message.reactions
+    onReactions(message.id, toggled(before, emoji, me, on))
+    try {
+      onReactions(message.id, await (on ? addReaction : removeReaction)(message.id, emoji))
+    } catch (e) {
+      onReactions(message.id, before)
+      toast(e instanceof ApiError && e.code === 'REACTION_LIMIT' ? e.message : M[49])
+    } finally {
+      reacting.current = reacting.current.filter((e) => e !== emoji)
     }
   }
 
@@ -156,6 +187,10 @@ export default function MessageItem({
               </>
             )}
         {compact && editing === null && edited}
+        {message && !deleted && editing === null && (
+          <Reactions reactions={message.reactions} canReact={canReact} onOpenPicker={setPickerAnchor}
+            onToggle={(emoji) => react(emoji, !message.reactions.find((r) => r.emoji === emoji)?.reactedByMe)} />
+        )}
         {message && onOpenThread && message.replyCount > 0 && (
           // 返信の件数（TH-2）：返信した人のアバター（最大 3 人）・「（件数）件の返信」・最後の返信の時刻
           <button type="button" className={styles.replies} onClick={() => onOpenThread(message.id)}>
@@ -177,9 +212,13 @@ export default function MessageItem({
           </p>
         )}
       </div>
-      {message && !deleted && editing === null && (message.mine || message.canDelete || (onOpenThread && canPost)) && (
-        // メッセージに重ねたときに出す操作（MS-9・MS-10）
+      {message && !deleted && editing === null && (message.mine || message.canDelete || canReact) && (
+        // メッセージに重ねたときに出す操作（RE-1・TH-1・MS-9・MS-10）
         <div className={styles.actions}>
+          {canReact && (
+            <button type="button" className={styles.action} aria-label="リアクション" title="リアクション"
+              onClick={(e) => setPickerAnchor(e.currentTarget)}>😀</button>
+          )}
           {onOpenThread && canPost && (
             <button type="button" className={styles.action} aria-label="スレッドで返信" title="スレッドで返信"
               onClick={() => onOpenThread(message.id)}>💬</button>
@@ -193,6 +232,12 @@ export default function MessageItem({
               onClick={() => onDelete(message)}>🗑</button>
           )}
         </div>
+      )}
+      {pickerAnchor && (
+        <Suspense fallback={null}>
+          <EmojiPicker anchor={pickerAnchor} onClose={() => setPickerAnchor(null)}
+            onSelect={(emoji) => { setPickerAnchor(null); void react(emoji, true) }} />
+        </Suspense>
       )}
       {viewing !== null && (
         <ImageViewer images={attachments.filter((a) => a.kind === 'IMAGE')} start={viewing}
