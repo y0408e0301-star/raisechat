@@ -117,6 +117,9 @@ public enum ErrorCode {
 	// 「削除されました」のメッセージには付けられない
 	MESSAGE_DELETED(HttpStatus.FORBIDDEN, "操作に失敗しました。時間をおいてもう一度お試しください。"),
 
+	// 検索（FN-13 9 章。M-43）
+	QUERY_REQUIRED(HttpStatus.BAD_REQUEST, "検索する言葉を入力してください。"),
+
 	// 画面を通さずに送られた、条件に合わない入力（JSON が読めない、上限を超えた文字数など）
 	BAD_REQUEST(HttpStatus.BAD_REQUEST, "入力が正しくありません。"),
 

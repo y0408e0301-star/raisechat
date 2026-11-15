@@ -6,6 +6,7 @@ import { AuthContext } from '../auth/AuthContext'
 import { M } from '../messages'
 import { me } from '../test/render'
 import AppHeader from './AppHeader'
+import { ToastProvider } from './ToastProvider'
 
 // ヘッダー（画面設計書 2.6）。簡単なヘッダー（G-3・G-10）とワークスペース用のヘッダー（G-5 など）
 
@@ -13,7 +14,9 @@ function renderHeader(workspace?: { id: number, name: string, mentionCount?: num
   render(
     <MemoryRouter>
       <AuthContext value={{ me, signedIn: vi.fn(), signOut }}>
-        <AppHeader workspace={workspace && { mentionCount: 0, ...workspace }} />
+        <ToastProvider>
+          <AppHeader workspace={workspace && { mentionCount: 0, ...workspace }} />
+        </ToastProvider>
       </AuthContext>
     </MemoryRouter>,
   )

@@ -33,6 +33,8 @@ export type UserName = Schemas['UserName']
 export type MentionCandidate = Schemas['MentionCandidate']
 export type MentionPage = Schemas['MentionPage']
 export type MentionItem = Schemas['MentionItem']
+export type SearchPage = Schemas['SearchPage']
+export type SearchResult = Schemas['SearchResult']
 
 // API がエラーを返したとき（機能定義書 3.3）。message は画面にそのまま出せる文、
 // field があればその入力欄の下に出す
@@ -278,6 +280,19 @@ export function fetchMentions(workspaceId: number, cursor?: string | null): Prom
   return requestJson<MentionPage>('GET', `/api/workspaces/${workspaceId}/mentions${queryString({ cursor })}`)
 }
 
+// ---------------------------------------------------------------- FN-13 検索
+
+// 検索の条件（G-6 の URL の ?q=&conversation=&from= と同じ）
+export type SearchQuery = { q: string, conversationId: number | null, from: string | null }
+
+// 見られる会話のメッセージから、q の言葉をすべて含むものを新しい順に 20 件ずつ（SR-1〜SR-5）
+export function searchMessages(workspaceId: number, query: SearchQuery, cursor?: string | null): Promise<SearchPage> {
+  return requestJson<SearchPage>('GET', `/api/workspaces/${workspaceId}/search${queryString({
+    q: query.q, conversationId: query.conversationId === null ? null : String(query.conversationId),
+    from: query.from, cursor,
+  })}`)
+}
+
 // ---------------------------------------------------------------- FN-06 チャンネル
 
 // クエリを組み立てる（値がないものは付けない）
@@ -494,6 +509,13 @@ export const conversationPath = (c: { workspaceId: number, id: number, type: Con
 // メッセージの位置を開く（MS-14）。開いたら URL から外す（画面設計書 7 章）
 export const messagePath = (c: { workspaceId: number, id: number, type: ConversationSummary['type'] }, messageId: number) =>
   `${conversationPath(c)}?message=${messageId}`
+// G-6 検索結果画面。検索した文字と絞り込みを URL に入れる（画面設計書 8 章）
+export const searchUrl = (workspaceId: number, query: SearchQuery) => {
+  const params = new URLSearchParams({ q: query.q })
+  if (query.conversationId !== null) params.set('conversation', String(query.conversationId))
+  if (query.from) params.set('from', query.from)
+  return `/w/${workspaceId}/search?${params.toString()}`
+}
 // G-7 メンション一覧画面
 export const mentionsUrl = (workspaceId: number) => `/w/${workspaceId}/mentions`
 // G-8 チャンネル一覧画面

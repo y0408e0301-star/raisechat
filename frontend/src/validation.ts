@@ -6,6 +6,8 @@ export const WORKSPACE_NAME_MAX = 50
 export const CHANNEL_NAME_MAX = 80
 export const CHANNEL_DESCRIPTION_MAX = 250
 export const SEARCH_MAX = 80
+// メッセージ検索の文字（FN-13 4 章）
+export const MESSAGE_SEARCH_MAX = 100
 // G-9 のメンバーの絞り込み（FN-05 4 章）
 export const MEMBER_SEARCH_MAX = 30
 export const MESSAGE_MAX = 4000

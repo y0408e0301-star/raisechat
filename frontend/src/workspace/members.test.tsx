@@ -72,9 +72,9 @@ describe('G-9 メンバー一覧画面（MB-1、TC-05-1）', () => {
 
     expect(await screen.findByText(M[47])).toBeInTheDocument()
     expect(fetch.keys()).toContain(`${MEMBERS}?q=zz`)
-    await user.clear(screen.getByRole('searchbox'))
-    await user.type(screen.getByRole('searchbox'), 'a'.repeat(31))
-    expect(screen.getByRole('searchbox')).toHaveValue('a'.repeat(30))
+    await user.clear(screen.getByRole('searchbox', { name: '名前で絞り込む' }))
+    await user.type(screen.getByRole('searchbox', { name: '名前で絞り込む' }), 'a'.repeat(31))
+    expect(screen.getByRole('searchbox', { name: '名前で絞り込む' })).toHaveValue('a'.repeat(30))
   })
 
   it('読み込みに失敗したら M-48 と「再読み込み」を出す', async () => {

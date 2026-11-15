@@ -192,8 +192,19 @@ class MessageService {
 		long before = parseCursor(cursor);
 		List<MessageRepository.MentionRow> rows = this.messages.findMentions(me, workspaceId, before, MENTION_PAGE + 1);
 		List<MessageRepository.MentionRow> page = rows.subList(0, Math.min(MENTION_PAGE, rows.size()));
-		Map<Long, Message> found = this.messages
-			.findAllById(page.stream().map(MessageRepository.MentionRow::getMessageId).toList())
+		List<Found> found = found(me, page.stream().map(MessageRepository.MentionRow::getMessageId).toList());
+		List<MentionItem> items = new ArrayList<>();
+		for (int i = 0; i < page.size(); i++) {
+			items.add(new MentionItem(found.get(i).message(), found.get(i).conversation(), page.get(i).getRead()));
+		}
+		String next = (rows.size() > MENTION_PAGE) ? String.valueOf(page.getLast().getMessageId()) : null;
+		return new MentionPage(items, next);
+	}
+
+	// ID の並びのメッセージを、その順に、会話の名前と一緒に返す（G-7 のメンション・G-6 の検索）。
+	// どれも見られる会話のメッセージであることを、呼ぶ側が確かめておく
+	List<Found> found(long me, List<Long> ids) {
+		Map<Long, Message> found = this.messages.findAllById(ids)
 			.stream()
 			.collect(Collectors.toMap(Message::getId, Function.identity()));
 		Map<Long, Conversation> conversations = this.conversations
@@ -207,17 +218,18 @@ class MessageService {
 			.collect(Collectors.groupingBy(Message::getConversationId))
 			.forEach((conversationId, list) -> views(me, conversations.get(conversationId), list)
 				.forEach((v) -> views.put(v.id(), v)));
-		List<MentionItem> items = page.stream().map((row) -> {
-			MessageView view = views.get(row.getMessageId());
-			return new MentionItem(view,
-					MentionConversation.of(conversations.get(view.conversationId()), me, this.directMessages),
-					row.getRead());
+		return ids.stream().map((id) -> {
+			MessageView view = views.get(id);
+			return new Found(view,
+					MessageConversation.of(conversations.get(view.conversationId()), me, this.directMessages));
 		}).toList();
-		String next = (rows.size() > MENTION_PAGE) ? String.valueOf(page.getLast().getMessageId()) : null;
-		return new MentionPage(items, next);
 	}
 
-	private static long parseCursor(@Nullable String cursor) {
+	// 一覧に出すメッセージと、その会話
+	record Found(MessageView message, MessageConversation conversation) {
+	}
+
+	static long parseCursor(@Nullable String cursor) {
 		if (cursor == null || cursor.isEmpty()) {
 			return Long.MAX_VALUE;
 		}
@@ -684,15 +696,15 @@ class MessageService {
 	}
 
 	// メンションの一覧の 1 行。read は読んだか（読んでいなければ印を付ける。NT-5）
-	record MentionItem(MessageView message, MentionConversation conversation, boolean read) {
+	record MentionItem(MessageView message, MessageConversation conversation, boolean read) {
 	}
 
-	// メンションの一覧の会話。チャンネルは名前、DM は相手（FN-14 6 章）
-	record MentionConversation(long id, Conversation.Type type, @Nullable String name,
+	// メンションの一覧・検索の結果の会話。チャンネルは名前、DM は相手（FN-14・FN-13 6 章）
+	record MessageConversation(long id, Conversation.Type type, @Nullable String name,
 			@Nullable UserSummary dmPartner) {
 
-		static MentionConversation of(Conversation c, long me, DirectMessages directMessages) {
-			return new MentionConversation(c.getId(), c.getType(), c.getName(),
+		static MessageConversation of(Conversation c, long me, DirectMessages directMessages) {
+			return new MessageConversation(c.getId(), c.getType(), c.getName(),
 					(c.getType() == Conversation.Type.DM) ? directMessages.partner(c, me) : null);
 		}
 

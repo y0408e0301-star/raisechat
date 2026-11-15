@@ -1,7 +1,7 @@
 /* 画面設計書 2.6 ヘッダー。区切り線はヘッダーの下だけ */
 .header { position: sticky; top: 0; z-index: 10; background: var(--bg); border-bottom: 1px solid var(--line); }
-.inner { height: 56px; padding: 0 16px; display: flex; align-items: center; gap: 16px; }
-.left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.inner { position: relative; height: 56px; padding: 0 16px; display: flex; align-items: center; gap: 16px; }
+.left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 0 0 auto; max-width: 50%; }
 /* 2.2 アプリ名は 18px・太字 */
 .appName { font-size: 18px; font-weight: bold; color: var(--text); white-space: nowrap; }
 .appName:hover { text-decoration: none; }

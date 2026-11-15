@@ -16,11 +16,11 @@ import ConversationPage from './workspace/ConversationPage'
 import InvitesPage from './workspace/InvitesPage'
 import MembersPage from './workspace/MembersPage'
 import MentionsPage from './workspace/MentionsPage'
+import SearchPage from './workspace/SearchPage'
 import WorkspaceHome from './workspace/WorkspaceHome'
 import WorkspaceLayout from './workspace/WorkspaceLayout'
 
 // 画面と URL（画面一覧 1 章）。BrowserRouter（テストでは MemoryRouter）の中で使う。
-// G-6 は、メッセージ検索を作るときに足す（開発計画書 3 章）
 export default function App() {
   return (
     <AuthProvider>
@@ -47,6 +47,7 @@ export default function App() {
                 <Route index element={<WorkspaceHome />} />
                 <Route path="c/:conversationId" element={<ConversationPage />} />
                 <Route path="d/:conversationId" element={<ConversationPage />} />
+                <Route path="search" element={<SearchPage />} />
                 <Route path="mentions" element={<MentionsPage />} />
                 <Route path="channels" element={<ChannelsPage />} />
                 <Route path="members" element={<MembersPage />} />
