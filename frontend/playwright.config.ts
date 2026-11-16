@@ -41,6 +41,8 @@ export default defineConfig({
   globalTeardown: './e2e/cleanup.ts',
   // 同じ DB を使うので 1 つずつ順に動かす
   workers: 1,
+  // 1 つのテストの時間の上限。既定の 30 秒では、CI のランナーで最初にブラウザを起動するときに足りないことがあった
+  timeout: 60_000,
   fullyParallel: false,
   // 対応環境の代わりのブラウザで流すときは 1 回だけやり直す。ふだん（CI も）はやり直さない
   retries: process.env.E2E_BROWSERS === 'all' ? 1 : 0,
