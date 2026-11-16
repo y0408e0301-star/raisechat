@@ -69,25 +69,39 @@ export async function xsrfHeader(context: BrowserContext): Promise<Record<string
 export const now = () => Date.now()
 
 // ブラウザの中で、条件（ブラウザで動く関数の文字列）が成り立った時刻を待つ準備をする。
-// 返した関数を await すると、その時刻（ミリ秒）になる。準備は、相手が操作する前に済ませる
-export async function watchFor(page: Page, condition: string): Promise<() => Promise<number>> {
+// 返した関数を await すると、その時刻（ミリ秒）になる。準備は、相手が操作する前に済ませる。
+// 条件は、DOM が変わったときと、20ms ごとに確かめる（画像の読み込みが終わっても DOM は変わらないため）。
+// timeout ミリ秒たっても成り立たなければ失敗にする
+export async function watchFor(page: Page, condition: string, timeout = 120_000): Promise<() => Promise<number>> {
   const key = `perf${Math.random().toString(36).slice(2)}`
-  await page.evaluate(({ name, source }) => {
+  await page.evaluate(({ name, source, limit }) => {
     const check = new Function(`return (${source})`) as () => boolean
     const store = window as unknown as Record<string, Promise<number>>
-    store[name] = new Promise((resolve) => {
+    store[name] = new Promise((resolve, reject) => {
       const done = () => {
         if (!check()) return false
         resolve(performance.timeOrigin + performance.now())
         return true
       }
       if (done()) return
+      const stop = () => {
+        observer.disconnect()
+        clearInterval(timer)
+        clearTimeout(expiry)
+      }
       const observer = new MutationObserver(() => {
-        if (done()) observer.disconnect()
+        if (done()) stop()
       })
       observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true })
+      const timer = setInterval(() => {
+        if (done()) stop()
+      }, 20)
+      const expiry = setTimeout(() => {
+        stop()
+        reject(new Error(`${limit / 1000} 秒たっても画面に出ませんでした：${source}`))
+      }, limit)
     })
-  }, { name: key, source: condition })
+  }, { name: key, source: condition, limit: timeout })
   return () => page.evaluate((k) => (window as unknown as Record<string, Promise<number>>)[k], key)
 }
 
