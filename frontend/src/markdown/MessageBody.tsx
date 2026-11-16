@@ -40,6 +40,9 @@ const COMPONENTS: Components = {
   a: ({ href, children }) => (isWebUrl(href)
     ? <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
     : <>{children}</>),
+  // コードブロックは長い行を折り返さず横にスクロールするので、キーボードでもスクロールできるようフォーカスを受ける（WCAG 2.1.1）
+  // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+  pre: ({ children }) => <pre tabIndex={0}>{children}</pre>,
   // span は remarkMentions が作るメンションだけ
   span: ({ children, ...props }) => (
     <Mention username={(props as Record<string, unknown>)['data-mention']}>{children}</Mention>

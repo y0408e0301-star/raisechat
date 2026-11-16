@@ -7,7 +7,7 @@ Slack 風のチャットアプリ。ワークスペースを作り、その中�
 - 作る順番と進み具合：[開発計画書](docs/development-plan.md)
 - 開発ルール：[CONTRIBUTING.md](CONTRIBUTING.md)
 
-いまは API サーバーと画面の土台、ユーザー登録・ログイン、ワークスペースの作成・一覧とチャット画面の枠、メッセージの送信・一覧・編集・削除（開発計画書 1-1〜1-4）まで作っています。公開の手順は、作ったときに足します。
+いまは要件定義書のすべての機能（開発計画書 1-1〜1-16）と、画面を通したテスト（2-1）まで作っています。公開の手順は、作ったときに足します。
 
 ## 起動方法
 
@@ -72,8 +72,9 @@ npm ci
 | --- | --- | --- |
 | API サーバー | `backend` で `.\mvnw.cmd verify` | テスト（下の「API サーバーのテストの種類」）、書式チェック（spring-javaformat。直すときは `.\mvnw.cmd spring-javaformat:apply`）、静的解析（SpotBugs）。API の仕様書（docs/api/openapi.yaml）がコードと違えば、書き直して失敗する |
 | 画面 | `frontend` で `npm run lint` → `npm test` → `npm run build` | lint（oxlint。React Hooks の決まり・アクセシビリティを含む）、テスト（Vitest・Testing Library。下の「画面のテスト」）、型チェックとビルド |
+| 画面を通したテスト | `frontend` で `npm run test:e2e` | Playwright で、2 人分のブラウザでの主な流れ・各機能のシナリオ・権限・ログインの続き・つなぎ直し・全画面のアクセシビリティと横幅を画面から確かめる（下の「画面を通したテスト」） |
 
-Pull Request を作ったときは、GitHub Actions（[.github/workflows/ci.yml](.github/workflows/ci.yml)）が上の 2 つと、画面の API の型が仕様書と同じかを自動で確かめます。あわせて、Claude Code が差分をレビューしてコメントします（[.github/workflows/claude-code-review.yml](.github/workflows/claude-code-review.yml)）。
+Pull Request を作ったときは、GitHub Actions（[.github/workflows/ci.yml](.github/workflows/ci.yml)）が上の 3 つと、画面の API の型が仕様書と同じかを自動で確かめます。あわせて、Claude Code が差分をレビューしてコメントします（[.github/workflows/claude-code-review.yml](.github/workflows/claude-code-review.yml)）。
 
 ### API サーバーのテストの種類
 
@@ -103,6 +104,44 @@ Pull Request を作ったときは、GitHub Actions（[.github/workflows/ci.yml]
 
 - 絵文字の一覧（emoji-picker-element）は jsdom では動かないので、画面のテストでは選ぶボタンだけの偽物にします（`profile/profilePage.test.tsx`）
 - 添付を S3 へ直接 PUT する XMLHttpRequest は、テストの中で偽物に替え、進み具合・成功・失敗をテストから起こします（`attachments/attachments.test.tsx`）
+
+### 画面を通したテスト（E2E テスト）
+
+[frontend/e2e](frontend/e2e) のテストは、Playwright でブラウザ（パソコンに入っている Microsoft Edge）を動かし、本物の API と DB につないで、利用者の操作の流れ（シナリオ）を確かめます。リアルタイムの通知は、2〜3 人のユーザーを別々のブラウザ（Cookie を分けたコンテキスト）で同時に開き、相手の画面に開き直さずに出ることを確かめます。
+
+| ファイル | 確かめること |
+| --- | --- |
+| `main-flow.spec.ts` | 主な流れ（ワークスペースを作る → 招待リンク → ログインしていない人が登録して参加 → メッセージ・スレッド・リアクション・DM が相手に出る） |
+| `channels.spec.ts` | 公開チャンネルの作成・G-8 で探して参加、プライベートチャンネルの招待・退出、オーナーの削除（M-28） |
+| `messages.spec.ts` | 編集・削除とオーナーの削除、Markdown と HTML、メンションの候補・未読とメンションの件数・G-7、検索（M-43・M-44・位置を開く） |
+| `members.spec.ts` | 招待リンクの取り消し（M-18）、キック（M-22）とまた参加したときの DM（M-36）、退出、ワークスペースの削除（M-15） |
+| `attachments.spec.ts` | 画像の添付（縮小した画像・拡大・編集で外す・送れない形式）、リアクションの付け外し、プロフィール（表示名・ステータス・アバター） |
+| `security.spec.ts` | ログインしていないと使えない、見られる範囲の外のデータを画面からも API からも取れない、オーナーだけの操作、CSRF、5 回の失敗でロック |
+| `session.spec.ts` | JWT が切れてもリフレッシュトークンで使い続けられる、ログアウト後・使い回したリフレッシュトークンは使えない、インターネットが切れたとき（M-50）、WebSocket が切れたとき（M-37 とつなぎ直し・取りこぼしの取り直し） |
+| `screens.spec.ts` | すべての画面（G-1〜G-18）に、アクセシビリティの違反（axe-core。WCAG 2.1 の A・AA）と横のスクロールがない |
+
+画面の幅は 2 通りで動かします（[playwright.config.ts](frontend/playwright.config.ts) の projects）。`pc`（1280px）ではすべてを、`mobile`（375px。タッチの画面）では `main-flow.spec.ts` と `screens.spec.ts` を動かします。
+
+使い方：
+
+1. データベース・API サーバー・画面を「起動する」のとおりに起動します
+2. `frontend` で `npm run test:e2e` を実行します（2〜3 分）。1 つのファイルだけなら `npm run test:e2e -- channels`、片方の幅だけなら `-- --project=pc`
+
+- 行き先は既定で画面の Vite（5173）です。環境変数 `E2E_BASE_URL` で変えられます（CI は jar の 8080）
+- 環境変数 `E2E_BROWSERS=all` を付けると、Edge に加えて Chrome・Firefox・WebKit（Safari の代わり）・iPhone と Android のエミュレーションでも流します（Firefox と WebKit は先に `npx playwright install firefox webkit`）
+- テストは開発用の DB にユーザー（ID が `e2e_` で始まる）とワークスペースを作り、テストを始める前と終わった後に `docker compose exec` で DB から消します
+- 添付・アバターを使うテストは、S3 の開発用のバケットにファイルを置きます。テストを始める前と終わった後に、テストのワークスペースの `workspaces/{ID}/` とテストのユーザーのアバターを `aws s3 rm` で消します（`aws configure` を済ませておきます）
+- 落ちたテストは `frontend/test-results/` にトレースが残ります。`npx playwright show-trace <trace.zip のパス>` で、操作ごとの画面を見られます
+
+### 画面も入れた jar
+
+E2E の CI では、画面も入れた jar 1 つでアプリを動かします（公開先の画面は CloudFront が配るので、この jar の画面は使いません）。
+
+1. `frontend` で `npm run build`
+2. `backend` で `.\mvnw.cmd clean package -Pwith-frontend`（画面をビルドしていなければ止まります）
+3. 環境変数 `WEB_ORIGIN=http://localhost:8080` を付けて `java -jar target\backend-0.0.1-SNAPSHOT.jar` で起動すると、http://localhost:8080/ で画面も使えます（API サーバーと同じ 8080 なので、開発用の API サーバーは止めておきます）。WebSocket の Origin が画面の URL と同じでないとつながらないため、`WEB_ORIGIN` を付けます
+
+S3 の開発用バケットの CORS は http://localhost:5173 だけを許しているので、jar の画面から添付を送るには、CI と同じく MinIO（S3 の代わり）を使います（[.github/actions/start-app/action.yml](.github/actions/start-app/action.yml) と同じ手順。MinIO は 9000 で起動し、`S3_ENDPOINT`・`S3_ACCESS_KEY`・`S3_SECRET_KEY`・`S3_BUCKET` で接続先を渡します）。
 
 ## API の仕様書（OpenAPI）
 
