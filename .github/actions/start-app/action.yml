@@ -48,5 +48,5 @@ runs:
         (cd frontend && npm run build)
         (cd backend && ./mvnw -B -q package -Pwith-frontend -DskipTests)
         # ヒープは、公開先のタスクのメモリ（2GB）の 75%（開発計画書 2-3）
-        nohup java -Xmx1536m -jar backend/target/backend-0.0.1-SNAPSHOT.jar ${PROFILE:+--spring.profiles.active=$PROFILE}           > "$LOG" 2>&1 &
+        nohup java -Xmx1536m -jar backend/target/backend-0.0.1-SNAPSHOT.jar ${PROFILE:+--spring.profiles.active=$PROFILE} > "$LOG" 2>&1 &
         timeout 120 sh -c 'until curl -sf http://localhost:8080/actuator/health; do sleep 2; done'

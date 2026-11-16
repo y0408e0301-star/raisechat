@@ -27,9 +27,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.example.raisechat.TestcontainersConfiguration;
 import com.example.raisechat.common.ErrorCode;
@@ -268,7 +269,7 @@ class SearchApiTests {
 	// 1〜2 文字の言葉でも GIN の索引で全部の行を読み直す（性能テストで約 5 秒）。検索の取引の中だけ、毎回計画を立てさせる。
 	// テストのデータは少なく計画の違いは時間に出ないので、設定が検索の取引の中で効き、外には残らないことを確かめる
 	@Test
-	void 検索は毎回言葉を見て計画を立て_その設定は取引の外に残さない() {
+	void 検索は毎回言葉を見て計画を立て_その設定は取引の外に残さない() throws NoSuchMethodException {
 		send(this.taro, this.general, "会議の資料");
 		long me = userId(this.jdbc, "taro_y");
 		TransactionTemplate transaction = new TransactionTemplate(this.transactionManager);
@@ -280,6 +281,11 @@ class SearchApiTests {
 		});
 		assertThat(inside).isEqualTo("force_custom_plan");
 		assertThat(this.jdbc.queryForObject("SHOW plan_cache_mode", String.class)).isEqualTo("auto");
+		// 上は外側の取引の中で呼んでいるので、search 自身が取引を始めること（@Transactional）も確かめる。
+		// 取引の外で SET LOCAL を実行しても効かない
+		assertThat(SearchService.class
+			.getDeclaredMethod("search", long.class, long.class, String.class, Long.class, String.class, String.class)
+			.isAnnotationPresent(Transactional.class)).isTrue();
 	}
 
 }
