@@ -27,6 +27,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
 import com.example.raisechat.TestcontainersConfiguration;
@@ -47,6 +49,12 @@ class SearchApiTests {
 
 	@Autowired
 	JdbcTemplate jdbc;
+
+	@Autowired
+	SearchService searchService;
+
+	@Autowired
+	PlatformTransactionManager transactionManager;
 
 	private Cookie taro;
 
@@ -254,6 +262,24 @@ class SearchApiTests {
 		// 日本語の文字が索引の言葉（trigram）になる（LC_CTYPE が C だとならない。技術スタック定義書）
 		assertThat(this.jdbc.queryForObject("SELECT array_length(show_trgm('集合場所'), 1)", Integer.class))
 			.isGreaterThan(0);
+	}
+
+	// データ設計書 8.3：PostgreSQL は同じ SQL を 5 回より多く実行すると、言葉の長さを見ない汎用の計画に替えることがあり、
+	// 1〜2 文字の言葉でも GIN の索引で全部の行を読み直す（性能テストで約 5 秒）。検索の取引の中だけ、毎回計画を立てさせる。
+	// テストのデータは少なく計画の違いは時間に出ないので、設定が検索の取引の中で効き、外には残らないことを確かめる
+	@Test
+	void 検索は毎回言葉を見て計画を立て_その設定は取引の外に残さない() {
+		send(this.taro, this.general, "会議の資料");
+		long me = userId(this.jdbc, "taro_y");
+		TransactionTemplate transaction = new TransactionTemplate(this.transactionManager);
+		String inside = transaction.execute((status) -> {
+			for (int i = 0; i < 7; i++) {
+				assertThat(this.searchService.search(me, this.workspace, "会議", null, null, null).items()).hasSize(1);
+			}
+			return this.jdbc.queryForObject("SHOW plan_cache_mode", String.class);
+		});
+		assertThat(inside).isEqualTo("force_custom_plan");
+		assertThat(this.jdbc.queryForObject("SHOW plan_cache_mode", String.class)).isEqualTo("auto");
 	}
 
 }
