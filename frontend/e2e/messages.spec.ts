@@ -97,7 +97,7 @@ test('メンションと未読が開き直さずに一覧・サイドバーに�
 
   // NT-1・NT-2 サイドバーとヘッダーにメンションの件数
   await row.click()
-  await expect(hanaPage.getByRole('link', { name: 'メンション 1 件' })).toBeVisible()
+  await expect(hanaPage.getByRole('banner').getByRole('link', { name: 'メンション 1 件' })).toBeVisible()
   // NT-5 G-7 から押すと、その会話を開いてメッセージを目立たせ、件数が消える
   await hanaPage.goto(`/w/${workspace.id}/mentions`)
   await hanaPage.getByRole('button', { name: /確認お願いします/ }).click()
@@ -105,7 +105,7 @@ test('メンションと未読が開き直さずに一覧・サイドバーに�
   await expect(mention).toBeVisible()
   // MN-3 記録したメンションは「@ユーザー ID」を目立たせる
   await expect(mention.getByText(`@${hana.username}`, { exact: true })).toBeVisible()
-  await expect(hanaPage.getByRole('link', { name: 'メンション 1 件' })).toHaveCount(0)
+  await expect(hanaPage.getByRole('banner').getByRole('link', { name: 'メンション 1 件' })).toHaveCount(0)
 })
 
 test('検索した結果を押すと、そのメッセージ（スレッドの返信は親とスレッド）の位置を開く', async ({ browser }) => {
