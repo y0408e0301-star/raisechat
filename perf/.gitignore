@@ -1,0 +1,3 @@
+# 性能テストの結果（npm run perf）。測るたびに作り直すので、リポジトリには入れない
+results/
+api.log

@@ -81,6 +81,10 @@ class SearchService {
 			params.addValue("from", from.strip());
 		}
 		sql.append(" ORDER BY m.id DESC LIMIT :limit");
+		// 毎回、言葉の長さを見て計画を立てさせる（データ設計書 8.3）。PostgreSQL は同じ SQL を 5 回実行すると、パラメータを見ない
+		// 汎用の計画に替えることがあり、そうなると 1〜2 文字の言葉でも本文の GIN の索引を使って、全部の行を読み直す
+		// （11.1 の件数で約 5 秒）。この取引の中だけの設定（SET LOCAL）
+		this.jdbc.getJdbcTemplate().execute("SET LOCAL plan_cache_mode = force_custom_plan");
 		List<Long> ids = this.jdbc.queryForList(sql.toString(), params, Long.class);
 		List<Long> page = ids.subList(0, Math.min(PAGE_SIZE, ids.size()));
 		List<SearchResult> items = this.messageService.found(me, page)
