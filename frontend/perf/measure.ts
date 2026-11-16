@@ -78,8 +78,14 @@ export async function watchFor(page: Page, condition: string, timeout = 120_000)
     const check = new Function(`return (${source})`) as () => boolean
     const store = window as unknown as Record<string, Promise<number>>
     store[name] = new Promise((resolve, reject) => {
+      // 条件を書き間違えて例外になったときは、2 分待たずにすぐ失敗にする
       const done = () => {
-        if (!check()) return false
+        try {
+          if (!check()) return false
+        } catch (e) {
+          reject(e)
+          return true
+        }
         resolve(performance.timeOrigin + performance.now())
         return true
       }
@@ -101,6 +107,8 @@ export async function watchFor(page: Page, condition: string, timeout = 120_000)
         reject(new Error(`${limit / 1000} 秒たっても画面に出ませんでした：${source}`))
       }, limit)
     })
+    // 返した関数を await する前に失敗しても、ブラウザに「処理されていない失敗」として出さない（await したときに失敗が届く）
+    store[name].catch(() => {})
   }, { name: key, source: condition, limit: timeout })
   return () => page.evaluate((k) => (window as unknown as Record<string, Promise<number>>)[k], key)
 }
