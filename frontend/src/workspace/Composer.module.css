@@ -1,7 +1,8 @@
 /* 画面設計書 2.14 入力欄。枠は区切り線の色 */
 .composer { margin: 0 16px 16px; padding: 4px 8px 8px; border: 1px solid var(--line); border-radius: 8px; }
 .composer:focus-within { border-color: var(--sub); }
-.toolbar { display: flex; align-items: center; gap: 4px; }
+/* 狭い画面で入りきらないときは「送信」を次の行に折り返す（N-29） */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 /* 2.3 アイコンボタン（32px 四方） */
 .icon {
   min-width: 32px; height: 32px; padding: 0 4px; border: none; border-radius: 8px; background: none; cursor: pointer;

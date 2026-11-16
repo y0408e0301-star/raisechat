@@ -43,9 +43,26 @@
   background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
   opacity: 0; pointer-events: none;
 }
-.message:hover .actions, .message:focus-within .actions { opacity: 1; pointer-events: auto; }
+/* 重ねて出すのはマウスのときだけ（タッチで押すとブラウザが重ねたことにするため）。キーボードで移ったときも出す */
+@media (hover: hover) {
+  .message:hover .actions { opacity: 1; pointer-events: auto; }
+}
+.message:focus-within .actions { opacity: 1; pointer-events: auto; }
 .action { width: 32px; height: 32px; border: none; border-radius: 6px; background: none; cursor: pointer; }
 .action:hover { background: var(--frame); }
+.actionLabel { display: none; }
+
+/* スマートフォンで長押ししたとき（画面設計書 2.9）。後ろを黒・透明度 50% で覆い、操作を文字つきで下から出す */
+.sheetBackdrop { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.5); }
+.sheet .actions {
+  position: fixed; top: auto; left: 0; right: 0; bottom: 0; z-index: 41; flex-direction: column; gap: 0;
+  padding: 8px 0 16px; border: none; border-radius: 8px 8px 0 0; opacity: 1; pointer-events: auto;
+}
+.sheet .action {
+  display: flex; align-items: center; gap: 12px; width: 100%; height: 48px; padding: 0 16px; border-radius: 0;
+  text-align: left; font-size: 18px;
+}
+.sheet .actionLabel { display: inline; color: var(--text); font-size: 15px; }
 
 /* 編集の状態（MS-9） */
 .editor { border: 1px solid var(--sub); border-radius: 8px; padding: 4px 8px 8px; background: var(--bg); }
@@ -54,7 +71,6 @@
 
 /* スマートフォンでは操作を常に出し、押せる大きさを 44px にする */
 @media (pointer: coarse) {
-  .actions { position: static; margin-left: auto; border: none; background: none; opacity: 1; pointer-events: auto; }
   .action { width: 44px; height: 44px; }
 }
 

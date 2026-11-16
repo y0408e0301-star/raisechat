@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react'
+import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clearDrafts } from '../drafts'
@@ -6,6 +6,7 @@ import { M } from '../messages'
 import { json, mockFetch, sentJson, type Handler } from '../test/fetchMock'
 import { me } from '../test/render'
 import { opened, renderAt } from '../test/workspace'
+import styles from './MessageItem.module.css'
 
 // G-5 の会話のメッセージ（FN-07 MS-1〜MS-4・MS-6〜MS-13・MS-15）
 
@@ -267,6 +268,37 @@ describe('編集と削除（MS-9〜MS-11）', () => {
     expect(await screen.findByText(M[49])).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByText('消す')).toBeInTheDocument()
+  })
+
+  // 画面設計書 2.9 スマートフォンでは、長押しで操作を下からのメニューで出す
+  it('指で長押しすると操作のメニューを出し、短く押す・指を動かすときは出さない', async () => {
+    openGeneral({ 'GET /api/conversations/10/messages': page([message(1, '長押し')]) })
+    await screen.findByText('長押し')
+    const item = articles()[0]
+    const press = async (moveTo?: number) => {
+      fireEvent.pointerDown(item, { pointerType: 'touch', clientX: 10, clientY: 10 })
+      if (moveTo !== undefined) fireEvent.pointerMove(item, { pointerType: 'touch', clientX: 10, clientY: moveTo })
+      await act(() => new Promise((resolve) => setTimeout(resolve, 600)))
+      fireEvent.pointerUp(item, { pointerType: 'touch' })
+    }
+    // マウスでは長押しにしない
+    fireEvent.pointerDown(item, { pointerType: 'mouse' })
+    await act(() => new Promise((resolve) => setTimeout(resolve, 600)))
+    expect(item).not.toHaveClass(styles.sheet)
+    // スクロール（指が 10px より動いた）は長押しにしない
+    await press(40)
+    expect(item).not.toHaveClass(styles.sheet)
+
+    await press()
+    expect(item).toHaveClass(styles.sheet)
+    // 後ろを押すと閉じる
+    fireEvent.click(item.querySelector(`.${styles.sheetBackdrop}`)!)
+    expect(item).not.toHaveClass(styles.sheet)
+    // 操作を選ぶと閉じて、その操作をする
+    await press()
+    await userEvent.click(within(item).getByRole('button', { name: '削除' }))
+    expect(item).not.toHaveClass(styles.sheet)
+    expect(screen.getByRole('dialog', { name: 'メッセージの削除' })).toBeInTheDocument()
   })
 })
 

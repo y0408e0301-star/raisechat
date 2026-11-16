@@ -1,4 +1,4 @@
-import { Suspense, lazy, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState, type PointerEvent } from 'react'
 import { addReaction, ApiError, editMessage, removeReaction, type MessageView, type ReactionView } from '../api'
 import AttachmentList from '../attachments/AttachmentList'
 import attachmentStyles from '../attachments/Attachments.module.css'
@@ -20,6 +20,14 @@ import Reactions from './Reactions'
 
 // 絵文字の一覧（emoji-picker-element）は大きいので、初めて開くときに読み込む
 const EmojiPicker = lazy(() => import('../components/EmojiPicker'))
+
+// 長押しとみなす時間と、指がこれ以上動いたら長押しにしない距離（px。スクロールと見分ける）
+const LONG_PRESS_MS = 500
+const LONG_PRESS_MOVE = 10
+
+// メッセージの操作（画面設計書 2.9）。重ねたときの右上のアイコンと、長押しの下からのメニューで使う
+type Action = 'リアクション' | 'スレッドで返信' | '編集' | '削除'
+const ICONS: Record<Action, string> = { リアクション: '😀', スレッドで返信: '💬', 編集: '✎', 削除: '🗑' }
 
 type Props = {
   entry: Entry
@@ -61,6 +69,20 @@ export default function MessageItem({
   const [pickerAnchor, setPickerAnchor] = useState<HTMLElement | null>(null)
   // API の応答を待っている絵文字。続けて押しても、応答が届くまでは送らない
   const reacting = useRef<string[]>([])
+  // スマートフォンで長押しして、操作を下からのメニューで出している（画面設計書 2.9）
+  const [sheet, setSheet] = useState(false)
+  const press = useRef<{ timer: number, x: number, y: number } | null>(null)
+  const article = useRef<HTMLElement>(null)
+
+  useEffect(() => () => window.clearTimeout(press.current?.timer), [])
+  useEffect(() => {
+    if (!sheet) return
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setSheet(false)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [sheet])
 
   const message = entry.kind === 'sent' ? entry.message : null
   const author = entry.kind === 'sent' ? entry.message.author : entry.author
@@ -122,8 +144,45 @@ export default function MessageItem({
   // 編集したメッセージは時刻の後ろに出す（MS-9）。時刻を隠す続けたメッセージでは、本文の後ろに出す
   const edited = message?.editedAt && !deleted ? <span className={styles.edited}>（編集済み）</span> : null
 
+  // 指で長押ししたら、操作を下からのメニューで出す。指が動いた（スクロールした）・離したときはやめる
+  function startPress(e: PointerEvent<HTMLElement>) {
+    if (e.pointerType !== 'touch') return
+    window.clearTimeout(press.current?.timer)
+    press.current = { timer: window.setTimeout(() => setSheet(true), LONG_PRESS_MS), x: e.clientX, y: e.clientY }
+  }
+  function movePress(e: PointerEvent<HTMLElement>) {
+    if (press.current && Math.hypot(e.clientX - press.current.x, e.clientY - press.current.y) > LONG_PRESS_MOVE) endPress()
+  }
+  function endPress() {
+    window.clearTimeout(press.current?.timer)
+    press.current = null
+  }
+
+  // 操作を押したら、下からのメニューは閉じる。絵文字の一覧は、メニューから開いたときはメッセージの近くに出す
+  function act(action: Action, button: HTMLElement) {
+    if (!message) return
+    setSheet(false)
+    if (action === 'リアクション') setPickerAnchor(sheet ? article.current : button)
+    if (action === 'スレッドで返信') onOpenThread?.(message.id)
+    if (action === '編集') startEditing()
+    if (action === '削除') onDelete(message)
+  }
+
+  const actions: Action[] = message && !deleted && editing === null
+    ? [
+        ...(canReact ? ['リアクション' as const] : []),
+        ...(onOpenThread && canPost ? ['スレッドで返信' as const] : []),
+        ...(message.mine ? ['編集' as const] : []),
+        ...(message.canDelete ? ['削除' as const] : []),
+      ]
+    : []
+
   return (
-    <article className={`${styles.message} ${compact ? styles.compact : ''} ${entry.kind === 'pending' && !entry.failed ? styles.sending : ''} ${mentionsMe ? styles.toMe : ''} ${highlighted ? styles.highlight : ''}`}
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- 長押しはタッチだけの近道。操作はボタンでもできる
+    <article ref={article} onPointerDown={startPress} onPointerMove={movePress} onPointerUp={endPress}
+      // 長押しで出るブラウザのメニューは出さない（Android の Chrome は長押しで contextmenu を出す）
+      onPointerCancel={endPress} onContextMenu={(e) => { if (press.current || sheet) e.preventDefault() }}
+      className={`${styles.message} ${sheet ? styles.sheet : ''} ${compact ? styles.compact : ''} ${entry.kind === 'pending' && !entry.failed ? styles.sending : ''} ${mentionsMe ? styles.toMe : ''} ${highlighted ? styles.highlight : ''}`}
       data-message-id={message?.id}
       aria-label={`${author.displayName}のメッセージ`}>
       <div className={styles.side}>
@@ -218,26 +277,20 @@ export default function MessageItem({
           </p>
         )}
       </div>
-      {message && !deleted && editing === null && (message.mine || message.canDelete || canReact) && (
-        // メッセージに重ねたときに出す操作（RE-1・TH-1・MS-9・MS-10）
-        <div className={styles.actions}>
-          {canReact && (
-            <button type="button" className={styles.action} aria-label="リアクション" title="リアクション"
-              onClick={(e) => setPickerAnchor(e.currentTarget)}>😀</button>
-          )}
-          {onOpenThread && canPost && (
-            <button type="button" className={styles.action} aria-label="スレッドで返信" title="スレッドで返信"
-              onClick={() => onOpenThread(message.id)}>💬</button>
-          )}
-          {message.mine && (
-            <button type="button" className={styles.action} aria-label="編集" title="編集"
-              onClick={startEditing}>✎</button>
-          )}
-          {message.canDelete && (
-            <button type="button" className={styles.action} aria-label="削除" title="削除"
-              onClick={() => onDelete(message)}>🗑</button>
-          )}
-        </div>
+      {actions.length > 0 && (
+        // 操作（RE-1・TH-1・MS-9・MS-10）。マウスではメッセージに重ねたとき右上に、スマートフォンでは長押しで下から出す
+        <>
+          {sheet && <div className={styles.sheetBackdrop} aria-hidden="true" onClick={() => setSheet(false)} />}
+          <div className={styles.actions}>
+            {actions.map((action) => (
+              <button key={action} type="button" className={styles.action} aria-label={action} title={action}
+                onClick={(e) => act(action, e.currentTarget)}>
+                <span aria-hidden="true">{ICONS[action]}</span>
+                <span className={styles.actionLabel} aria-hidden="true">{action}</span>
+              </button>
+            ))}
+          </div>
+        </>
       )}
       {pickerAnchor && (
         <Suspense fallback={null}>

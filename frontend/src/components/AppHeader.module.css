@@ -21,7 +21,10 @@
 /* 自分のアバターのボタン（枠なし） */
 .me { display: inline-flex; padding: 0; border: none; border-radius: 50%; background: none; cursor: pointer; }
 
-/* 画面の横幅が 600px 未満のときは、ワークスペース用のヘッダーではアプリ名を出さない */
+/* 画面の横幅が 600px 未満のときは、ワークスペース用のヘッダーではアプリ名を出さない。
+   ワークスペースの名前は残りの幅に縮めて「…」で省き、ヘッダーを横にはみ出させない（N-29） */
 @media (max-width: 599px) {
   .hideNarrow { display: none; }
+  .inner { gap: 8px; }
+  .left { flex: 1 1 auto; max-width: none; }
 }

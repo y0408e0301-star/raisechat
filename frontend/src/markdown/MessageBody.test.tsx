@@ -19,7 +19,7 @@ describe('MessageBody', () => {
   it('MS-6 の記法を飾りにする', () => {
     expect(html('**太字** *斜体* _斜体_ ~~取り消し~~ `コード`')).toBe(
       '<p><strong>太字</strong> <em>斜体</em> <em>斜体</em> <del>取り消し</del> <code>コード</code></p>')
-    expect(html('```\nconst a = 1\n```')).toBe('<pre><code>const a = 1\n</code></pre>')
+    expect(html('```\nconst a = 1\n```')).toBe('<pre tabindex="0"><code>const a = 1\n</code></pre>')
     expect(html('> 引用')).toBe('<blockquote>\n<p>引用</p>\n</blockquote>')
     expect(html('- a\n* b')).toContain('<ul>')
     expect(html('1. a\n2. b')).toContain('<ol>')
