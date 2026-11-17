@@ -3,7 +3,7 @@
 
 tf=deploy/terraform
 
-# -y を付けると、terraform plan の内容を確かめずに反映する
+# -y を付けると、terraform plan の内容を確かめずに反映する（source した側のスクリプトの第 1 引数を見る）
 auto_approve=false
 if [[ "${1:-}" == -y ]]; then
   auto_approve=true
