@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
-  closeContexts, composer, createWorkspace, join, messageAction, messageItem, openConversation, postMessage, postReply,
+  closeContexts, composer, createChannel, createWorkspace, join, messageAction, messageItem, openConversation, postMessage, postReply,
   runId, send, sendFrom, sidebar, signup, subscribed, toast, user, USER_QUEUE,
 } from './helpers.ts'
 
@@ -95,9 +95,12 @@ test('メンションと未読が開き直さずに一覧・サイドバーに�
   const row = hanaPage.getByRole('link', { name: new RegExp(workspace.name) })
   await expect(row.getByLabel('メンション 1 件')).toBeVisible()
 
-  // NT-1・NT-2 サイドバーとヘッダーにメンションの件数
-  await row.click()
+  // NT-1・NT-2 サイドバーとヘッダーにメンションの件数。行を押すと general が開いて読んだことになり、件数がすぐ消えるので、
+  // 自分で作ったほかのチャンネルを開いて確かめる
+  const other = await createChannel(hanaPage, workspace, `other-${runId()}`)
+  await openConversation(hanaPage, workspace, other.id)
   await expect(hanaPage.getByRole('banner').getByRole('link', { name: 'メンション 1 件' })).toBeVisible()
+  await expect((await sidebar(hanaPage)).getByRole('link', { name: /general/ }).getByLabel('メンション 1 件')).toBeVisible()
   // NT-5 G-7 から押すと、その会話を開いてメッセージを目立たせ、件数が消える
   await hanaPage.goto(`/w/${workspace.id}/mentions`)
   await hanaPage.getByRole('button', { name: /確認お願いします/ }).click()

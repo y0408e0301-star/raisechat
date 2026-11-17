@@ -155,6 +155,7 @@ describe('退出（MB-5、TC-05-6）', () => {
 })
 
 describe('ワークスペースの削除（W-6）', () => {
+  // M-14、TC-03-7、N-28
   it('名前が同じになるまで「削除」を押せず、削除すると G-3 に移る', async () => {
     const fetch = open('/w/3/members', {
       [MEMBERS]: page([taro]),
@@ -212,6 +213,7 @@ describe('ワークスペースから外れたときの通知（MB-4・W-7、TC-
     expect(location()).toHaveTextContent(/^\/$/)
   })
 
+  // TC-03-10
   it('削除されたらメンバーには M-15 を出して G-3 に移る', async () => {
     const client = await connected('MEMBER')
 

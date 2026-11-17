@@ -46,6 +46,7 @@ afterEach(() => {
 })
 
 describe('G-16 を開く', () => {
+  // MN-7
   it('メッセージの名前を押すと、いまのプロフィール（アバター・表示名・@ユーザー ID・ステータスと消す時刻）を出す（PF-7）', async () => {
     vi.useFakeTimers({ now: new Date('2026-11-14T01:00:00Z'), shouldAdvanceTime: true })
     const fetch = openGeneral({
@@ -80,6 +81,7 @@ describe('G-16 を開く', () => {
   })
 
   // TC-02-7
+  // TC-12-2
   it('自分には「メッセージを送る」を出さない', async () => {
     openGeneral({ 'GET /api/workspaces/3/members/taro_y': () => json(200, member(me, { role: 'OWNER' })) })
     const user = userEvent.setup()

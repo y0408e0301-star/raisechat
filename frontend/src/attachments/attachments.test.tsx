@@ -331,6 +331,7 @@ describe('メッセージの添付（AT-5〜AT-8）と G-17', () => {
     expect(screen.getByRole('button', { name: '78.pngを大きく見る' })).toHaveFocus()
   })
 
+  // TC-09-8（Safari で再生できない WebM の代わりに、再生できないことを知らせる）
   it('動画は再生の部品とファイル名・大きさ・「ダウンロード」を出す。再生できない形式は M-41', async () => {
     vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockImplementation((type) => (type === 'video/mp4' ? 'maybe' : ''))
     const mp4 = attachment(80, { kind: 'VIDEO', contentType: 'video/mp4', fileName: 'movie.mp4', size: 86_400_000,

@@ -157,6 +157,7 @@ describe('DM の会話（DM-5・DM-6）', () => {
     expect(screen.queryByRole('textbox', { name: 'メッセージ' })).not.toBeInTheDocument()
   })
 
+  // TC-05-5
   it('開いている間に相手がキックされたら、すぐ M-36 に替わり、また参加したら入力欄に戻る（TC-12-6）', async () => {
     open('/w/3/d/50')
     await screen.findByRole('textbox', { name: 'メッセージ' })

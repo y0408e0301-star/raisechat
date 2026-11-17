@@ -117,8 +117,9 @@ Pull Request を作ったときは、GitHub Actions（[.github/workflows/ci.yml]
 | `members.spec.ts` | 招待リンクの取り消し（M-18）、キック（M-22）とまた参加したときの DM（M-36）、退出、ワークスペースの削除（M-15） |
 | `attachments.spec.ts` | 画像の添付（縮小した画像・拡大・編集で外す・送れない形式）、リアクションの付け外し、プロフィール（表示名・ステータス・アバター） |
 | `security.spec.ts` | ログインしていないと使えない、見られる範囲の外のデータを画面からも API からも取れない、オーナーだけの操作、CSRF、5 回の失敗でロック |
-| `session.spec.ts` | JWT が切れてもリフレッシュトークンで使い続けられる、ログアウト後・使い回したリフレッシュトークンは使えない、インターネットが切れたとき（M-50）、WebSocket が切れたとき（M-37 とつなぎ直し・取りこぼしの取り直し） |
+| `session.spec.ts` | ブラウザを開き直してもログインしたまま、JWT が切れてもリフレッシュトークンで使い続けられる、ログアウト後・使い回したリフレッシュトークンは使えない、インターネットが切れたとき（M-50）、WebSocket が切れたとき（M-37 とつなぎ直し・取りこぼしの取り直し） |
 | `screens.spec.ts` | すべての画面（G-1〜G-18）に、アクセシビリティの違反（axe-core。WCAG 2.1 の A・AA）と横のスクロールがない |
+| `cross-browser.spec.ts` | Edge と、ほかの環境の代わりのブラウザ（Chrome・Firefox・WebKit・iPhone と Android のエミュレーション）の間で、メッセージが開き直さずに出る（`E2E_BROWSERS=all` のときだけ） |
 
 画面の幅は 2 通りで動かします（[playwright.config.ts](frontend/playwright.config.ts) の projects）。`pc`（1280px）ではすべてを、`mobile`（375px。タッチの画面）では `main-flow.spec.ts` と `screens.spec.ts` を動かします。
 
@@ -128,6 +129,7 @@ Pull Request を作ったときは、GitHub Actions（[.github/workflows/ci.yml]
 2. `frontend` で `npm run test:e2e` を実行します（2〜3 分）。1 つのファイルだけなら `npm run test:e2e -- channels`、片方の幅だけなら `-- --project=pc`
 
 - 行き先は既定で画面の Vite（5173）です。環境変数 `E2E_BASE_URL` で変えられます（CI は jar の 8080）
+- 環境ごとの結果と、要件 ID とテストの対応は[テスト仕様書](docs/test/test-specification.md)に書きます。テストを足したら `node scripts/requirement-coverage.mjs` で対応表を作り直します
 - 環境変数 `E2E_BROWSERS=all` を付けると、Edge に加えて Chrome・Firefox・WebKit（Safari の代わり）・iPhone と Android のエミュレーションでも流します（Firefox と WebKit は先に `npx playwright install firefox webkit`）
 - テストは開発用の DB にユーザー（ID が `e2e_` で始まる）とワークスペースを作り、テストを始める前と終わった後に `docker compose exec` で DB から消します
 - 添付・アバターを使うテストは、S3 の開発用のバケットにファイルを置きます。テストを始める前と終わった後に、テストのワークスペースの `workspaces/{ID}/` とテストのユーザーのアバターを `aws s3 rm` で消します（`aws configure` を済ませておきます）

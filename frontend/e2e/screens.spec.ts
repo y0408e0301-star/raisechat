@@ -14,10 +14,12 @@ test.afterEach(closeContexts)
 
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
 
-async function check(page: Page, ready: Locator): Promise<void> {
+async function check(page: Page, ready: Locator, firefoxExclude?: string): Promise<void> {
   await expect(ready).toBeVisible()
   // 絵文字の一覧（emoji-picker-element）は外の部品なので除く
-  const { violations } = await new AxeBuilder({ page }).withTags(WCAG).exclude('emoji-picker').analyze()
+  let axe = new AxeBuilder({ page }).withTags(WCAG).exclude('emoji-picker')
+  if (firefoxExclude && test.info().project.use.browserName === 'firefox') axe = axe.exclude(firefoxExclude)
+  const { violations } = await axe.analyze()
   const found = violations.map((v) => `${v.id}（${v.help}）: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)
   expect.soft(found, 'アクセシビリティの違反').toEqual([])
   // 375px の画面では、ページの幅（レイアウトの幅）が画面より広がると横にスクロールする
@@ -31,7 +33,10 @@ async function check(page: Page, ready: Locator): Promise<void> {
   expect.soft(scrollWidth, `横にスクロールしない（はみ出した要素：${wide.join('、')}）`).toBeLessThanOrEqual(width)
 }
 
+// N-27（axe のコントラスト比）、N-29（mobile の 375px）
 test('すべての画面に、アクセシビリティの違反と横のスクロールがない', async ({ browser }) => {
+  // 18 の画面を回るので、Firefox・WebKit では 1 分近くかかる。時間の上限を 3 倍にする
+  test.slow()
   // 表示名は 30 文字まで
   const taro = user('ga', 'とてもながいなまえのユーザーです')
   const hana = user('gb', 'はなこ')
@@ -182,6 +187,9 @@ test('すべての画面に、アクセシビリティの違反と横のスク�
 
   await test.step('G-10 プロフィールの設定', async () => {
     await page.goto('/settings/profile')
-    await check(page, page.getByRole('switch', { name: 'ブラウザの通知' }))
+    // Playwright の Firefox は、axe の button-name の検査でこのスイッチ（role="switch" の button）を調べると、
+    // ページごと落ちる（Page crashed）。画面を使う人には関係しないので、Firefox だけスイッチを axe から外す
+    //（ほかのブラウザでは調べている。テスト仕様書 3.2）
+    await check(page, page.getByRole('switch', { name: 'ブラウザの通知' }), '[role="switch"]')
   })
 })

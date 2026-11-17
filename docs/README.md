@@ -30,6 +30,9 @@ docs/
 │   ├── screen-design.md               … 画面設計書
 │   ├── data-design.md                 … データ設計書
 │   └── infra-design.md                … インフラ設計書
+├── test/
+│   ├── test-specification.md          … テスト仕様書（方針・環境ごとの結果・手動の項目）
+│   └── requirement-coverage.md        … 要件 ID とテストの対応表（スクリプトで作る。手で直さない）
 ├── tech-stack.md                      … 技術スタック定義書
 └── development-plan.md                … 開発計画書（作る順番と進み具合）
 ```
@@ -45,6 +48,8 @@ docs/
 | [画面設計書](design/screen-design.md) | RC-BD-SCR | 共通仕様（色・文字・ボタン・メッセージ・共通の部品・画面の幅）、画面ごとのレイアウト・表示項目・操作 | 〃 |
 | [データ設計書](design/data-design.md) | RC-BD-DATA | 方針、エンティティ一覧、ER 図、テーブル定義、索引、データのルール（BR）、特別な SQL、CRUD 表、データ量の見積もり | 〃 |
 | [インフラ設計書](design/infra-design.md) | RC-BD-INFRA | 方針、AWS の構成図、リソース一覧、セキュリティグループ（SG）、WebSocket と添付の流れ、開発環境との対応、費用の目安 | 〃 |
+| [テスト仕様書](test/test-specification.md) | RC-TEST | テストの方針、要件 ID・テストの観点とテストの対応、環境ごとの結果、手動で確かめる項目 | 本書で行う |
+| [要件 ID とテストの対応表](test/requirement-coverage.md) | — | 要件 ID・テストの観点ごとに、確かめるテストの一覧。テスト仕様書 2 章のとおりスクリプトで作る | 要らない（コードと同じ） |
 | [技術スタック定義書](tech-stack.md) | RC-TECH | 使う言語・フレームワーク・サービス・開発ツールと選んだ理由 | 本書で行う |
 | [開発計画書](development-plan.md) | RC-PLAN | 作る順番（段階と Pull Request の単位）、段階ごとの完了条件、どこまでできたか | 本書で行う |
 

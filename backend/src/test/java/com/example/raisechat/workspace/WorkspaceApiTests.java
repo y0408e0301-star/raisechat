@@ -106,6 +106,7 @@ class WorkspaceApiTests {
 	}
 
 	// TC-03-2
+	// BR-4、CH-13
 	@Test
 	void 作ると自分がオーナーになりgeneralに自分だけが入っている() {
 		MvcTestResult result = create(this.taro, " 仲間うち ");

@@ -149,6 +149,7 @@ const SEARCHES = [
   { key: 'none2', word: 'ぬゑ', label: '見つからない 2 文字の言葉' },
 ]
 
+// TC-13-9
 test('N-5 検索してから、最初の 20 件が出るまで', async ({ browser }, info) => {
   const page = await loggedIn(browser, info, 62)
   for (const { key, word, label } of SEARCHES) {
@@ -214,6 +215,7 @@ async function attachAndSend(sender: Page, paths: string[], text: string): Promi
   return start
 }
 
+// TC-09-7
 test('N-6・N-7 画像 4 枚・動画 1 本を送ってから、相手の画面に出るまで', async ({ browser }, info) => {
   // 大きなファイルを S3 に送るので、PERF_UPLOAD=1 のとき（GitHub Actions のランナーの中の MinIO・公開先で測るとき）だけ測る。
   // 手元の開発用バケットは、画面の Vite（5173）からの PUT だけを受け付ける（CORS）ため、jar（8080）の画面からは送れない

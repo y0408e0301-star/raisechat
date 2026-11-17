@@ -104,6 +104,7 @@ describe('一覧（MS-1・MS-2・MS-12）', () => {
 
 describe('送信（MS-3・MS-4・MS-8・MS-13）', () => {
   // TC-07-2
+  // N-31
   it('Enter で送り、送っている間は「送信中…」。Shift＋Enter は改行', async () => {
     let resolve: ((r: Response) => void) | undefined
     const fetch = openGeneral({
@@ -171,6 +172,7 @@ describe('送信（MS-3・MS-4・MS-8・MS-13）', () => {
   })
 
   // TC-07-12
+  // N-31（失敗しても入力した文を残す）
   it('送れなかったら M-34 を出し、「もう一度送る」は同じ clientId で送る', async () => {
     const fetch = openGeneral({
       'POST /api/conversations/10/messages': [
@@ -181,6 +183,8 @@ describe('送信（MS-3・MS-4・MS-8・MS-13）', () => {
     })
     await userEvent.type(await screen.findByRole('textbox', { name: 'メッセージ' }), '送りたい{Enter}')
     expect(await screen.findByText(M[34])).toBeInTheDocument()
+    // 入力した文は消さずに一覧に残す（MS-13）
+    expect(articles()[0]).toHaveTextContent('送りたい')
     await userEvent.click(screen.getByRole('button', { name: 'もう一度送る' }))
     await vi.waitFor(() => expect(screen.queryByText(M[34])).not.toBeInTheDocument())
     const posts = fetch.calls.filter((c) => c.key === 'POST /api/conversations/10/messages')

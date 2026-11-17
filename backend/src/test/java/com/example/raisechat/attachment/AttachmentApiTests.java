@@ -267,6 +267,7 @@ class AttachmentApiTests {
 
 	// ---- メッセージに付ける（FN-07、3.1）----
 
+	// BR-7
 	@Test
 	void 添付を付けて送ると選んだ順に並び一覧と1件の読み直しにも出る() throws Exception {
 		long a = id(uploaded(this.taro, this.general, "1.png", "image/png", TestImages.png(10, 10)));
@@ -283,6 +284,21 @@ class AttachmentApiTests {
 		MvcTestResult one = get(this.mvc, this.hanako, "/api/messages/" + message);
 		assertThat(one).hasStatusOk();
 		assertThat(one).bodyJson().extractingPath("$.attachments[0].downloadUrl").asString().contains("attachment");
+	}
+
+	// TC-12-7：DM でもチャンネルと同じように添付できる
+	@Test
+	void DMでも添付を付けて送れる() throws Exception {
+		long dm = readLong(post(this.mvc, this.taro, "/api/workspaces/%d/dms".formatted(this.workspace),
+				"{\"username\":\"hanako\"}"), "$.id");
+		long a = id(uploaded(this.taro, dm, "a.png", "image/png", TestImages.png(10, 10)));
+
+		MvcTestResult sent = send(this.taro, dm, "写真", List.of(a));
+
+		assertThat(sent).hasStatus(HttpStatus.CREATED);
+		assertThat(get(this.mvc, this.hanako, "/api/messages/" + readLong(sent, "$.id"))).bodyJson()
+			.extractingPath("$.attachments[0].fileName")
+			.isEqualTo("a.png");
 	}
 
 	// TC-09-10：見られない会話のメッセージ（とその添付の URL）は受け取れない
@@ -317,6 +333,7 @@ class AttachmentApiTests {
 	}
 
 	// TC-09-9（9 章）
+	// BR-7：付けられない添付が 1 つでもあれば全体をやめる
 	@Test
 	void 自分のでない添付やほかの会話の添付や送り済みの添付は付けられない() throws Exception {
 		long hanakos = id(uploaded(this.hanako, this.general, "h.png", "image/png", TestImages.png(10, 10)));
@@ -413,6 +430,7 @@ class AttachmentApiTests {
 		assertThat(keys()).singleElement().satisfies((key) -> assertThat(key).doesNotContain("-thumb"));
 	}
 
+	// TC-03-9（S3 のファイル）
 	@Test
 	void ワークスペースを消すと添付もS3から消える() throws Exception {
 		long a = id(uploaded(this.taro, this.general, "a.png", "image/png", TestImages.png(1000, 1000)));

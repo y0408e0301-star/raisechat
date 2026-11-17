@@ -404,6 +404,7 @@ class WebSocketApiTests {
 	// ----------------------------------------------------------------
 	// 見られなくなったとき（FN-06、機能定義書 4.5）
 
+	// N-15
 	@Test
 	void プライベートチャンネルから退出すると購読が取り消され_通知が届かなくなる() throws Exception {
 		long secret = createChannel(this.taro, "運営", "PRIVATE");
@@ -545,6 +546,7 @@ class WebSocketApiTests {
 		assertThat(hanakoClient.nothingWithin(500)).isTrue();
 	}
 
+	// TC-05-5（相手の画面にすぐ届く）
 	@Test
 	void DMのメッセージで2人にconversation_updatedが届き_相手がキックされると送れなくなったことが届く() throws Exception {
 		MvcTestResult started = post(this.mvc, this.taro, "/api/workspaces/%d/dms".formatted(this.workspace),
@@ -611,6 +613,7 @@ class WebSocketApiTests {
 
 	// ---------------------------------------------------------------- 購読の取り消し（4.5）
 
+	// N-15
 	@Test
 	void キックされるとそのワークスペースのすべての会話の購読が取り消され_通知が届かなくなる() throws Exception {
 		long chat = createChannel(this.taro, "雑談", "PUBLIC");
@@ -633,6 +636,7 @@ class WebSocketApiTests {
 		assertThat(client.isConnected()).isTrue();
 	}
 
+	// TC-03-10（その後そのワークスペースの通知が届かない）
 	@Test
 	void ワークスペースを削除するとオーナーを含むメンバー全員にDELETEDが届き購読が取り消される() throws Exception {
 		StompTestClient taroClient = connect(this.taro);

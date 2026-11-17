@@ -64,6 +64,7 @@ describe('メッセージの中のメンション（MN-3、TC-11-4〜6）', () =
     expect(container.querySelectorAll('[class*="mention"]')).toHaveLength(0)
   })
 
+  // MN-7
   it('自分へのメンションを含むメッセージは、左の線と背景で目立たせ、「@ユーザー ID」を押すと G-16 を出す', async () => {
     await open({
       'GET /api/conversations/10/messages': page([
