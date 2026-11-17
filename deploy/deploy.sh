@@ -1,7 +1,7 @@
 #!/bin/bash
 # 今のコミットの API と画面を公開環境に反映する（インフラ設計書 5.2、基本設計書 2.2）
 # リポジトリのフォルダで実行する（Windows では Git Bash。Docker Desktop を起動しておく）：bash deploy/deploy.sh
-# 止めているときに実行すると、そのまま起動もする（RDS が止まっていれば先に bash deploy/start.sh）
+# ECS と ALB だけが止まっているとき（RDS は起動済み）に実行すると、そのまま起動もする。RDS が止まっていれば止まるので、先に bash deploy/start.sh
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

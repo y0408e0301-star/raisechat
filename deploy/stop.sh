@@ -18,5 +18,8 @@ if [[ "$status" == available ]]; then
   aws rds stop-db-instance --db-instance-identifier "$db_id" >/dev/null
   # 止まりきるまで数分かかるが、待たなくてよい（止める処理は AWS 側で続く）
   echo "RDS を止めています（数分で stopped になります）"
+elif [[ "$status" != stopped && "$status" != stopping ]]; then
+  # starting・modifying などの間は止められない。止め忘れると費用がかかるので知らせる
+  echo "!! RDS は $status なので止めていません。available になってから、もう一度 bash deploy/stop.sh を実行してください" >&2
 fi
 echo "== 止めました。RDS は止めてから 7 日たつと AWS が自動で起動します。長く止めるときは、7 日以内にもう一度 stop.sh を実行してください"
