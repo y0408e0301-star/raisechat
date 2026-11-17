@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Browser, BrowserContext, Locator, Page } from '@playwright/test'
+import type { Browser, BrowserContext, BrowserContextOptions, Locator, Page } from '@playwright/test'
 
 // E2E のテストで共通に使う部品。ユーザーを作る・ログインする・API を直接呼ぶ・ワークスペースと会話を用意する・
 // メッセージを送る
@@ -36,9 +36,11 @@ function trackFrames(page: Page): void {
   page.on('websocket', (ws) => ws.on('framesent', (frame) => frames.push(String(frame.payload))))
 }
 
-// project の設定（baseURL・画面の幅・端末のエミュレーションなど）で、Cookie を分けた新しいブラウザを開く
-export async function newContext(browser: Browser): Promise<BrowserContext> {
-  const { baseURL, viewport, locale, timezoneId, isMobile, hasTouch, userAgent, deviceScaleFactor } = test.info().project.use
+// project の設定（baseURL・画面の幅・端末のエミュレーションなど）で、Cookie を分けた新しいブラウザを開く。
+// use を渡すと、画面の幅・端末のエミュレーションはそちらを使う（別の環境のブラウザで開くとき。cross-browser.spec.ts）
+export async function newContext(browser: Browser, use: BrowserContextOptions = test.info().project.use): Promise<BrowserContext> {
+  const { baseURL, locale, timezoneId } = test.info().project.use
+  const { viewport, isMobile, hasTouch, userAgent, deviceScaleFactor } = use
   const context = await browser.newContext({ baseURL, viewport, locale, timezoneId, isMobile, hasTouch, userAgent, deviceScaleFactor })
   context.on('page', trackFrames)
   opened.add(context)
@@ -63,8 +65,8 @@ export async function fillSignup(page: Page, { username, displayName }: User): P
 }
 
 // 新しいブラウザで G-2 から登録し、ログインした状態（G-3）のページを返す
-export async function signup(browser: Browser, who: User): Promise<Page> {
-  const page = await (await newContext(browser)).newPage()
+export async function signup(browser: Browser, who: User, use?: BrowserContextOptions): Promise<Page> {
+  const page = await (await newContext(browser, use)).newPage()
   await page.goto('/signup')
   await fillSignup(page, who)
   await expect(page.getByRole('heading', { name: 'ワークスペース', exact: true })).toBeVisible()

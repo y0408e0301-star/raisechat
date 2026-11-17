@@ -179,6 +179,16 @@ describe('チャンネルの詳細（CH-6〜CH-9、G-14・G-18）', () => {
     expect(within(dialog).queryByRole('button', { name: 'メンバーを招待' })).not.toBeInTheDocument()
   })
 
+  // TC-06-9
+  it('名前・説明に入れたタグは文字のまま出す', async () => {
+    open('/w/3/c/12', withChannel12({ name: '<script>alert(1)</script>', description: '<b>説明</b>' }))
+    const user = userEvent.setup()
+    const dialog = await openDetails(user)
+    expect(within(dialog).getByRole('heading', { name: '# <script>alert(1)</script>' })).toBeInTheDocument()
+    expect(within(dialog).getByText('<b>説明</b>')).toBeInTheDocument()
+    expect(dialog.querySelector('script, b')).toBeNull()
+  })
+
   it('公開チャンネルは確認なしで退出し、サイドバーから消して general に移る', async () => {
     const fetch = open('/w/3/c/12', withChannel12({}, { 'POST /api/conversations/12/leave': () => json(204) }))
     const user = userEvent.setup()
@@ -190,6 +200,7 @@ describe('チャンネルの詳細（CH-6〜CH-9、G-14・G-18）', () => {
     expect(within(sidebar()).queryByRole('link', { name: /雑談/ })).not.toBeInTheDocument()
   })
 
+  // N-28
   it('プライベートチャンネルは M-29 で確かめてから退出する', async () => {
     const fetch = open('/w/3/c/12', withChannel12({ visibility: 'PRIVATE' }, {
       'POST /api/conversations/12/leave': () => json(204),
@@ -206,6 +217,7 @@ describe('チャンネルの詳細（CH-6〜CH-9、G-14・G-18）', () => {
     await vi.waitFor(() => expect(location()).toHaveTextContent('/w/3/c/10'))
   })
 
+  // N-28、CH-13
   it('オーナーは M-26 で確かめて削除する。general には退出・削除を出さない', async () => {
     const fetch = open('/w/3/c/12', withChannel12({}, { 'DELETE /api/conversations/12': () => json(204) }))
     const user = userEvent.setup()

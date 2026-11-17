@@ -236,6 +236,31 @@ class NotificationApiTests {
 		assertThat(mentions(this.hanako, "")).bodyJson().extractingPath("$.items").asList().isEmpty();
 	}
 
+	// TC-05-8：キックされた後に招待リンクでまた参加しても、入り直していないプライベートチャンネルのメンションは出さない。
+	// 公開チャンネルのものは見られるので、参加していなくても数える（TC-11-3・TC-14-1）
+	@Test
+	void キックされてまた参加しても_入り直していないプライベートチャンネルのメンションは数えず一覧にも出さない() throws Exception {
+		long secret = channel("運営", "PRIVATE");
+		post(this.mvc, this.taro, "/api/conversations/%d/members".formatted(secret), "{\"usernames\":[\"hanako\"]}");
+		send(this.taro, secret, "@hanako 秘密");
+		long travel = channel("旅行", "PUBLIC");
+		long open = send(this.taro, travel, "@hanako 行く？");
+		assertThat(delete(this.mvc, this.taro, "/api/workspaces/%d/members/hanako".formatted(this.workspace)))
+			.hasStatus(HttpStatus.NO_CONTENT);
+
+		String url = JsonPath
+			.read(post(this.mvc, this.taro, "/api/workspaces/%d/invites".formatted(this.workspace), "{}").getResponse()
+				.getContentAsString(StandardCharsets.UTF_8), "$.url");
+		assertThat(post(this.mvc, this.hanako,
+				"/api/invites/%s/accept".formatted(url.substring(url.lastIndexOf('/') + 1)), "{}"))
+			.hasStatusOk();
+
+		assertThat(workspaces(this.hanako)).bodyJson().extractingPath("$[0].mentionCount").isEqualTo(1);
+		assertThat(mentions(this.hanako, "")).bodyJson()
+			.extractingPath("$.items[*].message.id")
+			.isEqualTo(List.of((int) open));
+	}
+
 	// TC-14-6（NT-5）
 	@Test
 	void メンションの一覧は新しい順に20件ずつで_会話と読んだかを返す() throws Exception {

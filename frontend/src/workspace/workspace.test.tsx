@@ -66,6 +66,7 @@ describe('ワークスペースを開く（W-4）', () => {
 })
 
 describe('会話（画面設計書 7.1）', () => {
+  // CH-11
   it('M-27：見られない会話は general を開く', async () => {
     mockFetch({
       ...opened,

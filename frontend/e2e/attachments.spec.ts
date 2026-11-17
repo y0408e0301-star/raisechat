@@ -26,7 +26,8 @@ test('画像を添付して送ると、相手に縮小した画像が出て、�
   const previews = page.getByRole('list', { name: '添付' })
   await expect(previews.getByRole('img')).toHaveCount(2)
   const sendButton = page.getByRole('button', { name: '送信 ➤' })
-  await expect(sendButton).toBeEnabled()
+  // S3（開発用のバケット）へのアップロードと縮小した画像を作るのを待つ。API を起動した直後の 1 回目は 5 秒を超えることがある
+  await expect(sendButton).toBeEnabled({ timeout: 15_000 })
   await composer(page).fill('写真です')
   await sendButton.click()
 

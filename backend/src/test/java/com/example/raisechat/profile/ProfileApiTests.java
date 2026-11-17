@@ -5,6 +5,7 @@ import static com.example.raisechat.ApiTestSupport.delete;
 import static com.example.raisechat.ApiTestSupport.get;
 import static com.example.raisechat.ApiTestSupport.join;
 import static com.example.raisechat.ApiTestSupport.patch;
+import static com.example.raisechat.ApiTestSupport.post;
 import static com.example.raisechat.ApiTestSupport.readLong;
 import static com.example.raisechat.ApiTestSupport.signup;
 import static com.example.raisechat.ControllerTestSupport.assertError;
@@ -25,6 +26,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -304,6 +306,24 @@ class ProfileApiTests {
 				ErrorCode.WORKSPACE_NOT_FOUND);
 		assertError(get(this.mvc, hanako, "/api/workspaces/%d/members/jiro".formatted(workspace)),
 				ErrorCode.USER_NOT_FOUND);
+	}
+
+	// PF-8：変えた後に読み込んだメッセージ（変える前に送ったものも）には、新しい表示名・ステータスが出る
+	@Test
+	void 変える前に送ったメッセージも次に読み込むと新しいプロフィールで出る() {
+		Cookie hanako = signup(this.mvc, "hanako");
+		MvcTestResult created = createWorkspace(this.mvc, this.taro, "仲間うち");
+		long general = readLong(created, "$.generalConversationId");
+		join(this.jdbc, readLong(created, "$.id"), "hanako");
+		post(this.mvc, this.taro, "/api/conversations/%d/messages".formatted(general),
+				"{\"body\":\"前の名前で送る\",\"clientId\":\"%s\"}".formatted(UUID.randomUUID()));
+
+		update("たろう", "🏖️", "休暇中", null);
+
+		assertThat(get(this.mvc, hanako, "/api/conversations/%d/messages".formatted(general))).bodyJson()
+			.isLenientlyEqualTo("""
+					{"items":[{"body":"前の名前で送る",
+					 "author":{"username":"taro_y","displayName":"たろう","statusEmoji":"🏖️","statusText":"休暇中"}}]}""");
 	}
 
 	private MvcTestResult update(@Nullable String displayName, @Nullable String emoji, @Nullable String text,

@@ -5,6 +5,7 @@ import static com.example.raisechat.ApiTestSupport.delete;
 import static com.example.raisechat.ApiTestSupport.get;
 import static com.example.raisechat.ApiTestSupport.join;
 import static com.example.raisechat.ApiTestSupport.post;
+import static com.example.raisechat.ApiTestSupport.put;
 import static com.example.raisechat.ApiTestSupport.readLong;
 import static com.example.raisechat.ApiTestSupport.signup;
 import static com.example.raisechat.ApiTestSupport.userId;
@@ -214,6 +215,7 @@ class MemberApiTests {
 	// ----------------------------------------------------------------
 	// キック（MB-3・MB-4、TC-05-2・TC-05-3・TC-05-4）
 
+	// BR-9
 	@Test
 	void キックするとワークスペースとチャンネルから外れ_会話を読めなくなり_メッセージは残る() {
 		long chat = channel(this.taro, "雑談", "PUBLIC");
@@ -241,6 +243,7 @@ class MemberApiTests {
 		assertThat(members(this.taro, "")).bodyJson().extractingPath("$.memberCount").isEqualTo(2);
 	}
 
+	// BR-9
 	@Test
 	void キックで_DMの行は残す() {
 		long taroId = userId(this.jdbc, "taro_y");
@@ -257,6 +260,7 @@ class MemberApiTests {
 		assertThat(count("SELECT count(*) FROM conversation_members WHERE conversation_id = ?", dm)).isEqualTo(2);
 	}
 
+	// BR-3
 	@Test
 	void オーナーでない人はキックできず_オーナーはキックできない() {
 		assertError(kick(this.hanako, "jiro"), HttpStatus.FORBIDDEN, "NOT_OWNER");
@@ -272,6 +276,7 @@ class MemberApiTests {
 	// ----------------------------------------------------------------
 	// 退出（MB-5、TC-05-6）
 
+	// BR-9
 	@Test
 	void 退出するとワークスペースとチャンネルから外れ_一覧から消える() {
 		long chat = channel(this.taro, "雑談", "PUBLIC");
@@ -316,19 +321,31 @@ class MemberApiTests {
 	// ----------------------------------------------------------------
 	// ワークスペースの削除（W-6）
 
+	// TC-03-9（添付の S3 のファイルは AttachmentApiTests）
 	@Test
 	void オーナーが名前を入れて削除すると_中のデータごと消え_誰の一覧からも消える() {
 		long chat = channel(this.taro, "雑談", "PUBLIC");
-		send(this.taro, chat, "こんにちは");
-		post(this.mvc, this.taro, "/api/workspaces/%d/invites".formatted(this.workspace), "{}");
+		long message = send(this.taro, chat, "@hanako こんにちは");
+		assertThat(put(this.mvc, this.taro, "/api/messages/%d/reactions/%s".formatted(message, "👍")))
+			.hasStatus2xxSuccessful();
+		long dm = readLong(post(this.mvc, this.hanako, "/api/workspaces/%d/dms".formatted(this.workspace),
+				"{\"username\":\"jiro\"}"), "$.id");
+		send(this.hanako, dm, "DM です");
+		String url = JsonPath.read(
+				body(post(this.mvc, this.taro, "/api/workspaces/%d/invites".formatted(this.workspace), "{}")), "$.url");
+		assertThat(count("SELECT count(*) FROM reactions")).isOne();
+		assertThat(count("SELECT count(*) FROM mentions")).isOne();
 
 		assertThat(deleteWorkspace(this.taro, "仲間うち")).hasStatus(HttpStatus.NO_CONTENT);
 
 		assertThat(count("SELECT count(*) FROM workspaces")).isZero();
 		for (String table : new String[] { "workspace_members", "conversations", "conversation_members", "messages",
-				"invites" }) {
+				"reactions", "mentions", "invites" }) {
 			assertThat(count("SELECT count(*) FROM " + table)).as(table).isZero();
 		}
+		// その招待リンクはもう使えない（M-18）
+		assertError(get(this.mvc, this.jiro, "/api/invites/" + url.substring(url.lastIndexOf('/') + 1)),
+				HttpStatus.GONE, "INVITE_INVALID");
 		assertThat(get(this.mvc, this.hanako, "/api/workspaces")).bodyJson().extractingPath("$").asArray().isEmpty();
 		assertError(get(this.mvc, this.taro, "/api/workspaces/" + this.workspace), HttpStatus.NOT_FOUND,
 				"WORKSPACE_NOT_FOUND");
@@ -336,6 +353,7 @@ class MemberApiTests {
 		assertThat(createWorkspace(this.mvc, this.taro, "仲間うち")).hasStatus(HttpStatus.CREATED);
 	}
 
+	// TC-03-7・TC-03-8、BR-3
 	@Test
 	void 名前が違えば400_オーナーでなければ403_メンバーでなければ404() {
 		assertError(deleteWorkspace(this.taro, "仲間"), HttpStatus.BAD_REQUEST, "CONFIRM_NAME_MISMATCH");

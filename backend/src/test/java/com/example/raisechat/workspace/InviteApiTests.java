@@ -170,6 +170,7 @@ class InviteApiTests {
 	// ----------------------------------------------------------------
 	// 作成・一覧・取り消し（I-1〜I-3、TC-04-1）
 
+	// N-22：推測できない長い文字列
 	@Test
 	void オーナーが作ると期限は7日後で_URLは画面のURLと43文字の招待の文字列() {
 		MvcTestResult created = create(this.taro);
@@ -224,6 +225,7 @@ class InviteApiTests {
 		assertError(list(this.taro, "?cursor=abc"), HttpStatus.BAD_REQUEST, "BAD_REQUEST");
 	}
 
+	// N-22
 	@Test
 	void 取り消すと参加できない_ほかのワークスペースのリンクやないリンクは404() {
 		String token = token();
@@ -270,6 +272,7 @@ class InviteApiTests {
 		assertThat(preview(this.hanako, token)).bodyJson().extractingPath("$.alreadyMember").isEqualTo(true);
 	}
 
+	// N-22
 	@Test
 	void 期限切れ_取り消し済み_文字を変えた_形が違うリンクは410で名前を返さない() {
 		String token = token();
@@ -316,6 +319,7 @@ class InviteApiTests {
 	// ----------------------------------------------------------------
 	// 参加する（I-5・I-7・I-8、TC-04-3・TC-04-5〜TC-04-8）
 
+	// CH-13：参加した人は general に自動で入る
 	@Test
 	void 参加するとgeneralにだけ入り_ワークスペースの詳細を返す() {
 		long chat = readLong(post(this.mvc, this.taro, "/api/workspaces/%d/channels".formatted(this.workspace),

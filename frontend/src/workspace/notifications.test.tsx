@@ -87,6 +87,7 @@ function fakeNotification(permission: NotificationPermission, answer: Notificati
 }
 
 describe('サイドバー・ヘッダーの件数（NT-1・NT-2・NT-6、TC-14-1）', () => {
+  // N-30
   it('未読の会話を太字にし、チャンネルはメンションの件数、DM は未読の件数を出す。「メンション」と「@」には合計', async () => {
     await open('/w/3/c/10', {
       'GET /api/workspaces/3': () => json(200, workspace({ hasUnread: true, mentionCount: 3 })),
@@ -159,6 +160,7 @@ describe('読んだことにする（NT-4、TC-14-3・TC-14-4）', () => {
 })
 
 describe('「新着」の線（MS-1）', () => {
+  // TC-07-8
   it('最後に読んだものより後の、ほかの人のメッセージの上に出す', async () => {
     await open('/w/3/c/10', {
       'GET /api/conversations/10': () => json(200, detail(10, 'general', { general: true, lastReadMessageId: 1 })),
@@ -183,6 +185,7 @@ describe('「新着」の線（MS-1）', () => {
 })
 
 describe('メッセージの位置を開く（MS-14）', () => {
+  // TC-07-13
   it('前後を読み込んでそのメッセージを目立たせ、URL から外す。下まで来たら後ろを読む', async () => {
     const { fetch } = await open('/w/3/c/10?message=5', {
       'GET /api/conversations/10/messages?around=5': page([message(4, '前'), message(5, 'これ'), message(6, '後')],

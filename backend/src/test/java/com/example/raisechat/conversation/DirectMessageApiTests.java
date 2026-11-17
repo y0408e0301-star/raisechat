@@ -5,6 +5,7 @@ import static com.example.raisechat.ApiTestSupport.delete;
 import static com.example.raisechat.ApiTestSupport.get;
 import static com.example.raisechat.ApiTestSupport.join;
 import static com.example.raisechat.ApiTestSupport.post;
+import static com.example.raisechat.ApiTestSupport.put;
 import static com.example.raisechat.ApiTestSupport.readLong;
 import static com.example.raisechat.ApiTestSupport.signup;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -102,6 +103,7 @@ class DirectMessageApiTests {
 	// ----------------------------------------------------------------
 	// 始める（DM-2、TC-12-1）
 
+	// TC-12-2（「メッセージを送る」で同じ DM を開く）
 	@Test
 	void 始めるとDMを作って2人をメンバーにし_もう一度始めると同じDMを返す() {
 		MvcTestResult created = start(this.hanako, "JIRO");
@@ -240,6 +242,7 @@ class DirectMessageApiTests {
 	// ----------------------------------------------------------------
 	// 相手が抜けたとき（DM-6、TC-12-6）
 
+	// TC-05-5
 	@Test
 	void 相手がキックされると読めるが送れず_また参加すると送れる() {
 		long id = dm(this.hanako, "jiro");
@@ -275,6 +278,27 @@ class DirectMessageApiTests {
 			.extractingPath("$[?(@.type == 'DM')].id")
 			.asArray()
 			.containsExactly((int) id);
+	}
+
+	// ----------------------------------------------------------------
+	// DM の中のスレッド・リアクション・メンション（TC-12-7。添付は AttachmentApiTests）
+
+	@Test
+	void DMでもスレッドとリアクションとメンションが使える() {
+		long id = dm(this.hanako, "jiro");
+		long message = readLong(send(this.hanako, id, "@jiro 見てね"), "$.id");
+
+		assertThat(post(this.mvc, this.jiro, "/api/messages/%d/replies".formatted(message),
+				"{\"body\":\"見たよ\",\"clientId\":\"%s\"}".formatted(UUID.randomUUID())))
+			.hasStatus(HttpStatus.CREATED);
+		assertThat(put(this.mvc, this.jiro, "/api/messages/%d/reactions/%s".formatted(message, "👍")))
+			.hasStatus2xxSuccessful();
+
+		assertThat(get(this.mvc, this.hanako, "/api/messages/" + message)).bodyJson().isLenientlyEqualTo("""
+				{"replyCount":1,"reactions":[{"emoji":"👍","count":1}]}""");
+		assertThat(get(this.mvc, this.jiro, "/api/workspaces/%d/mentions".formatted(this.workspace))).bodyJson()
+			.extractingPath("$.items[0].message.id")
+			.isEqualTo((int) message);
 	}
 
 	private static String body(MvcTestResult result) {

@@ -156,6 +156,7 @@ class ChannelApiTests {
 		assertError(create(stranger, "x", "PUBLIC"), HttpStatus.NOT_FOUND, "WORKSPACE_NOT_FOUND");
 	}
 
+	// TC-06-9（API。画面は channels.test.tsx）
 	@Test
 	void 名前と説明は文字のまま保存する() {
 		long id = readLong(post(this.mvc, this.taro, "/api/workspaces/%d/channels".formatted(this.workspace),
@@ -280,6 +281,7 @@ class ChannelApiTests {
 			.isEqualTo(2);
 	}
 
+	// CH-11：入っていないプライベートチャンネルは、あるかどうかも教えない
 	@Test
 	void プライベートチャンネルには参加APIで入れない() {
 		long secret = channel(this.taro, "運営", "PRIVATE");
@@ -395,6 +397,7 @@ class ChannelApiTests {
 				HttpStatus.NOT_FOUND, "CONVERSATION_NOT_FOUND");
 	}
 
+	// CH-13
 	@Test
 	void generalからは退出も削除もできない() {
 		assertError(post(this.mvc, this.hanako, "/api/conversations/%d/leave".formatted(this.general), "{}"),
@@ -405,6 +408,7 @@ class ChannelApiTests {
 
 	// ---------------------------------------------------------------- 削除（CH-9、TC-06-8）
 
+	// BR-3
 	@Test
 	void オーナーが削除するとメッセージも消え_メンバーは削除できない() {
 		long chat = channel(this.hanako, "雑談", "PUBLIC");
@@ -420,6 +424,7 @@ class ChannelApiTests {
 			.isZero();
 	}
 
+	// CH-11
 	@Test
 	void 入っていないプライベートチャンネルはオーナーでも削除できない() {
 		long secret = channel(this.hanako, "内緒", "PRIVATE");
