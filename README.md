@@ -7,7 +7,7 @@ Slack 風のチャットアプリ。ワークスペースを作り、その中�
 - 作る順番と進み具合：[開発計画書](docs/development-plan.md)
 - 開発ルール：[CONTRIBUTING.md](CONTRIBUTING.md)
 
-いまは要件定義書のすべての機能（開発計画書 1-1〜1-16）と、画面を通したテスト（2-1）・性能テスト（2-2）まで作っています。公開の手順は、作ったときに足します。
+いまは要件定義書のすべての機能（開発計画書 1-1〜1-16）と、画面を通したテスト（2-1）・性能テスト（2-2）、公開先の API のイメージ（`backend/Dockerfile`）と環境を作る Terraform（`deploy/terraform/`。2-3）、反映・起動・停止のスクリプト（`deploy/`。2-4）まで作っています。公開の手順は下の「公開環境」にあります。
 
 ## 起動方法
 
@@ -192,3 +192,18 @@ API サーバーのログは、公開用の jar（`java -jar`）では 1 行 1 �
 - リクエスト ID は応答のヘッダー `X-Request-Id` でも返します
 - 5xx は ERROR、1 秒以上かかったリクエストは WARN で出します（閾値は `application.properties` の `app.logging.slow-request-threshold`）
 - パスワード・JWT・Cookie・リクエストの本文・クエリ文字列は出しません
+
+## 公開環境
+
+構成・費用は[インフラ設計書](docs/design/infra-design.md)、手順は[基本設計書 2.2.1](docs/design/basic-design.md#221-公開環境の手順)にあります。
+
+| コマンド（Git Bash） | すること |
+| --- | --- |
+| `bash deploy/deploy.sh` | 今のコミットの API（ECR）と画面（S3）を反映する。止めていれば起動もする |
+| `bash deploy/start.sh` | RDS を起動し、ECS のサービスと ALB を作り直す |
+| `bash deploy/stop.sh` | 「止めています」のページにして、ECS のサービスと ALB を消し、RDS を止める |
+
+- AWS のリソースはすべて Terraform（`deploy/terraform/`）で作ります。手作業で作るものはありません
+- 公開の URL は CloudFront を作ったときに決まり、止めたり起動したりしても変わりません（`terraform destroy` で消すと変わります）
+- 反映でタスクを入れ替える間（1〜2 分）は使えず、WebSocket も切れます（画面がつなぎ直します）
+- 常に動かすと月 14,600 円ほどかかり予算（月 10,000 円）を超えるため、使う時間だけ動かします。公開は検収のときだけ行い、終わったら環境を消します（要件定義書 P-5）
