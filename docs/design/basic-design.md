@@ -3,7 +3,7 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-BD |
-| 版数 | 0.16 |
+| 版数 | 0.18 |
 | 作成日 | 2026-11-10 |
 | 最終更新日 | 2026-11-17 |
 | 作成者 | （氏名） |
@@ -30,6 +30,8 @@
 | 0.14 | 2026-11-16 | 性能テストを作ったので（開発計画書 2-2）、2.4 に測り方と手元で測った結果を書いた。N-5 は 1〜2 文字の言葉でも満たすので、検索の最小の文字数は設けない。データ設計書を 0.6 にした（8.3 の汎用の計画） | （氏名） |
 | 0.15 | 2026-11-16 | 2.4 に、手元の MinIO で測った N-6・N-7 と、GitHub Actions のランナーで測った結果を足した（ランナーで N-6・N-7 が途中で止まったので、画面に出たかを待つ部品を直した） | （氏名） |
 | 0.16 | 2026-11-17 | インフラ設計書を 0.3 にした（CloudFront から ALB へ渡すヘッダー） | （氏名） |
+| 0.17 | 2026-11-17 | 反映・起動・停止のスクリプトを作ったので（開発計画書 2-4）、2.2 に運用の手順（2.2.1〜2.2.4）を書いた | （氏名） |
+| 0.18 | 2026-11-17 | インフラ設計書を 0.4 にした（公開して確かめた結果、未決事項 4 の決定） | （氏名） |
 
 ## 承認
 
@@ -92,15 +94,97 @@ API の一覧（URL・メソッド・入力・出力・主なエラー）、エ�
 
 | 項目 | 内容 |
 | --- | --- |
-| 環境の作り方 | 開発環境（Docker Compose）と AWS の構築手順。AWS は Terraform で作る |
-| 表の変更の管理 | Flyway のマイグレーションの書き方と履歴の残し方 |
-| 公開の手順 | API のイメージ（ECR）と画面（S3）の反映、止め方・起動し直し方、検収の後の消し方（要件定義書 P-5）。BookLog の deploy.sh・start.sh・stop.sh と同じ形にする。API のコンテナを入れ替える間は WebSocket が切れ、画面がつなぎ直す（要件定義書 R-7） |
-| データベースのバックアップと復旧 | RDS の自動バックアップからの戻し方（N-10） |
-| 不適切なメッセージ・添付の削除 | オーナーが削除しない場合に、作成者がデータベースと S3 から消す手順（R-2） |
-| JWT の秘密の値の変え方 | 漏れた・漏れた疑いがあるときに、Parameter Store の値を変え、リフレッシュトークンを全部無効にして全員をログアウトさせる手順 |
-| 定期の処理 | 期限切れのリフレッシュトークンの削除、期限切れから 30 日たった招待リンクの削除、送らなかった添付の削除、S3 から消せなかったファイルの削除を 1 日 1 回動かす方法 |
-| 費用の確認 | 月 1 回の確認手順と AWS Budgets の設定（R-1）。とくに S3 に置いた動画の量 |
-| 障害時の対応 | 障害に気づく方法（CloudWatch）、WebSocket の接続の数・切断の数の見方 |
+| 環境の作り方 | 開発環境（Docker Compose）は README の「起動方法」に、AWS（Terraform）は 2.2.1 に書いた |
+| 表の変更の管理 | backend/src/main/resources/db/migration に V{番号}__{内容}.sql を足す。main に入れたファイルは変えず、変更は新しいファイルで行う。API の起動時に Flyway が流し、JPA は表の定義を確かめるだけにする（ddl-auto=validate） |
+| 公開の手順 | API のイメージ（ECR）と画面（S3）の反映、止め方・起動し直し方、検収の後の消し方（要件定義書 P-5）。2.2.1 に書いた |
+| データベースのバックアップと復旧 | RDS の自動バックアップからの戻し方（N-10）。2.2.2 に書いた |
+| 不適切なメッセージ・添付の削除 | オーナーが削除しない場合に、作成者がデータベースと S3 から消す手順（R-2）。2.2.3 に書いた |
+| JWT の秘密の値の変え方 | 漏れた・漏れた疑いがあるときに、Parameter Store の値を変え、リフレッシュトークンを全部無効にして全員をログアウトさせる手順。2.2.4 に書いた |
+| 定期の処理 | 期限切れのリフレッシュトークンの削除（RefreshTokenCleanup）、期限切れから 30 日たった招待リンクの削除（InviteCleanup）、送らなかった添付の削除（AttachmentCleanup）、S3 から消せなかったファイルの消し直し（StorageDeleter）を、API の中の @Scheduled で毎日 4:30（日本時間）に動かす。タスクは 1 つなので重ならない（インフラ設計書 方針 4）。止めている間は動かず、次に動いている 4:30 にまとめて行う |
+| 費用の確認 | 月 1 回の確認手順と AWS Budgets の設定（R-1）。2.2.1 に書いた |
+| 障害時の対応 | 障害に気づく方法は CloudWatch のアラームのメール（インフラ設計書 3.3）。調べ方は 2.2.1 の「困ったとき」。WebSocket のつないだ・切れたは API のログ（WebSocketSessions）で数える |
+
+#### 2.2.1 公開環境の手順
+
+構成は[インフラ設計書](infra-design.md)のとおり。スクリプトはリポジトリのフォルダで Git Bash から実行する。どれも先に terraform plan を出し、「この内容で反映しますか？」に y と答えたときだけ反映する（`-y` を付けると確かめずに反映する）。
+
+| スクリプト | すること | かかる時間 |
+| --- | --- | --- |
+| `bash deploy/deploy.sh` | 今のコミットを反映する。jar を作り、API のイメージ（arm64）をコミット ID のタグで ECR に push し、`terraform apply -var running=true` で新しいタスクに入れ替える。画面をビルドして S3 に置き（assets/ は 1 年、ほかは no-cache）、CloudFront のキャッシュを消して、公開 URL の /actuator/health が UP になるのを待つ。コミットしていない変更があるとき、RDS が動いていないときは止まる | 10〜15 分 |
+| `bash deploy/start.sh` | RDS を起動して待ち、`running=true` で ECS のサービスと ALB を作り直す。イメージと画面は前に反映したものを使う | 10〜20 分 |
+| `bash deploy/stop.sh` | `running=false` で CloudFront を止めている間のページにし、ECS のサービスと ALB を消して、RDS を止める。データと URL はそのまま | 5〜10 分 |
+
+**初めて作るとき**
+
+1. 手元に AWS CLI（~/.aws の鍵）・Terraform・Docker Desktop を用意する（技術スタック定義書 3.4）
+2. deploy/terraform/terraform.tfvars に `alert_email = "通知を受け取るメールアドレス"` を書く（リポジトリには入れない）
+3. deploy/terraform で `terraform init` → `terraform plan` で中身を確かめ → `terraform apply`（running は既定の false。CloudFront・RDS などを作る。15〜20 分）
+4. 届いたメール（AWS Notification）の「Confirm subscription」を押す
+5. `bash deploy/deploy.sh` で最初のイメージと画面を反映する（ECR にイメージがないうちは running=true にできないため、start.sh ではなく deploy.sh を使う）
+
+**すべて消すとき**
+
+元に戻せない。公開の URL も変わる（作り直すと別の URL になる）。
+
+1. deploy/terraform で `terraform apply -var rds_deletion_protection=false` で RDS の削除保護を外す（RDS が止まっていると、変更の後の待ち合わせで失敗と出るが、削除保護は外れる。`aws rds describe-db-instances` の DeletionProtection で確かめる）
+2. S3 の画面と添付のバケット（`aws s3 rm s3://<バケット> --recursive`）と ECR（`aws ecr batch-delete-image`）を空にする。中身があると Terraform は消せない
+3. `terraform plan -destroy -var rds_deletion_protection=false` で中身を確かめてから、`terraform destroy -var rds_deletion_protection=false`（CloudFront の削除に 20 分ほどかかる）
+4. 消す前に取った最後のスナップショット（rc-db-final）が要らなければ、`aws rds delete-db-snapshot --db-snapshot-identifier rc-db-final` で消す
+
+**反映のきまり**
+
+- 入れ替えでは、古いタスクを止めてから新しいタスクを起動する（インフラ設計書 方針 10）。その間（1〜2 分）は API が 502・503 になり、WebSocket も切れる。画面はつなぎ直し、取り直す（要件定義書 R-7）。利用者が少ない時間に反映する
+- 新しいタスクが起動しなければ、ECS が前のタスク定義に戻す（デプロイのサーキットブレーカー）。戻すまでの数分も止まる。このとき terraform apply は失敗で終わる
+- イメージのタグは上書きできず、Terraform は ECR に最後に push したイメージを使う。前のコミットに戻すときは、`git revert` で新しいコミットを作ってから反映する
+- 画面の古い assets/ は消さない（反映の前から開いている人が、古い画面のファイルを読めるように）
+
+**困ったとき**
+
+| 症状 | 調べるところ・対処 |
+| --- | --- |
+| deploy.sh・start.sh の apply がタスクの起動で止まる・失敗する | CloudWatch Logs の /rc/app で API のログを見る（起動の失敗・DB に接続できないなど）。ECS のコンソールのサービスの「イベント」で、イメージが取れない・ヘルスチェックに通らない・Parameter Store の値を読めないなどを見る |
+| start.sh の plan が ECR のイメージを読めずに失敗する | ECR にイメージがない（初めてのとき）。deploy.sh で反映する |
+| 公開 URL が「止めています」のページのまま | CloudFront の反映（5〜10 分）を待つ。続くなら `terraform output` と CloudFront のコンソールで、/api/* のビヘイビアがあるかを見る |
+| 画面に「つながっていません」が出続ける | ブラウザの開発者ツールで /ws の応答を見る。403 なら Origin が WEB_ORIGIN（CloudFront の URL）と違う。ECS のタスク定義の環境変数を見る |
+| 添付の送信が失敗する（ブラウザのコンソールに CORS のエラー） | 添付のバケットの CORS（`aws s3api get-bucket-cors --bucket <files_bucket>`）の送り元が、公開 URL と同じかを見る |
+| Git Bash で `aws logs tail /rc/app` などが何も出さない・名前が違うと言われる | Git Bash が /rc/... を Windows のパスに書き換えている。`MSYS_NO_PATHCONV=1` を前に付ける |
+| RDS が勝手に起動している | 止めてから 7 日たつと AWS が起動する。もう一度 stop.sh を実行する |
+| deploy.sh の `npm ci` が EPERM（operation not permitted）で止まる | 開発用の Vite（5173）などが frontend/node_modules のファイルを使っている。止めてから deploy.sh をもう一度実行する（イメージの push と apply は済んでいれば飛ばされる） |
+| 反映の直後に /api/* が 502 になる | CloudFront の設定の反映中か、タスクの入れ替え中。数分待つ |
+| apply が `Unrecognized remote plugin message` で途中で止まる | Windows で、.terraform の中の random プロバイダーの exe が消えていることがある（Raise timeline で起きた）。deploy/terraform で `terraform init` をして入れ直し、同じスクリプトをもう一度実行する（途中まで済んだ分は state に残っている） |
+
+**費用の確認**
+
+月 1 回、請求のコンソールで費用とクレジットの残りを確かめる。AWS Budgets（rc-budget）は、実際の費用が予算の 80% を超えたときと、月末の予測が予算を超えそうなときにメールを送る（R-1）。動画が多いと S3 からの転送の費用が増えるので、S3 の費用も見る（インフラ設計書 7 章）。無料プランの間は、クレジットの残りと期限にも気を付ける。
+
+#### 2.2.2 データベースの復旧（N-10、R-9）
+
+RDS の自動バックアップから、別の RDS に戻して入れ替える。戻せるのは自動バックアップを残している間だけである（無料プランの間は 1 日。インフラ設計書 3.2）。この手順はまだ実際に試していない。
+
+1. `terraform -chdir=deploy/terraform apply -var running=false` で API を止める（書き込みを止めるため）
+2. 今の RDS の名前を変える：`aws rds modify-db-instance --db-instance-identifier rc-db --new-db-instance-identifier rc-db-old --apply-immediately`
+3. 戻したい時刻（UTC）で、元の名前の RDS を作る：`aws rds restore-db-instance-to-point-in-time --source-db-instance-identifier rc-db-old --target-db-instance-identifier rc-db --restore-time <時刻> --db-instance-class db.t4g.micro --db-subnet-group-name rc-db --vpc-security-group-ids <SG-3 の ID> --no-publicly-accessible`。`aws rds wait db-instance-available --db-instance-identifier rc-db` で待つ
+4. `bash deploy/start.sh` を実行する。plan で RDS が作り直し（replace）にならないことを確かめてから y と答える
+5. 公開 URL で動きを確かめたら、rc-db-old の削除保護を外して消す
+
+S3 の添付はバージョンを残していないので、戻した時刻より後に消した添付は戻らない。その添付は表示できない。
+
+#### 2.2.3 不適切なメッセージ・添付の削除（R-2）
+
+まずワークスペースのオーナーに、メッセージの削除（FN-07 MS-10）を頼む。オーナーが対応しないときは、見つけた日から 3 日以内に（要件定義書 15.2）、作成者がデータベースと S3 から消す。RDS は VPC の中からしかつなげないので、psql の入った PostgreSQL のイメージを API と同じセキュリティグループの Fargate のタスクとして 1 回だけ動かし（Raise timeline と同じ方法。開発計画書 2-8 で公開先の性能テストのデータを入れるときに作る）、結果は CloudWatch Logs で読む。
+
+1. メッセージの ID を、知らせてもらった本文・送った人・日時から探す：`SELECT m.id, u.display_name, m.created_at, left(m.body, 50) FROM messages m JOIN users u ON u.id = m.user_id WHERE m.body LIKE '%<本文の一部>%' ORDER BY m.id DESC LIMIT 20;`
+2. 添付のファイルを消す一覧に入れる：`INSERT INTO storage_deletions (storage_key) SELECT k FROM attachments, LATERAL (VALUES (storage_key), (thumbnail_key)) v(k) WHERE message_id = <ID> AND k IS NOT NULL ON CONFLICT DO NOTHING;`。翌日 4:30 の StorageDeleter が S3 から消す（急ぐときは `aws s3 rm s3://<files_bucket>/<storage_key>` で消す。バケットの名前は `terraform output files_bucket`）
+3. メッセージを消す：`DELETE FROM messages WHERE id = <ID>;`（添付・リアクション・メンションの行と、スレッドの返信も一緒に消える）。返信を残すときは、代わりに `UPDATE messages SET body = '', deleted_at = now() WHERE id = <ID>;` と `DELETE FROM attachments WHERE message_id = <ID>;` を行う（アプリで返信のある親を消したときと同じ形。データ設計書 方針 3）
+4. 開いている画面には通知が届かないので、利用者が読み直すまでは前の表示が残る
+
+#### 2.2.4 JWT の秘密の値の変え方
+
+漏れた・漏れた疑いがあるときに行う。全員がログアウトされる。
+
+1. `terraform -chdir=deploy/terraform apply -replace=random_password.jwt -var running=true` で新しい値を Parameter Store に置く（値は Terraform が作るので、手で置くと次の apply で戻る）
+2. `aws ecs update-service --cluster rc-cluster --service rc-app --force-new-deployment` でタスクを入れ替える。タスクは起動するときにしか値を読まない。ここで全員のアクセストークンが使えなくなり、WebSocket も切れる
+3. 2.2.3 と同じ方法で、リフレッシュトークンを全部無効にする：`UPDATE refresh_tokens SET revoked_at = now() WHERE revoked_at IS NULL;`
 
 ### 2.3 ログ
 
