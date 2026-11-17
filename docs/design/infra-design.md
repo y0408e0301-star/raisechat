@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-BD-INFRA |
-| 版数 | 0.2 |
+| 版数 | 0.3 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-14 |
+| 最終更新日 | 2026-11-17 |
 | 作成者 | （氏名） |
 | 上位文書 | [基本設計書](basic-design.md)（RC-BD） |
 | 元にした文書 | [要件定義書](../requirements/requirements.md)（RC-REQ）版数 0.6、[技術スタック定義書](../tech-stack.md)（RC-TECH）版数 0.2 |
@@ -17,6 +17,7 @@
 | --- | --- | --- | --- |
 | 0.1 | 2026-11-10 | 初版。BookLog のインフラ設計書を元にし、WebSocket の通り道、S3 への直接のアップロード、タスクの大きさと入れ替え方を変えた | （氏名） |
 | 0.2 | 2026-11-14 | 添付のバケットの CORS で許すヘッダーに If-None-Match を足した（添付を作るとき（開発計画書 1-11）に、署名付きの PUT の URL で置き換えさせないことにしたため） | （氏名） |
+| 0.3 | 2026-11-17 | Terraform を作ったので（開発計画書 2-3）、3.2 の CloudFront から ALB へ渡すヘッダーを、作ったとおり Host 以外（AllViewerExceptHostHeader）に直した | （氏名） |
 
 本書は基本設計書の一部である。承認は[基本設計書](basic-design.md)で一括して行う。表記のルールは基本設計書 1.3 のとおり。
 
@@ -111,7 +112,7 @@ Terraform（deploy/terraform/）で作る。名前の頭は「rc-」にする。
 
 | リソース | 名前 | 設定 |
 | --- | --- | --- |
-| CloudFront | raisechat | 価格クラスは PriceClass_200（日本を含む）。ビューワーは HTTPS に移す。既定は画面のバケット（OAC、CachingOptimized）。`/api/*`・`/ws`・`/actuator/*` は ALB の HTTP 80 へ、キャッシュしない（CachingDisabled）・すべてのメソッド・Cookie とクエリとヘッダーをすべて渡す（AllViewer。WebSocket のつなぎ始めのヘッダーも渡る）。止めている間は ALB へのビヘイビアをなくし、すべてのパスで止めている間のページを返す |
+| CloudFront | raisechat | 価格クラスは PriceClass_200（日本を含む）。ビューワーは HTTPS に移す。既定は画面のバケット（OAC、CachingOptimized）。`/api/*`・`/ws`・`/actuator/*` は ALB の HTTP 80 へ、キャッシュしない（CachingDisabled）・すべてのメソッド・Cookie とクエリと Host 以外のヘッダーをすべて渡す（AllViewerExceptHostHeader。WebSocket のつなぎ始めのヘッダーと Origin も渡る。Host を渡すと ALB に CloudFront の名前が届くだけで役に立たないため、BookLog と同じく渡さない）。止めている間は ALB へのビヘイビアをなくし、すべてのパスで止めている間のページを返す |
 | CloudFront Function | rc-router | 動いている間は画面の URL を index.html に、止めている間はすべてを maintenance/index.html に書き換える（5.4） |
 | ALB | rc-alb | インターネット向け、パブリックサブネット a・c、HTTP 80。X-Origin-Verify が合うときだけターゲットグループ rc-app（IP、8080、ヘルスチェック /actuator/health）に送り、ほかは 403。アイドルタイムアウトは 60 秒のまま（WebSocket は 20 秒ごとのハートビートで切れない。機能定義書 4.1）。ターゲットの登録解除の遅延は 10 秒にする（既定の 300 秒のままだと、WebSocket の接続が残っている間、古いタスクの停止が待たされ、入れ替えの停止が長くなるため。方針 10）。止めている間は消す |
 | ECR | rc-app | API のイメージ。タグはコミット ID で上書きさせない（IMMUTABLE）。push したときに脆弱性を検査する。新しいものから 10 個だけ残す |
