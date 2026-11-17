@@ -21,5 +21,6 @@ if [[ "$status" == available ]]; then
 elif [[ "$status" != stopped && "$status" != stopping ]]; then
   # starting・modifying などの間は止められない。止め忘れると費用がかかるので知らせる
   echo "!! RDS は $status なので止めていません。available になってから、もう一度 bash deploy/stop.sh を実行してください" >&2
+  exit 1
 fi
 echo "== 止めました。RDS は止めてから 7 日たつと AWS が自動で起動します。長く止めるときは、7 日以内にもう一度 stop.sh を実行してください"

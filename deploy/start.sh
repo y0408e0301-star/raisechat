@@ -16,10 +16,16 @@ echo "== RDS（$db_id）: $status"
 #（AWS CLI に止まりきるまで待つコマンドはない）
 if [[ "$status" == stopping ]]; then
   echo "止まりきるのを待っています"
-  while [[ "$status" == stopping ]]; do
+  # 通常は数分で止まりきる。30 分たっても止まらなければ、AWS 側の異常として終わる
+  for _ in $(seq 120); do
     sleep 15
     status=$(db_status)
+    [[ "$status" == stopping ]] || break
   done
+  if [[ "$status" == stopping ]]; then
+    echo "!! 30 分たっても RDS が止まりきりません。AWS のコンソールで rds の状態を確かめてください" >&2
+    exit 1
+  fi
 fi
 if [[ "$status" == stopped ]]; then
   aws rds start-db-instance --db-instance-identifier "$db_id" >/dev/null
