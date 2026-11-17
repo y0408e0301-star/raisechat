@@ -382,7 +382,7 @@ function ConversationView({ conversationId }: { conversationId: number }) {
 
   return (
     <div className={styles.layout}>
-    {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions */}
+    {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- ドロップはマウスだけの近道。添付は「ファイルを添付」のボタンでもできる */}
     <div className={styles.page} onDragOver={handleDragOver} onDrop={handleDrop}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false) }}>
       {dragging && <div className={attachmentStyles.dropZone}>ドロップして添付</div>}

@@ -1,5 +1,6 @@
 package com.example.raisechat.common;
 
+import org.apache.tomcat.util.http.InvalidParameterException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +23,13 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(ApiException.class)
 	ResponseEntity<ErrorResponse> handleApiException(ApiException ex) {
 		return ResponseEntity.status(ex.code().status()).body(ErrorResponse.of(ex.code(), ex.field()));
+	}
+
+	// クエリの値が UTF-8 として読めない（Tomcat がクエリを読むときに投げる）。入力の誤りなので 400 にし、ERROR のログにしない（#63）
+	@ExceptionHandler(InvalidParameterException.class)
+	ResponseEntity<ErrorResponse> handleInvalidParameter(InvalidParameterException ex) {
+		log.debug("クエリを読めませんでした", ex);
+		return ResponseEntity.badRequest().body(ErrorResponse.of(ErrorCode.BAD_REQUEST, null));
 	}
 
 	// 思いがけない失敗（データベースの障害など）。中身は利用者に見せず、ログに残す

@@ -24,7 +24,10 @@ test('JWT が切れても、リフレッシュトークンで取り直して使�
   await expect(composer(page)).toBeVisible()
   // 書き込みもできる（取り直しの後に CSRF のトークンも使える）
   await context.clearCookies({ name: 'access_token' })
+  // 送った直後は、取り直し → 送信の途中でも画面に出る。保存されたのを待ってから読み直す（#65）
+  const sent = page.waitForResponse((r) => r.request().method() === 'POST' && /\/api\/conversations\/\d+\/messages$/.test(r.url()) && r.status() === 201)
   await sendFrom(composer(page), '取り直した後のメッセージ')
+  await sent
   await expect(messageItem(page, taro, '取り直した後のメッセージ')).not.toContainText('送信できませんでした。')
   await page.reload()
   await expect(messageItem(page, taro, '取り直した後のメッセージ')).toBeVisible()
