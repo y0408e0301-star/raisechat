@@ -340,6 +340,44 @@ describe('ブラウザの通知（NT-7〜NT-9、TC-14-8〜11）', () => {
       { kind: 'DM', message: message(9, 'DM', { conversationId: 50 }), conversationName: 'DM' }, 50)))
     expect(shown).toHaveLength(1)
   })
+
+  // Android の Chrome は new Notification() を受け付けないので、Service Worker で出す（#71）
+  it('Service Worker が動いていればそれで出し、押されて Service Worker から届いたメッセージの位置を開く', async () => {
+    const { shown } = fakeNotification('granted')
+    localStorage.setItem('raisechat.browserNotifications', 'on')
+    const showNotification = vi.fn(async () => {})
+    const worker = Object.assign(new EventTarget(), {
+      register: vi.fn(async () => ({})),
+      getRegistration: vi.fn(async () => ({ active: {}, showNotification })),
+      startMessages: vi.fn(),
+    })
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: worker })
+    try {
+      const { client } = await open('/w/3/c/11', {
+        'GET /api/conversations/11': () => json(200, detail(11, '運営', { visibility: 'PRIVATE' })),
+        'GET /api/conversations/10/messages?around=7': page([message(7, '@taro_y 見て')]),
+      })
+      expect(worker.register).toHaveBeenCalledWith('/sw.js')
+      act(() => client.deliver(USER_EVENTS, event('notify',
+        { kind: 'MENTION', message: message(7, '@taro_y 見て'), conversationName: '#general' })))
+      await waitFor(() => expect(showNotification).toHaveBeenCalledWith('はなこ（#general）',
+        { body: '@taro_y 見て', tag: '7', data: { path: '/w/3/c/10?message=7' } }))
+      expect(shown).toHaveLength(0)
+
+      // 画面の中の URL でなければ開かない
+      act(() => {
+        worker.dispatchEvent(new MessageEvent('message', { data: { type: 'open-message', path: 'https://example.com/' } }))
+      })
+      expect(screen.queryByText('@taro_y 見て')).not.toBeInTheDocument()
+      act(() => {
+        worker.dispatchEvent(new MessageEvent('message', { data: { type: 'open-message', path: '/w/3/c/10?message=7' } }))
+      })
+      expect(await screen.findByText('@taro_y 見て')).toBeInTheDocument()
+    } finally {
+      // @ts-expect-error -- 足した serviceWorker を消して、jsdom のもとの状態（ない）に戻す
+      delete navigator.serviceWorker
+    }
+  })
 })
 
 describe('G-3 の印（NT-3、TC-14-5）', () => {

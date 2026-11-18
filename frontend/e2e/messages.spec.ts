@@ -152,3 +152,61 @@ test('検索した結果を押すと、そのメッセージ（スレッドの�
   await expect(page.getByText('「ないことば」に一致するメッセージは見つかりませんでした。')).toBeVisible()
   await expect(await sidebar(page)).toBeVisible()
 })
+
+// NT-7・NT-9 ブラウザの通知を、本物のブラウザの Service Worker で出す（#71。Android の Chrome は Service Worker でしか出せない）。
+// Playwright で通知を許可できるのは Chromium 系（Edge・Chrome）だけ。通知を押したときの動きは src/notifications/sw.test.ts。
+// OS の通知欄に出るかは OS による（CI の Linux には通知を受け取るものがなく、出せずに終わる）ので、
+// 画面が Service Worker の showNotification() を呼んだことと、その中身を確かめる
+test('ブラウザの通知をオンにすると、Service Worker でメンションの通知を出す', async ({ browser, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Firefox・WebKit は Playwright で通知を許可できない')
+  const taro = user('eh', 'たろう')
+  const hana = user('ei', 'はなこ')
+  const page = await signup(browser, taro)
+  const hanaPage = await signup(browser, hana)
+  const workspace = await createWorkspace(page, 'ブラウザの通知')
+  await join(page, workspace, hanaPage)
+
+  // showNotification() と new Notification() の呼び出しを記録する（次に開いたページから）
+  await hanaPage.addInitScript(() => {
+    const calls: { via: string, title: string, body?: string, data?: unknown, result?: string }[] = []
+    Object.assign(window, { notificationCalls: calls })
+    const show = ServiceWorkerRegistration.prototype.showNotification
+    ServiceWorkerRegistration.prototype.showNotification = function (title, options) {
+      const call = { via: 'serviceWorker', title, body: options?.body, data: options?.data as unknown, result: '出している' }
+      calls.push(call)
+      return show.call(this, title, options).then((value) => {
+        call.result = '出した'
+        return value
+      }, (error: unknown) => {
+        call.result = String(error)
+        throw error
+      })
+    }
+    // permission・requestPermission はもとのものをそのまま見せる
+    window.Notification = new Proxy(window.Notification, {
+      construct(target, args: [string, NotificationOptions?]) {
+        calls.push({ via: 'new Notification', title: args[0], body: args[1]?.body })
+        return Reflect.construct(target, args) as object
+      },
+    })
+  })
+  await hanaPage.context().grantPermissions(['notifications'])
+  await hanaPage.goto('/settings/profile')
+  const toggle = hanaPage.getByRole('switch', { name: 'ブラウザの通知' })
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-checked', 'true')
+  await hanaPage.evaluate(() => navigator.serviceWorker.ready)
+  await subscribed(hanaPage, USER_QUEUE)
+
+  const sent = await postMessage(page, workspace.generalConversationId, `@${hana.username} 土曜の **集合** は駅前で`)
+  type Call = { via: string, title: string, body?: string, data?: unknown, result?: string }
+  const calls = () => hanaPage.evaluate(() => (window as unknown as { notificationCalls: Call[] }).notificationCalls)
+  await expect.poll(async () => (await calls()).map(({ via, title, body, data }) => ({ via, title, body, data })), { message: '通知の呼び出し' }).toEqual([{
+    via: 'serviceWorker',
+    title: `${taro.displayName}（#general）`,
+    body: `@${hana.username} 土曜の 集合 は駅前で`,
+    data: { path: `/w/${workspace.id}/c/${workspace.generalConversationId}?message=${sent.id}` },
+  }])
+  // OS の通知欄に出せたか（Windows では「出した」。CI の Linux では出せない）は、結果に書くだけにする
+  test.info().annotations.push({ type: '通知の結果', description: (await calls())[0].result })
+})

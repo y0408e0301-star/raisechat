@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-TECH |
-| 版数 | 0.2 |
+| 版数 | 0.3 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-10 |
+| 最終更新日 | 2026-11-18 |
 | 作成者 | （氏名） |
 | 元にした文書 | [要件定義書](requirements/requirements.md) 版数 0.4、[機能定義書](functions/function-definition.md) 版数 0.1 |
 | 状態 | 承認待ち |
@@ -16,6 +16,7 @@
 | --- | --- | --- | --- |
 | 0.1 | 2026-11-10 | 初版。BookLog と同じ技術・同じバージョンを基本にし、チャットに要るもの（WebSocket・Markdown・絵文字・画像の縮小）を足した | （氏名） |
 | 0.2 | 2026-11-10 | インフラ設計書を作ったので、1 章からリンクした | （氏名） |
+| 0.3 | 2026-11-18 | ブラウザの通知を Service Worker で出すことにした（#71。Android の Chrome は Notification のコンストラクタを受け付けないため） | （氏名） |
 
 ## 承認
 
@@ -114,7 +115,7 @@
 | STOMP の接続 | @stomp/stompjs | 7.5.0（2026-10-15 公開） | 新 | 条件 3。ブラウザの WebSocket の上で STOMP を使う。切れたときのつなぎ直し・ハートビート・購読と取り消しができる。依存するライブラリがない。SockJS は使わない（対応環境のブラウザはすべて WebSocket が使えるため） |
 | Markdown の表示 | react-markdown ＋ remark-gfm | 10.1.0・4.0.1 | 新 | 条件 7。Markdown を React の部品に組み立てて出し、HTML の文字列を差し込まない（HTML のタグはそのまま文字になる）。出してよい要素（太字・斜体・取り消し線・コード・引用・箇条書き・リンク）を allowedElements で決め、それ以外は文字に戻す。リンクは http・https だけにする。取り消し線と URL の自動のリンクに remark-gfm を使う |
 | 絵文字の一覧 | emoji-picker-element ＋ emoji-picker-element-data | 1.29.1・1.8.0（Emoji 17.0。emojibase-data 17.0.0 から作られたもの） | 新 | 条件 8。分類・検索・最近使ったもの・肌の色を持つ絵文字の一覧。日本語の名前（ja のデータ）で探せる。データはアプリと一緒に配り、外部の CDN から読まない。React からは Web Components として使う |
-| ブラウザの通知 | ブラウザの Notification API | （ブラウザに含まれる） | 新 | FN-14 NT-7。ライブラリは使わない |
+| ブラウザの通知 | ブラウザの Notification API と Service Worker | （ブラウザに含まれる） | 新 | FN-14 NT-7。ライブラリは使わない。通知は frontend/public/sw.js の Service Worker の showNotification() で出し、押したときもこの Service Worker がアプリのタブを前に出す（Android の Chrome は new Notification() を受け付けないため）。Service Worker を使えないとき（Firefox のプライベートウィンドウなど）は new Notification() で出す。Service Worker は画面のファイルの読み込み（fetch）には手を出さない |
 
 バージョンは package.json に書く範囲である。実際に入るバージョンは package-lock.json で固定し、BookLog と同じものは BookLog の package-lock.json と同じ版にそろえる。
 
