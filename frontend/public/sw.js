@@ -15,9 +15,10 @@ self.addEventListener('notificationclick', (event) => {
     // 並びは最後に前にあったタブから（Chrome・Edge・Firefox）
     const [tab] = await self.clients.matchAll({ type: 'window' })
     if (tab) {
-      await tab.focus()
+      // 先に位置を知らせる（前に出せなかったときも、タブを開いた人にはその位置が出ているように）
       // oxlint-disable-next-line unicorn/require-post-message-target-origin -- Client の postMessage は同じオリジンのタブにだけ届き、targetOrigin はない
       tab.postMessage({ type: 'open-message', path })
+      await tab.focus()
     } else if (path) {
       await self.clients.openWindow(path)
     }

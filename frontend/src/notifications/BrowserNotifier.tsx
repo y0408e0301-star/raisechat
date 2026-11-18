@@ -23,8 +23,9 @@ export default function BrowserNotifier() {
 
   useEffect(() => {
     registerNotificationWorker()
-    return onNotificationOpen((target) => navigate(target))
-  }, [navigate])
+  }, [])
+
+  useEffect(() => onNotificationOpen((target) => navigate(target)), [navigate])
 
   useEffect(() => subscribeUser((event) => {
     if (event.type !== 'notify' || !notificationsEnabled()) return
