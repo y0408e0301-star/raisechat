@@ -3,11 +3,13 @@ import { useLocation, useNavigate } from 'react-router'
 import { messagePath } from '../api'
 import { useRealtime } from '../realtime/RealtimeContext'
 import { isPageVisible } from '../visibility'
-import { notificationBody, notificationsEnabled } from './browserNotifications'
+import {
+  notificationBody, notificationsEnabled, onNotificationOpen, registerNotificationWorker, showNotification,
+} from './browserNotifications'
 
 // メンション・DM が届いたら、ブラウザの通知（OS の通知欄に出るもの）を出す（FN-14 NT-7・NT-8）。
 // アプリをどこかのタブで開いている間だけ動く（ログインしていて WebSocket でつながっている間）。
-// その会話を開いていて画面が見えているときは出さない。押すと、このタブを前に出してそのメッセージの位置を開く。
+// その会話を開いていて画面が見えているときは出さない。押すと、アプリのタブを前に出してそのメッセージの位置を開く。
 // 同じブラウザで複数のタブを開いていても、tag にメッセージの ID を入れて 1 つだけにする（5 章の 5）
 export default function BrowserNotifier() {
   const { subscribeUser } = useRealtime()
@@ -19,6 +21,11 @@ export default function BrowserNotifier() {
     path.current = location.pathname
   }, [location.pathname])
 
+  useEffect(() => {
+    registerNotificationWorker()
+    return onNotificationOpen((target) => navigate(target))
+  }, [navigate])
+
   useEffect(() => subscribeUser((event) => {
     if (event.type !== 'notify' || !notificationsEnabled()) return
     const { kind, message, conversationName } = event.payload
@@ -27,15 +34,11 @@ export default function BrowserNotifier() {
     }
     const opened = new RegExp(`^/w/${event.workspaceId}/[cd]/${message.conversationId}$`).test(path.current)
     if (opened && isPageVisible()) return
-    const notification = new Notification(`${message.author.displayName}（${conversationName}）`, {
+    showNotification(`${message.author.displayName}（${conversationName}）`, {
       body: notificationBody(message),
       tag: String(message.id),
-    })
-    notification.addEventListener('click', () => {
-      window.focus()
-      navigate(messagePath(conversation, message.id))
-      notification.close()
-    })
+      path: messagePath(conversation, message.id),
+    }, (target) => navigate(target))
   }), [subscribeUser, navigate])
 
   return null

@@ -152,3 +152,34 @@ test('検索した結果を押すと、そのメッセージ（スレッドの�
   await expect(page.getByText('「ないことば」に一致するメッセージは見つかりませんでした。')).toBeVisible()
   await expect(await sidebar(page)).toBeVisible()
 })
+
+// NT-7・NT-9 ブラウザの通知を、本物のブラウザの Service Worker で出す（#71。Android の Chrome は Service Worker でしか出せない）。
+// Playwright で通知を許可できるのは Chromium 系（Edge・Chrome）だけ。通知を押したときの動きは src/notifications/sw.test.ts
+test('ブラウザの通知をオンにすると、Service Worker でメンションの通知を出す', async ({ browser, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Firefox・WebKit は Playwright で通知を許可できない')
+  const taro = user('eh', 'たろう')
+  const hana = user('ei', 'はなこ')
+  const page = await signup(browser, taro)
+  const hanaPage = await signup(browser, hana)
+  const workspace = await createWorkspace(page, 'ブラウザの通知')
+  await join(page, workspace, hanaPage)
+
+  await hanaPage.context().grantPermissions(['notifications'])
+  await hanaPage.goto('/settings/profile')
+  const toggle = hanaPage.getByRole('switch', { name: 'ブラウザの通知' })
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-checked', 'true')
+  await hanaPage.evaluate(() => navigator.serviceWorker.ready)
+  await subscribed(hanaPage, USER_QUEUE)
+
+  const sent = await postMessage(page, workspace.generalConversationId, `@${hana.username} 土曜の **集合** は駅前で`)
+  const shown = () => hanaPage.evaluate(async () => {
+    const registration = await navigator.serviceWorker.ready
+    return (await registration.getNotifications()).map((n) => ({ title: n.title, body: n.body, data: n.data as unknown }))
+  })
+  await expect.poll(shown, { message: 'Service Worker の通知' }).toEqual([{
+    title: `${taro.displayName}（#general）`,
+    body: `@${hana.username} 土曜の 集合 は駅前で`,
+    data: { path: `/w/${workspace.id}/c/${workspace.generalConversationId}?message=${sent.id}` },
+  }])
+})
