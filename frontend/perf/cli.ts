@@ -2,6 +2,7 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { accountId, remotePsql } from './aws.ts'
 import type { Result } from './measure.ts'
 import { noisePng } from './png.ts'
 
@@ -16,7 +17,9 @@ const USAGE = `使い方：npm run perf -- <コマンド>
   ui       画面で測る（Playwright。N-1〜N-5。PERF_UPLOAD=1 なら N-6・N-7 も）
   mixed    k6 で 50 人の負荷をかけながら、画面で N-1〜N-5 を測る
   report   perf/results/ の結果を 1 つの表（summary.md）にまとめる
-  all      api → load → realtime → ui → mixed → report の順にすべて動かす`
+  all      api → load → realtime → ui → mixed → report の順にすべて動かす
+
+公開先（AWS）で測るとき：PERF_DB=aws を付けて seed・clean すると、公開先の DB（RDS）と添付のバケットに入れる・消す`
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url))
 const FRONTEND = fileURLToPath(new URL('../', import.meta.url))
@@ -28,9 +31,11 @@ const PLAYWRIGHT = fileURLToPath(new URL('../node_modules/@playwright/test/cli.j
 // 測る先。公開先で測るときは CloudFront の URL を入れる（開発計画書 2-8）
 const BASE_URL = process.env.PERF_BASE_URL ?? 'http://localhost:8080'
 const K6_IMAGE = 'grafana/k6:2.2.0'
-const DB = 'raisechat_perf'
+// 公開先（AWS）の DB と添付のバケットに入れる・消すか（PERF_DB=aws）。公開先では、API が使う DB にそのまま入れる
+const ON_AWS = process.env.PERF_DB === 'aws'
+const DB = ON_AWS ? 'raisechat' : 'raisechat_perf'
 // 測るワークスペースの画像を置くバケット（手元は application.properties と同じ既定値）。S3_ENDPOINT があれば S3 以外（MinIO）に置く
-const BUCKET = process.env.S3_BUCKET ?? 'rc-files-dev-467112307516'
+const BUCKET = process.env.S3_BUCKET ?? (ON_AWS ? `rc-files-${accountId()}` : 'rc-files-dev-467112307516')
 const IMAGES_PREFIX = 'workspaces/900000001/attachments/'
 // 測るワークスペースの general の最新 50 件に付ける画像（perf/seed.sql）の数と大きさ。元の画像と縮小した画像を同じものにする
 const SAMPLE_IMAGES = 200
@@ -41,6 +46,7 @@ const START_API = `jar を perf プロファイルで起動してから、もう
   java -jar backend/target/backend-0.0.1-SNAPSHOT.jar --spring.profiles.active=perf`
 
 function psql(database: string, args: string[], input?: string): string {
+  if (ON_AWS) return remotePsql(database, args, input)
   return execFileSync('docker', ['compose', 'exec', '-T', 'db', 'psql', '-U', 'raisechat', '-d', database,
     '-v', 'ON_ERROR_STOP=1', '-q', ...args], { cwd: ROOT, input, encoding: 'utf8', stdio: ['pipe', 'pipe', 'inherit'] })
 }
@@ -51,16 +57,17 @@ function s3(args: string[]): void {
     '--only-show-errors'], { stdio: 'inherit' })
 }
 
-const dbExists = () => psql('raisechat', ['-tAc', `SELECT 1 FROM pg_database WHERE datname = '${DB}'`]).trim() === '1'
+// 公開先の DB は API が使っているものなので、あって表もある
+const dbExists = () => ON_AWS || psql('raisechat', ['-tAc', `SELECT 1 FROM pg_database WHERE datname = '${DB}'`]).trim() === '1'
 
 function seed(): void {
-  if (!dbExists()) {
+  if (!ON_AWS && !dbExists()) {
     // pg_trgm が日本語を索引に入れるよう、文字の分類は en_US.UTF-8 にする（compose.yaml と同じ）
     psql('raisechat', ['-c', `CREATE DATABASE ${DB} LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8' TEMPLATE template0`])
     console.log(`DB ${DB} を作りました。表は API が起動したときに Flyway が作ります。\n${START_API}`)
     process.exit(1)
   }
-  if (psql(DB, ['-tAc', "SELECT to_regclass('public.users') IS NOT NULL"]).trim() !== 't') {
+  if (!ON_AWS && psql(DB, ['-tAc', "SELECT to_regclass('public.users') IS NOT NULL"]).trim() !== 't') {
     console.log(`DB ${DB} に表がありません。\n${START_API}`)
     process.exit(1)
   }
