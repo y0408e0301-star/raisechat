@@ -10,7 +10,10 @@ self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim(
 // タブがなければ（通知の後に閉じた）、そのメッセージの位置を新しいタブで開く
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const path = event.notification.data && event.notification.data.path
+  const data = event.notification.data
+  // 画面の中の URL（/w/…）だけを開く
+  const path = data && typeof data.path === 'string' && data.path.startsWith('/w/') ? data.path : null
+  if (!path) return
   event.waitUntil((async () => {
     // 並びは最後に前にあったタブから（Chrome・Edge・Firefox）
     const [tab] = await self.clients.matchAll({ type: 'window' })
@@ -19,7 +22,7 @@ self.addEventListener('notificationclick', (event) => {
       // oxlint-disable-next-line unicorn/require-post-message-target-origin -- Client の postMessage は同じオリジンのタブにだけ届き、targetOrigin はない
       tab.postMessage({ type: 'open-message', path })
       await tab.focus()
-    } else if (path) {
+    } else {
       await self.clients.openWindow(path)
     }
   })())

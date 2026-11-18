@@ -117,7 +117,7 @@ TC-05-8 の「入っていないチャンネル」は、公開チャンネルを
 
 API（`mvnw verify`、566 件）・画面（`npm test`、351 件）は、ブラウザに関係しないので Pull Request ごとの CI の結果をそのまま使う。
 
-上の表の後に、ブラウザの通知を Service Worker で出すように直し（#71）、messages.spec.ts に「ブラウザの通知をオンにすると、Service Worker でメンションの通知を出す」を足した（画面のテストは 354 件になった）。Playwright で通知を許可できるのは Chromium 系だけなので、Edge（pc）と Chrome（chrome）で流して合格し、Firefox・WebKit では skipped になる。全環境での流し直しは、受け入れ（開発計画書 2-8）のときに行う。
+上の表の後に、ブラウザの通知を Service Worker で出すように直し（#71）、messages.spec.ts に「ブラウザの通知をオンにすると、Service Worker でメンションの通知を出す」を足した（画面のテストは 355 件になった）。Playwright で通知を許可できるのは Chromium 系だけなので、Edge（pc）と Chrome（chrome）で流して合格し、Firefox・WebKit では skipped になる。全環境での流し直しは、受け入れ（開発計画書 2-8）のときに行う。
 
 この結果の前に流したときに落ちたテストと、直したこと（どれもアプリの不具合ではなかった）：
 
