@@ -1,5 +1,6 @@
 package com.example.raisechat;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.springframework.boot.test.context.TestConfiguration;
@@ -15,9 +16,20 @@ import org.testcontainers.utility.DockerImageName;
 public class DatabaseTestConfiguration {
 
 	// 開発用と同じ、pg_bigm を足した postgres:17（db/Dockerfile。compose.yaml と同じ）。
-	// テストは backend のフォルダで動く。Docker のキャッシュがあれば、作り直しは数秒で終わる
+	// Docker のキャッシュがあれば、作り直しは数秒で終わる
 	private static final ImageFromDockerfile IMAGE = new ImageFromDockerfile("raisechat-db:17", false)
-		.withFileFromPath(".", Path.of("..", "db"));
+		.withFileFromPath(".", dockerfileDir());
+
+	// mvnw は backend のフォルダで、IDE はリポジトリのフォルダでテストを動かすことがあるので、どちらからでも db を探す
+	private static Path dockerfileDir() {
+		for (Path dir : new Path[] { Path.of("db"), Path.of("..", "db") }) {
+			if (Files.isRegularFile(dir.resolve("Dockerfile"))) {
+				return dir;
+			}
+		}
+		throw new IllegalStateException(
+				"db/Dockerfile が見つかりません。リポジトリか backend のフォルダでテストを動かしてください（今は " + Path.of("").toAbsolutePath() + "）");
+	}
 
 	@Bean
 	@ServiceConnection

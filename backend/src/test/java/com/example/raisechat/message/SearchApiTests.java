@@ -245,6 +245,7 @@ class SearchApiTests {
 	@Test
 	void 一から二文字の日本語の言葉でも本文の索引を使える() {
 		send(this.taro, this.general, "土曜の集合場所は駅前です");
+		// 言葉はここで決めた定数だけ（外からの入力ではない）なので、SQL に直接入れる
 		for (String word : List.of("集合場所", "集合", "駅")) {
 			List<String> plan = this.jdbc.execute((ConnectionCallback<List<String>>) (connection) -> {
 				try (Statement statement = connection.createStatement()) {
