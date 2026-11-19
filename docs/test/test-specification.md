@@ -3,7 +3,7 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-TEST |
-| 版数 | 0.3 |
+| 版数 | 0.4 |
 | 作成日 | 2026-11-18 |
 | 最終更新日 | 2026-11-19 |
 | 作成者 | （氏名） |
@@ -17,6 +17,7 @@
 | 0.1 | 2026-11-18 | 初版。テストの方針、要件 ID・テストの観点とテストの対応表（自動で作る）、対応環境の代わりのブラウザで E2E を流した結果、違う環境のブラウザの間のリアルタイムの通信、実機で確かめる手順と目で見る項目を書いた（開発計画書 2-6） | （氏名） |
 | 0.2 | 2026-11-18 | ブラウザの通知を Service Worker で出すように直した（#71。Android の Chrome は new Notification() を受け付けないため）。3.2 に足した E2E の結果を、4.1 の No.13 に通知を押したときの確かめ方を足した | （氏名） |
 | 0.3 | 2026-11-19 | 受け入れ（開発計画書 2-8）で、3.2 に全環境で流し直した結果を、4.3 に実機と目で見る・設定を見る項目の結果を書いた | （氏名） |
+| 0.4 | 2026-11-19 | E2E の流し方の参照先を、README から開発者向けガイド（docs/guide/testing.md）に直した（#78） | （氏名） |
 
 ## 承認
 
@@ -98,7 +99,7 @@ TC-05-8 の「入っていないチャンネル」は、公開チャンネルを
 | 6 | iOS・Safari | WebKit で iPhone 15 の大きさ・User-Agent・タッチ（iphone） | 393px | 主な流れと全画面 |
 | 7 | Android・Google Chrome | Chrome で Pixel 7 の大きさ・User-Agent・タッチ（android） | 412px | 主な流れと全画面 |
 
-流し方：README「画面を通したテスト」のとおりに 3 つのサーバー（DB・API・画面）を起動し、frontend で `E2E_BROWSERS=all npx playwright test`（PowerShell では `$env:E2E_BROWSERS='all'; npx playwright test`）。Firefox と WebKit は先に `npx playwright install firefox webkit` で入れる。この流し方のときだけ、落ちたテストを 1 回やり直す。やり直して通ったものは「flaky」と出るので、結果に書く。
+流し方：[テストとコードチェックのガイド](../guide/testing.md#画面を通したテストe2e-テスト)のとおりに 3 つのサーバー（DB・API・画面）を起動し、frontend で `E2E_BROWSERS=all npx playwright test`（PowerShell では `$env:E2E_BROWSERS='all'; npx playwright test`）。Firefox と WebKit は先に `npx playwright install firefox webkit` で入れる。この流し方のときだけ、落ちたテストを 1 回やり直す。やり直して通ったものは「flaky」と出るので、結果に書く。
 
 ### 3.2 結果
 

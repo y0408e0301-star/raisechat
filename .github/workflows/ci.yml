@@ -1,5 +1,5 @@
 # コードチェックとテストを、Pull Request と main への push ごとに GitHub 上で実行する。
-# 手元で同じことをするコマンドは README「テストとコードチェック」
+# 手元で同じことをするコマンドは docs/guide/testing.md（テストとコードチェック）
 name: CI
 
 on:
