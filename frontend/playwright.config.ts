@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 import type { Project } from '@playwright/test'
 
 // 画面を操作して、本物の API と DB で動くかを確かめる E2E テスト（開発計画書 2-1）。
-// サーバー（DB 5432・API 8080・画面 5173）は起動しておく（README「画面を通したテスト」）。
+// サーバー（DB 5432・API 8080・画面 5173）は起動しておく（docs/guide/testing.md の「画面を通したテスト」）。
 // CI では jar（8080）に画面も入れて動かすので、環境変数 E2E_BASE_URL で行き先を変える。
 // テストで作るユーザーは ID が「e2e_」で始まり、始める前と終わった後に DB から消す（e2e/cleanup.ts）
 

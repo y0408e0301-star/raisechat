@@ -8,7 +8,7 @@ import type { Result } from './measure.ts'
 import { noisePng } from './png.ts'
 
 // 性能テスト（開発計画書 2-2、基本設計書 2.4）をまとめて動かす。frontend で npm run perf -- <コマンド>。
-// 先に DB（docker compose up -d）と、jar を perf プロファイルで起動しておく（README「性能テスト」）
+// 先に DB（docker compose up -d）と、jar を perf プロファイルで起動しておく（docs/guide/performance.md）
 const USAGE = `使い方：npm run perf -- <コマンド>
   seed     DB raisechat_perf にデータ（要件定義書 11.1 の量）を入れ、測るワークスペースの画像を S3 に置く（数分かかる）
   clean    データと S3 の画像を消す
@@ -45,7 +45,7 @@ const SAMPLE_IMAGES = 200
 const IMAGE_WIDTH = 320
 const IMAGE_HEIGHT = 240
 
-const START_API = `jar を perf プロファイルで起動してから、もう一度実行してください（README「性能テスト」）：
+const START_API = `jar を perf プロファイルで起動してから、もう一度実行してください（docs/guide/performance.md）：
   java -jar backend/target/backend-0.0.1-SNAPSHOT.jar --spring.profiles.active=perf`
 
 function psql(database: string, args: string[], input?: string): string {

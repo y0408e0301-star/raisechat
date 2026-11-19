@@ -243,7 +243,7 @@
 | N-30 | 未読・メンションは、太字・件数の数字でも区別し、色だけで区別しない | requirements/requirements.md | 画面 1：notifications.test.tsx › 未読の会話を太字にし、チャンネルはメンションの件数、DM は未読の件数を出す。「メンション」と「@」には合計 |
 | N-31 | メッセージの入力欄では、Enter で送信、Shift＋Enter で改行する。送信中に失敗したときは、入力した文を消さ… | requirements/requirements.md | 画面 3：messages.test.tsx › Enter で送り、送っている間は「送信中…」。Shift＋Enter は改行、messages.test.tsx › MS-8：選んだ文字の前後に記号を入れ、選んでいなければ記号の間にカーソルを置く、messages.test.tsx › 送れなかったら M-34 を出し、「もう一度送る」は同じ clientId で送る |
 | N-32 | ソースコードは GitHub のリポジトリで管理する | requirements/requirements.md | （テスト以外）GitHub のリポジトリ（y0408e0301-star/raisechat）で管理している |
-| N-33 | リポジトリの README に、開発環境の準備手順、データベースの作成手順、公開手順を書く | requirements/requirements.md | （テスト以外）README の「起動方法」（DB は compose.yaml で作る）と「公開環境」（基本設計書 2.2.1）を見る |
+| N-33 | リポジトリの README に、開発環境の準備手順、データベースの作成手順、公開手順を書く | requirements/requirements.md | （テスト以外）README の「動かし方」（開発環境の準備、DB は compose.yaml で作る、公開のスクリプトと基本設計書 2.2.1）と、詳しい手順の docs/guide/ を見る |
 | N-34 | データベース・S3 への接続設定は環境変数で渡し、設定を読むところをソースコード中の 1 か所にまとめる | requirements/requirements.md | （テスト以外）application.properties だけで環境変数（DB_URL・DB_USERNAME・DB_PASSWORD・S3_BUCKET・AWS_REGION など）を読んでいることを見る |
 | N-35 | 書式・lint・テストを、Pull Request ごとに GitHub Actions で自動で動かす。あわせて、Pu… | requirements/requirements.md | （テスト以外）.github/workflows/ci.yml で、Pull Request ごとに書式・lint・テスト・E2E を動かし、claude-code-review.yml で差分をレビューしている |
 | BR-1 | 文字列は前後の空白を取り除き、改行を LF にそろえてから保存する。パスワードは取り除かない | design/data-design.md | API 5：AuthApiTests.java › ユーザーIDは3から15文字の半角英数字とアンダースコアだけ、AuthApiTests.java › ユーザーIDは前後の空白を取り除いて保存する、AuthApiTests.java › パスワードは英字と数字を含む8から64文字の半角文字、AuthApiTests.java › パスワードの前後の空白は取り除かずにそのまま使う、AuthServiceTests.java › トリムした値とハッシュにしたパスワードで保存しトークンを渡す |

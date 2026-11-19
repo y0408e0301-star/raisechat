@@ -29,7 +29,7 @@ const OTHER = {
   'N-23': 'DB のパスワードと JWT の秘密の値は Terraform が作って Parameter Store に置き（ssm.tf）、terraform.tfvars・state は .gitignore で除いている。application.properties の既定値は開発用だけ',
   'N-26': '画面の文言は機能定義書・画面設計書のとおり日本語で書いている。全画面を目で見て確かめる（テスト仕様書の手動の項目）',
   'N-32': 'GitHub のリポジトリ（y0408e0301-star/raisechat）で管理している',
-  'N-33': 'README の「起動方法」（DB は compose.yaml で作る）と「公開環境」（基本設計書 2.2.1）を見る',
+  'N-33': 'README の「動かし方」（開発環境の準備、DB は compose.yaml で作る、公開のスクリプトと基本設計書 2.2.1）と、詳しい手順の docs/guide/ を見る',
   'N-34': 'application.properties だけで環境変数（DB_URL・DB_USERNAME・DB_PASSWORD・S3_BUCKET・AWS_REGION など）を読んでいることを見る',
   'N-35': '.github/workflows/ci.yml で、Pull Request ごとに書式・lint・テスト・E2E を動かし、claude-code-review.yml で差分をレビューしている',
 }

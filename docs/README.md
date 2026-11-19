@@ -37,6 +37,12 @@ docs/
 │   └── acceptance-report.md           … 検収書（合格の条件の確認と署名）
 ├── manual/
 │   └── operation-manual.md            … 操作マニュアル（利用者向けの使い方）
+├── guide/                             … 開発者向けガイド（手元で開発・テスト・公開する手順）
+│   ├── README.md                      … ガイドの一覧
+│   ├── development.md                 … 開発環境（準備・起動と停止・API の仕様書・ログ）
+│   ├── testing.md                     … テストとコードチェック（E2E を含む）
+│   ├── performance.md                 … 性能テスト
+│   └── deploy.md                      … 公開環境（スクリプトと注意）
 ├── tech-stack.md                      … 技術スタック定義書
 └── development-plan.md                … 開発計画書（作る順番と進み具合）
 ```
@@ -59,6 +65,8 @@ docs/
 | [操作マニュアル](manual/operation-manual.md) | RC-MAN | 利用者向けの使い方（招待リンクの渡し方、ブラウザの通知の許可のしかたと共用のパソコンでの注意、DM を見られる人を含む）、メッセージが出たときにすること | 本書で行う |
 | [技術スタック定義書](tech-stack.md) | RC-TECH | 使う言語・フレームワーク・サービス・開発ツールと選んだ理由 | 本書で行う |
 | [開発計画書](development-plan.md) | RC-PLAN | 作る順番（段階と Pull Request の単位）、段階ごとの完了条件、どこまでできたか | 本書で行う |
+
+[開発者向けガイド](guide/README.md)（開発環境・テスト・性能テスト・公開の手順）は、コードと一緒に直す手順書なので、文書番号と承認は付けない。リポジトリの README には概要と最短の手順だけを書き、詳しい手順はガイドに書く。
 
 文書は BookLog（読書記録アプリ）・Raise timeline（タイムライン型 SNS）と同じ構成で作る。
 

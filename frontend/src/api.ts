@@ -2,7 +2,7 @@ import type { components } from './api-schema'
 import { M } from './messages'
 
 // API が返す形・受け取る形は、API の仕様書（docs/api/openapi.yaml）から作った api-schema.d.ts の型を使う。
-// API を変えたら、backend の mvnw verify で仕様書を書き直し、npm run gen:api で型を作り直す（README）
+// API を変えたら、backend の mvnw verify で仕様書を書き直し、npm run gen:api で型を作り直す（docs/guide/development.md）
 type Schemas = components['schemas']
 
 // ユーザー（機能定義書 3.5）。ログインしている自分（GET /api/auth/me などが返す）もこの形
