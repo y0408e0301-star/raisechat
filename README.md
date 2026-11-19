@@ -162,7 +162,7 @@ Pull Request を作ったときは、GitHub Actions（[.github/workflows/ci.yml]
 - 画像 4 枚（40MB）の送信（N-6）と動画 1 本（100MB）の送信と再生（N-7）は、`PERF_UPLOAD=1` を付けたときだけ測ります。手元の S3 の開発用バケットは Vite（5173）の画面からの送信だけを受け付ける（CORS）ため、jar（8080）の画面からは送れません。GitHub Actions のランナーの中（MinIO）と公開先で測ります。動画は ffmpeg で作ります
 - 測る回数は `PERF_RUNS`（既定 20）、測る先は `PERF_BASE_URL`（既定 `http://localhost:8080`）で変えられます
 - 手元とランナーの数値は参考です。合否は公開先（AWS）で測った値で決めます（開発計画書 2-8）
-- 公開先で測るとき：公開して（「公開環境」）、`frontend` で `PERF_DB=aws npm run perf -- seed`（PowerShell では `$env:PERF_DB='aws'; npm run perf -- seed`）。RDS には手元からつなげないので、psql の入った Fargate のタスクを 1 回動かして入れます（[frontend/perf/aws.ts](frontend/perf/aws.ts)。10 分以上かかることがあります）。測るワークスペースの画像は公開先の添付のバケットに置きます。そのあと Actions の「性能テスト」を、測る先に公開先の URL を入れて動かします。終わったら `PERF_DB=aws npm run perf -- clean`
+- 公開先で測るとき：公開して（「公開環境」）、`frontend` で `PERF_DB=aws npm run perf -- seed`（PowerShell では `$env:PERF_DB='aws'; npm run perf -- seed`）。RDS には手元からつなげないので、psql の入った Fargate のタスクを 1 回動かして入れます（[frontend/perf/aws.ts](frontend/perf/aws.ts)。10 分以上かかることがあります）。測るワークスペースの画像は公開先の添付のバケットに置きます。そのあと Actions の「性能テスト」を、測る先に公開先の URL を入れて動かします。終わったら `PERF_DB=aws npm run perf -- clean`。公開先の DB は利用者と同じなので、seed・clean は実行する前に確かめます（`-y` で確かめない）。clean が消すのは、ユーザー ID が `perf_` と 4 桁の数字で表示名が「性能テスト」で始まるユーザーと、その人が作ったワークスペースです
 
 GitHub Actions で動かす：Actions の画面で「性能テスト」を選び、「Run workflow」を押します（[.github/workflows/perf.yml](.github/workflows/perf.yml)）。測る先を空にすると、ランナーの中で DB・MinIO（S3 の代わり）・jar を起動して、データを入れてから測ります（N-6・N-7 も測ります）。結果は実行の画面に表で出て、成果物 `perf-results` にも残ります。
 

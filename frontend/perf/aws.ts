@@ -67,6 +67,7 @@ export function remotePsql(database: string, args: string[], input = ''): string
       { name: 'PGDATABASE', value: database },
       { name: 'PGUSER', value: 'raisechat' },
       { name: 'PGSSLMODE', value: 'require' },
+      // タスク定義は全体で 64KB までなので、SQL（base64 で 4/3 倍になる）は 40KB ほどまで。超えたら S3 に置いて渡す形に変える
       { name: 'SQL', value: Buffer.from(input).toString('base64') },
     ],
     secrets: [{ name: 'PGPASSWORD', valueFrom: env.password }],
