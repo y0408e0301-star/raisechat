@@ -32,7 +32,9 @@ docs/
 │   └── infra-design.md                … インフラ設計書
 ├── test/
 │   ├── test-specification.md          … テスト仕様書（方針・環境ごとの結果・手動の項目）
-│   └── requirement-coverage.md        … 要件 ID とテストの対応表（スクリプトで作る。手で直さない）
+│   ├── requirement-coverage.md        … 要件 ID とテストの対応表（スクリプトで作る。手で直さない）
+│   ├── performance-test-report.md     … 性能試験報告書（公開先で測った結果と合否）
+│   └── acceptance-report.md           … 検収書（合格の条件の確認と署名）
 ├── manual/
 │   └── operation-manual.md            … 操作マニュアル（利用者向けの使い方）
 ├── tech-stack.md                      … 技術スタック定義書
@@ -52,6 +54,8 @@ docs/
 | [インフラ設計書](design/infra-design.md) | RC-BD-INFRA | 方針、AWS の構成図、リソース一覧、セキュリティグループ（SG）、WebSocket と添付の流れ、開発環境との対応、費用の目安 | 〃 |
 | [テスト仕様書](test/test-specification.md) | RC-TEST | テストの方針、要件 ID・テストの観点とテストの対応、環境ごとの結果、手動で確かめる項目 | 本書で行う |
 | [要件 ID とテストの対応表](test/requirement-coverage.md) | — | 要件 ID・テストの観点ごとに、確かめるテストの一覧。テスト仕様書 2 章のとおりスクリプトで作る | 要らない（コードと同じ） |
+| [性能試験報告書](test/performance-test-report.md) | RC-TEST-PERF | 公開先（AWS）で測った性能（N-1〜N-7）の結果と合否、目標を超えたものの扱い | 本書で行う |
+| [検収書](test/acceptance-report.md) | RC-TEST-ACC | 要件定義書 13.4 の合格の条件ごとの確認、検収の結果と署名 | 署名で行う |
 | [操作マニュアル](manual/operation-manual.md) | RC-MAN | 利用者向けの使い方（招待リンクの渡し方、ブラウザの通知の許可のしかたと共用のパソコンでの注意、DM を見られる人を含む）、メッセージが出たときにすること | 本書で行う |
 | [技術スタック定義書](tech-stack.md) | RC-TECH | 使う言語・フレームワーク・サービス・開発ツールと選んだ理由 | 本書で行う |
 | [開発計画書](development-plan.md) | RC-PLAN | 作る順番（段階と Pull Request の単位）、段階ごとの完了条件、どこまでできたか | 本書で行う |

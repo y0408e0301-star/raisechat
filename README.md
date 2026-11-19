@@ -7,7 +7,7 @@ Slack 風のチャットアプリ。ワークスペースを作り、その中�
 - 作る順番と進み具合：[開発計画書](docs/development-plan.md)
 - 開発ルール：[CONTRIBUTING.md](CONTRIBUTING.md)
 
-いまは要件定義書のすべての機能（開発計画書 1-1〜1-16）と、画面を通したテスト（2-1）・性能テスト（2-2）、公開先の API のイメージ（`backend/Dockerfile`）と環境を作る Terraform（`deploy/terraform/`。2-3）、反映・起動・停止のスクリプト（`deploy/`。2-4）まで作っています。公開の手順は下の「公開環境」にあります。
+いまは要件定義書のすべての機能（開発計画書 1-1〜1-16）と、画面を通したテスト（2-1）・性能テスト（2-2）、公開先の API のイメージ（`backend/Dockerfile`）と環境を作る Terraform（`deploy/terraform/`。2-3）、反映・起動・停止のスクリプト（`deploy/`。2-4）、品質チェック（2-5）、テスト仕様書（2-6）、操作マニュアル（2-7）、受け入れ（2-8）まで、開発計画書のすべてを終えています。受け入れの結果は[検収書](docs/test/acceptance-report.md)と[性能試験報告書](docs/test/performance-test-report.md)にあります。公開の手順は下の「公開環境」にあります。
 
 ## 起動方法
 
@@ -161,7 +161,8 @@ Pull Request を作ったときは、GitHub Actions（[.github/workflows/ci.yml]
 - k6 は Docker のイメージ（`grafana/k6:2.2.0`）で動くので、入れる必要はありません。Playwright はパソコンの Edge を使います
 - 画像 4 枚（40MB）の送信（N-6）と動画 1 本（100MB）の送信と再生（N-7）は、`PERF_UPLOAD=1` を付けたときだけ測ります。手元の S3 の開発用バケットは Vite（5173）の画面からの送信だけを受け付ける（CORS）ため、jar（8080）の画面からは送れません。GitHub Actions のランナーの中（MinIO）と公開先で測ります。動画は ffmpeg で作ります
 - 測る回数は `PERF_RUNS`（既定 20）、測る先は `PERF_BASE_URL`（既定 `http://localhost:8080`）で変えられます
-- 手元とランナーの数値は参考です。合否は公開先（AWS）で測った値で決めます（開発計画書 2-8。公開先にデータを入れる手順は 2-8 で足します）
+- 手元とランナーの数値は参考です。合否は公開先（AWS）で測った値で決めます（開発計画書 2-8）
+- 公開先で測るとき：公開して（「公開環境」）、`frontend` で `PERF_DB=aws npm run perf -- seed`（PowerShell では `$env:PERF_DB='aws'; npm run perf -- seed`）。RDS には手元からつなげないので、psql の入った Fargate のタスクを 1 回動かして入れます（[frontend/perf/aws.ts](frontend/perf/aws.ts)。10 分以上かかることがあります）。測るワークスペースの画像は公開先の添付のバケットに置きます。そのあと Actions の「性能テスト」を、測る先に公開先の URL を入れて動かします。終わったら `PERF_DB=aws npm run perf -- clean`。公開先の DB は利用者と同じなので、seed・clean は実行する前に確かめます（`-y` で確かめない）。clean が消すのは、ユーザー ID が `perf_` と 4 桁の数字で表示名が「性能テスト」で始まるユーザーと、その人が作ったワークスペースです
 
 GitHub Actions で動かす：Actions の画面で「性能テスト」を選び、「Run workflow」を押します（[.github/workflows/perf.yml](.github/workflows/perf.yml)）。測る先を空にすると、ランナーの中で DB・MinIO（S3 の代わり）・jar を起動して、データを入れてから測ります（N-6・N-7 も測ります）。結果は実行の画面に表で出て、成果物 `perf-results` にも残ります。
 
@@ -205,6 +206,7 @@ API サーバーのログは、公開用の jar（`java -jar`）では 1 行 1 �
 | `bash deploy/start.sh` | RDS を起動し、ECS のサービスと ALB を作り直す |
 | `bash deploy/stop.sh` | 「止めています」のページにして、ECS のサービスと ALB を消し、RDS を止める |
 
+- いまは公開していません。受け入れ（開発計画書 2-8）の後、2026-11-19 に環境を消しました。もう一度公開するときは、基本設計書 2.2.1 の「初めて作るとき」の手順で作り直します（URL は変わります）
 - AWS のリソースはすべて Terraform（`deploy/terraform/`）で作ります。手作業で作るものはありません
 - 公開の URL は CloudFront を作ったときに決まり、止めたり起動したりしても変わりません（`terraform destroy` で消すと変わります）
 - 反映でタスクを入れ替える間（1〜2 分）は使えず、WebSocket も切れます（画面がつなぎ直します）
