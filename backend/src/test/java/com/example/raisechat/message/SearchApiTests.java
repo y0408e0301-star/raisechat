@@ -240,29 +240,31 @@ class SearchApiTests {
 		assertThat(rest).bodyJson().extractingPath("$.nextCursor").isNull();
 	}
 
-	// 5 章の 4、データ設計書 8.3：日本語の言葉でも本文の GIN の索引（pg_trgm）を使える。
+	// 5 章の 4、データ設計書 8.3：1〜2 文字の日本語の言葉でも、本文の GIN の索引（pg_bigm）を使える（#75）。
 	// テストのデータは少なく、ふだんは全件を読むほうが速いと判断されるので、全件を読む計画を止めて確かめる
 	@Test
-	void 日本語の言葉で本文の索引を使える() {
+	void 一から二文字の日本語の言葉でも本文の索引を使える() {
 		send(this.taro, this.general, "土曜の集合場所は駅前です");
-		List<String> plan = this.jdbc.execute((ConnectionCallback<List<String>>) (connection) -> {
-			try (Statement statement = connection.createStatement()) {
-				statement.execute("SET enable_seqscan = off");
-				List<String> lines = new ArrayList<>();
-				try (ResultSet rs = statement
-					.executeQuery("EXPLAIN SELECT id FROM messages WHERE body ILIKE '%集合場所%'")) {
-					while (rs.next()) {
-						lines.add(rs.getString(1));
+		// 言葉はここで決めた定数だけ（外からの入力ではない）なので、SQL に直接入れる
+		for (String word : List.of("集合場所", "集合", "駅")) {
+			List<String> plan = this.jdbc.execute((ConnectionCallback<List<String>>) (connection) -> {
+				try (Statement statement = connection.createStatement()) {
+					statement.execute("SET enable_seqscan = off");
+					List<String> lines = new ArrayList<>();
+					try (ResultSet rs = statement.executeQuery(
+							"EXPLAIN SELECT id FROM messages WHERE lower(body) LIKE lower('%" + word + "%')")) {
+						while (rs.next()) {
+							lines.add(rs.getString(1));
+						}
 					}
+					statement.execute("RESET enable_seqscan");
+					return lines;
 				}
-				statement.execute("RESET enable_seqscan");
-				return lines;
-			}
-		});
-		assertThat(String.join("\n", plan)).contains("messages_body_trgm_idx");
-		// 日本語の文字が索引の言葉（trigram）になる（LC_CTYPE が C だとならない。技術スタック定義書）
-		assertThat(this.jdbc.queryForObject("SELECT array_length(show_trgm('集合場所'), 1)", Integer.class))
-			.isGreaterThan(0);
+			});
+			assertThat(String.join("\n", plan)).as(word).contains("messages_body_bigm_idx");
+		}
+		// 日本語の文字が索引の言葉（2 文字の組）になる
+		assertThat(this.jdbc.queryForList("SELECT unnest(show_bigm('集合場所'))", String.class)).contains("集合", "合場");
 	}
 
 	// データ設計書 8.3：PostgreSQL は同じ SQL を 5 回より多く実行すると、言葉の長さを見ない汎用の計画に替えることがあり、

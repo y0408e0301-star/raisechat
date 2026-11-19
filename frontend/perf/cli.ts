@@ -80,7 +80,7 @@ const dbExists = () => ON_AWS || psql('raisechat', ['-tAc', `SELECT 1 FROM pg_da
 
 function seed(): void {
   if (!ON_AWS && !dbExists()) {
-    // pg_trgm が日本語を索引に入れるよう、文字の分類は en_US.UTF-8 にする（compose.yaml と同じ）
+    // 検索の lower() が日本語・全角の英字も扱えるよう、文字の分類は en_US.UTF-8 にする（compose.yaml と同じ）
     psql('raisechat', ['-c', `CREATE DATABASE ${DB} LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8' TEMPLATE template0`])
     console.log(`DB ${DB} を作りました。表は API が起動したときに Flyway が作ります。\n${START_API}`)
     process.exit(1)
