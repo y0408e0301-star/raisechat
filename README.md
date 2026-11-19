@@ -49,7 +49,7 @@ npm ci
 
 | 順番 | 起動するもの | コマンド | ポート |
 | --- | --- | --- | --- |
-| 1 | データベース | `docker compose up -d` | 5432（PostgreSQL） |
+| 1 | データベース | `docker compose up -d`（初めてのときは、検索の索引の pg_bigm を足したイメージを作るので 1〜2 分かかります） | 5432（PostgreSQL） |
 | 2 | API サーバー | `cd backend` → `.\mvnw.cmd spring-boot:run` | 8080 |
 | 3 | 画面 | 別のターミナルで `cd frontend` → `npm run dev` | 5173 |
 

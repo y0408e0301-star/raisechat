@@ -21,8 +21,8 @@ DELETE FROM users WHERE left(username, 5) = 'perf_';
 -- 乱数の種を決め、毎回同じデータにする（結果の表は出さない）
 SELECT setseed(0.42) \g /dev/null
 
--- 検索の索引（V10）は、50 万件を入れてから作り直す（入れながら索引を更新すると何倍も遅いため）
-DROP INDEX IF EXISTS messages_body_trgm_idx;
+-- 検索の索引（V11）は、50 万件を入れてから作り直す（入れながら索引を更新すると何倍も遅いため）
+DROP INDEX IF EXISTS messages_body_bigm_idx;
 
 -- ユーザー 1,000 人。パスワード（perf-pass1）の BCrypt のハッシュは 1 つを使い回す（1,000 回計算すると遅いため）
 INSERT INTO users (username, display_name, password_hash, created_at, updated_at)
@@ -233,7 +233,7 @@ FROM (SELECT conversation_id, id AS before
       WHERE r = 6) x
 WHERE x.conversation_id = cm.conversation_id;
 
-CREATE INDEX messages_body_trgm_idx ON messages USING gin (body gin_trgm_ops);
+CREATE INDEX messages_body_bigm_idx ON messages USING gin (lower(body) gin_bigm_ops);
 
 COMMIT;
 

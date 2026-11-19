@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-TECH |
-| 版数 | 0.3 |
+| 版数 | 0.4 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-18 |
+| 最終更新日 | 2026-11-19 |
 | 作成者 | （氏名） |
 | 元にした文書 | [要件定義書](requirements/requirements.md) 版数 0.4、[機能定義書](functions/function-definition.md) 版数 0.1 |
 | 状態 | 承認待ち |
@@ -17,6 +17,7 @@
 | 0.1 | 2026-11-10 | 初版。BookLog と同じ技術・同じバージョンを基本にし、チャットに要るもの（WebSocket・Markdown・絵文字・画像の縮小）を足した | （氏名） |
 | 0.2 | 2026-11-10 | インフラ設計書を作ったので、1 章からリンクした | （氏名） |
 | 0.3 | 2026-11-18 | ブラウザの通知を Service Worker で出すことにした（#71。Android の Chrome は Notification のコンストラクタを受け付けないため） | （氏名） |
+| 0.4 | 2026-11-19 | 部分一致の検索を pg_trgm から pg_bigm に替えた（#75。公開先の性能の確認（開発計画書 2-8）で、1〜2 文字の言葉に索引が効かず N-5 を超えたため）。開発用・テスト用の PostgreSQL は、postgres:17 に pg_bigm を足したイメージ（db/Dockerfile）にした | （氏名） |
 
 ## 承認
 
@@ -123,8 +124,8 @@
 
 | 区分 | 開発環境 | AWS | BL | 用途・理由 |
 | --- | --- | --- | --- | --- |
-| データベース | PostgreSQL 17（Docker のイメージ postgres:17） | Amazon RDS for PostgreSQL 17 | ○ | 条件 1 |
-| 部分一致の検索 | PostgreSQL の pg_trgm（GIN の索引） | 同じ（RDS で使える） | 新 | 条件 9。本文に索引を付け、大文字・小文字を区別しない部分一致（ILIKE）を速くする（5.4）。PostgreSQL に含まれる拡張なので、イメージを変えずに使える。pg_trgm は、データベースの文字の分類（LC_CTYPE）が C だと日本語の文字を索引に入れないため、データベースは LC_CTYPE を en_US.UTF-8 にして作る（postgres:17・Testcontainers・RDS の既定はこれ）。日本語の検索で索引が使われることを、API のテストで実行計画（EXPLAIN）を見て確かめる |
+| データベース | PostgreSQL 17（Docker のイメージ postgres:17 に pg_bigm を足したもの。db/Dockerfile） | Amazon RDS for PostgreSQL 17 | ○ | 条件 1 |
+| 部分一致の検索 | PostgreSQL の拡張 pg_bigm 1.2-20250903（GIN の索引） | 同じ（RDS for PostgreSQL 17.8 以降にある版） | 新 | 条件 9。本文に 2 文字の組の索引を付け、1 文字からの部分一致を速くする（5.4）。pg_bigm は ILIKE に効かないので、lower(本文) に索引を作り、lower(本文) LIKE lower(言葉) で大文字・小文字を区別せずに探す。lower() が日本語・全角の英字も扱えるよう、データベースは文字の分類（LC_CTYPE）を en_US.UTF-8 にして作る（compose.yaml・Testcontainers・RDS の既定はこれ）。postgres:17 には含まれないので、開発用・テスト用・CI は db/Dockerfile で作ったイメージを使う。1〜2 文字の日本語で索引が使われることを、API のテストで実行計画（EXPLAIN）を見て確かめる |
 | 添付・アバターの保存先 | Amazon S3 の開発用のバケット。自動のテストでは MinIO（Docker のイメージ chainguard/minio。ダイジェストで固定） | Amazon S3 | ○ | 開発中は本番と同じ S3 で確かめる。テストは S3 と同じ API の MinIO を使い、AWS の鍵を GitHub に渡さない。画面からの直接のアップロードのため、バケットに CORS を設定する（FN-09 の 5 章の 9） |
 
 ### 3.4 外部のサービス
@@ -187,7 +188,7 @@
 | アップロード | API サーバーが受け取る（multipart） | 画面から S3 に直接（署名付きの PUT）。アバターだけ API が受け取る | 100MB の動画で API サーバーを長く使わないため（FN-09） |
 | 文章の表示 | 文字のまま | Markdown（react-markdown・remark-gfm） | FN-07 MS-6 |
 | 絵文字 | なし | emoji-picker-element（画面）、emoji-test.txt（サーバー） | FN-10 |
-| 部分一致の検索 | なし（本の検索は Google Books API） | pg_trgm | FN-13 |
+| 部分一致の検索 | なし（本の検索は Google Books API） | pg_bigm | FN-13 |
 | API のタスクの大きさ | 0.5 vCPU・1GB | 1 vCPU・2GB | 画像の縮小と WebSocket の接続のため |
 | 自動の PR レビュー | なし | Claude Code | 2026-11-09 以降に作るリポジトリに入れると決めたため |
 | 画面の数 | 13 画面 | 18 画面 | G-1〜G-18 |
@@ -229,8 +230,8 @@ API のコンテナを複数にする場合は、simple broker の代わりに�
 
 | 候補 | 9 | 備考 |
 | --- | --- | --- |
-| **pg_trgm（GIN の索引）** | ○ | 採用。PostgreSQL に含まれ、Docker の postgres:17 でも RDS でも追加の作業なしに使える。3 文字以上の言葉は索引で速く探せる。1〜2 文字の言葉は索引が効かず全件を読むが、1 つのワークスペースのメッセージ 10 万件なら 2 秒（N-5）に収まる見込み。k6 で確かめる |
-| pg_bigm | ○ | 1〜2 文字の日本語にも索引が効くが、Docker の postgres:17 に含まれず、開発用・テスト用のイメージを自分で作ることになる |
+| **pg_bigm** | ○ | 採用（0.4 で pg_trgm から替えた）。1〜2 文字の日本語にも索引が効く。Docker の postgres:17 に含まれないので、開発用・テスト用のイメージを db/Dockerfile で作る（ソースから組み立てて 1〜2 分。Docker のキャッシュがあれば数秒） |
+| pg_trgm（GIN の索引） | △ | 初めはこれを採用した。PostgreSQL に含まれ追加の作業はないが、3 文字の組で引くので 1〜2 文字の言葉に索引が効かない。見つからない 2 文字の言葉だとワークスペースのメッセージを全部読み、公開先で 50 人が使うと RDS の CPU を使い切って N-5（2 秒）を超えた（性能試験報告書、#75） |
 | 索引なしの ILIKE | △ | 作るものは最も少ないが、件数が増えると遅くなる |
 | Amazon OpenSearch Service | ○ | 数十人の利用には大きすぎ、費用もかかる |
 

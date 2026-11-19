@@ -17,8 +17,8 @@ import com.example.raisechat.conversation.ConversationRepository;
 import com.example.raisechat.workspace.WorkspaceAccess;
 
 // メッセージ検索（機能定義書 FN-13、データ設計書 8.3）。そのワークスペースの、自分が見られる会話のメッセージとスレッドの返信から、
-// 空白で区切った言葉をすべて含むものを、新しい順に 20 件ずつ返す。大文字・小文字を区別しない部分一致（ILIKE）で、
-// 本文の GIN の索引（pg_trgm）を使う。結果はリアルタイムでは変えない（SR-8）
+// 空白で区切った言葉をすべて含むものを、新しい順に 20 件ずつ返す。大文字・小文字を区別しない部分一致（lower(本文) LIKE）で、
+// 本文の GIN の索引（pg_bigm。1〜2 文字の言葉にも効く）を使う。結果はリアルタイムでは変えない（SR-8）
 @Service
 class SearchService {
 
@@ -65,7 +65,7 @@ class SearchService {
 				WHERE c.workspace_id = :workspaceId AND m.deleted_at IS NULL AND m.id < :before
 				  AND\s""").append(ConversationRepository.VISIBLE_TO_ME);
 		for (int i = 0; i < words.size(); i++) {
-			sql.append(" AND m.body ILIKE :w").append(i).append(" ESCAPE '\\'");
+			sql.append(" AND lower(m.body) LIKE lower(:w").append(i).append(") ESCAPE '\\'");
 			params.addValue("w" + i, "%" + escape(words.get(i)) + "%");
 		}
 		if (conversationId != null) {
@@ -81,10 +81,10 @@ class SearchService {
 			params.addValue("from", from.strip());
 		}
 		sql.append(" ORDER BY m.id DESC LIMIT :limit");
-		// 毎回、言葉の長さを見て計画を立てさせる（データ設計書 8.3）。PostgreSQL は同じ SQL を 5 回実行すると、パラメータを見ない
-		// 汎用の計画に替えることがあり、そうなると 1〜2 文字の言葉でも本文の GIN の索引を使って、全部の行を読み直す
-		// （11.1 の件数で約 5 秒）。この取引の中だけの設定（SET LOCAL）なので、
-		// このメソッドの @Transactional を外さない（外すと効かない）
+		// 毎回、言葉を見て計画を立てさせる（データ設計書 8.3）。PostgreSQL は同じ SQL を 5 回実行すると、パラメータを見ない
+		// 汎用の計画に替えることがある。よくある 1 文字の言葉は、索引で何万行も集めるより新しい順に読んで 21 件で止めるほうが
+		// 速く、まれな言葉は索引が速いので、言葉ごとに選ばせる（pg_trgm のときは汎用の計画で約 5 秒かかった）。
+		// この取引の中だけの設定（SET LOCAL）なので、このメソッドの @Transactional を外さない（外すと効かない）
 		this.jdbc.getJdbcTemplate().execute("SET LOCAL plan_cache_mode = force_custom_plan");
 		List<Long> ids = this.jdbc.queryForList(sql.toString(), params, Long.class);
 		List<Long> page = ids.subList(0, Math.min(PAGE_SIZE, ids.size()));
