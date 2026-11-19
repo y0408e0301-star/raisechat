@@ -49,7 +49,7 @@ cd frontend && npm ci && cd ..             # 画面の部品を入れる（初�
 | API サーバー | `cd backend` → `.\mvnw.cmd spring-boot:run` | 8080 |
 | 画面 | `cd frontend` → `npm run dev` | 5173 |
 
-テストは `backend` で `.\mvnw.cmd verify`、`frontend` で `npm run lint`・`npm test`・`npm run build`・`npm run test:e2e`。
+テストは `backend` で `.\mvnw.cmd verify`（Docker を動かしておく）、`frontend` で `npm run lint`・`npm test`・`npm run build`。画面を通したテストは、上の 3 つを起動してから `frontend` で `npm run test:e2e`。
 
 公開は Git Bash で `bash deploy/deploy.sh`（反映）・`bash deploy/start.sh`（起動）・`bash deploy/stop.sh`（停止）。初めて作るときの手順は[基本設計書 2.2.1](docs/design/basic-design.md#221-公開環境の手順)にある。
 
