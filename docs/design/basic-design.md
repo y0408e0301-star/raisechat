@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-BD |
-| 版数 | 0.21 |
+| 版数 | 0.22 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-19 |
+| 最終更新日 | 2026-11-22 |
 | 作成者 | （氏名） |
 | 元にした文書 | [要件定義書](../requirements/requirements.md)（RC-REQ）版数 0.6、[機能定義書](../functions/function-definition.md)（RC-FD）版数 0.9、[技術スタック定義書](../tech-stack.md)（RC-TECH）版数 0.2 |
 | 状態 | 承認待ち |
@@ -35,6 +35,7 @@
 | 0.19 | 2026-11-19 | 2.4：公開先の DB にデータを入れる方法と、公開先で測った結果の置き場所（性能試験報告書）を書いた（開発計画書 2-8） | （氏名） |
 | 0.20 | 2026-11-19 | 検索の索引を pg_bigm に替えた（#75）。データ設計書を 0.7（6 章の索引、8.3 の SQL と時間、10 章の量）、インフラ設計書を 0.6（RDS で pg_bigm を使う）にし、2.4 に書いた | （氏名） |
 | 0.21 | 2026-11-19 | README の詳しい手順を開発者向けガイド（docs/guide/）に移したので、2.2・2.4 の参照先を直した（#78） | （氏名） |
+| 0.22 | 2026-11-22 | CD を入れた（#80）。2.2.1 に、マージで自動で反映されること、起動・停止のボタン、初めて作るときの土台（deploy/bootstrap）と状態ファイルの置き場所を書いた。インフラ設計書を 0.7 にした | （氏名） |
 
 ## 承認
 
@@ -109,21 +110,24 @@ API の一覧（URL・メソッド・入力・出力・主なエラー）、エ�
 
 #### 2.2.1 公開環境の手順
 
-構成は[インフラ設計書](infra-design.md)のとおり。スクリプトはリポジトリのフォルダで Git Bash から実行する。どれも先に terraform plan を出し、「この内容で反映しますか？」に y と答えたときだけ反映する（`-y` を付けると確かめずに反映する）。
+構成は[インフラ設計書](infra-design.md)のとおり。**反映は、Pull Request を main にマージすると CD（.github/workflows/cd.yml）が自動で行う**（インフラ設計書 5.3）。公開環境が動いていれば入れ替え、止めていればイメージと画面を置くだけ、なければ何もしない。起動・停止は、Actions の画面の「公開環境の起動・停止」（.github/workflows/ops.yml）で start か stop を選んで Run workflow を押すか、下のスクリプトで行う。
+
+スクリプトはリポジトリのフォルダで Git Bash から実行する（CD とボタンも同じスクリプトを使う）。どれも先に terraform plan を出し、「この内容で反映しますか？」に y と答えたときだけ反映する（`-y` を付けると確かめずに反映する）。
 
 | スクリプト | すること | かかる時間 |
 | --- | --- | --- |
-| `bash deploy/deploy.sh` | 今のコミットを反映する。jar を作り、API のイメージ（arm64）をコミット ID のタグで ECR に push し、`terraform apply -var running=true` で新しいタスクに入れ替える。画面をビルドして S3 に置き（assets/ は 1 年、ほかは no-cache）、CloudFront のキャッシュを消して、公開 URL の /actuator/health が UP になるのを待つ。コミットしていない変更があるとき、RDS が動いていないときは止まる | 10〜15 分 |
+| `bash deploy/deploy.sh` | 今のコミットを反映する。jar を作り、API のイメージ（arm64）をコミット ID のタグで ECR に push し、`terraform apply -var running=true` で新しいタスクに入れ替える。画面をビルドして S3 に置き（assets/ は 1 年、ほかは no-cache）、CloudFront のキャッシュを消して、公開 URL の /actuator/health が UP になるのを待つ。コミットしていない変更があるとき、RDS が動いていないときは止まる。`--if-running` を付けると（CD が付ける）、ECS のサービスがないときは起動せず、イメージと画面を置くだけにする | 10〜15 分 |
 | `bash deploy/start.sh` | RDS を起動して待ち、`running=true` で ECS のサービスと ALB を作り直す。イメージと画面は前に反映したものを使う | 10〜20 分 |
 | `bash deploy/stop.sh` | `running=false` で CloudFront を止めている間のページにし、ECS のサービスと ALB を消して、RDS を止める。データと URL はそのまま | 5〜10 分 |
 
 **初めて作るとき**
 
 1. 手元に AWS CLI（~/.aws の鍵）・Terraform・Docker Desktop を用意する（技術スタック定義書 3.4）
-2. deploy/terraform/terraform.tfvars に `alert_email = "通知を受け取るメールアドレス"` を書く（リポジトリには入れない）
-3. deploy/terraform で `terraform init` → `terraform plan` で中身を確かめ → `terraform apply`（running は既定の false。CloudFront・RDS などを作る。15〜20 分）
-4. 届いたメール（AWS Notification）の「Confirm subscription」を押す
-5. `bash deploy/deploy.sh` で最初のイメージと画面を反映する（ECR にイメージがないうちは running=true にできないため、start.sh ではなく deploy.sh を使う）
+2. CD の土台がまだなければ、deploy/bootstrap で `terraform init` → `terraform apply`（OIDC のロールと状態ファイルのバケット。インフラ設計書 3.3。アカウントに 1 回だけ）。GitHub のリポジトリの secret `ALERT_EMAIL` に通知を受け取るメールアドレスを入れる（CD が使う）
+3. deploy/terraform/terraform.tfvars に `alert_email = "通知を受け取るメールアドレス"` を書く（リポジトリには入れない）
+4. deploy/terraform で `terraform init`（状態ファイルは S3 の rc-tfstate）→ `terraform plan` で中身を確かめ → `terraform apply`（running は既定の false。CloudFront・RDS などを作る。15〜20 分）
+5. 届いたメール（AWS Notification）の「Confirm subscription」を押す
+6. `bash deploy/deploy.sh` で最初のイメージと画面を反映する（ECR にイメージがないうちは running=true にできないため、start.sh ではなく deploy.sh を使う）。これより後は、マージで CD が反映する
 
 **すべて消すとき**
 
@@ -133,6 +137,7 @@ API の一覧（URL・メソッド・入力・出力・主なエラー）、エ�
 2. S3 の画面と添付のバケット（`aws s3 rm s3://<バケット> --recursive`）と ECR（`aws ecr batch-delete-image`）を空にする。中身があると Terraform は消せない
 3. `terraform plan -destroy -var rds_deletion_protection=false` で中身を確かめてから、`terraform destroy -var rds_deletion_protection=false`（CloudFront の削除に 20 分ほどかかる）
 4. 消す前に取った最後のスナップショット（rc-db-final）が要らなければ、`aws rds delete-db-snapshot --db-snapshot-identifier rc-db-final` で消す
+5. CD の土台（deploy/bootstrap）は消さない（作り直すときにそのまま使う。費用は状態ファイルの S3 の分だけで、ほぼかからない）。消した後のマージでは、CD は「公開環境がない」と出して何もしない
 
 **反映のきまり**
 

@@ -1,0 +1,60 @@
+# main にマージして CI が通ったら、公開環境へ反映する（CD。インフラ設計書 5.3、基本設計書 2.2）。
+# 動いていれば入れ替え、止めていればイメージ（ECR）と画面（S3）を置くだけ、公開環境がなければ何もしない
+# （deploy/deploy.sh --if-running）。Actions の画面のボタン（Run workflow）でも、main の今のコミットを反映できる。
+# AWS には鍵を置かず、OIDC で rc-github-deploy のロールを使う（deploy/bootstrap。main からだけ使える）
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+# 反映・起動・停止を重ねない（ops.yml と同じグループ）。途中で取り消すと Terraform のロックが残るので、取り消さずに待つ
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: 公開環境へ反映
+    # CI が成功した、main への push のときだけ（Pull Request の CI では動かさない）
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    # 公開先の API は arm64（Graviton）なので、arm64 のランナーでイメージをそのまま作る（パブリックのリポジトリは無料）
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    env:
+      # 予算・アラームの通知先（deploy/terraform の alert_email。手元では terraform.tfvars に書く）
+      TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+    steps:
+      # CI が試したコミットを反映する（ボタンのときは main の今のコミット）
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      # deploy.sh は terraform output -raw の結果を変数に入れるので、出力を書き換えるラッパーは使わない
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::467112307516:role/rc-github-deploy
+          aws-region: ap-northeast-1
+      - run: terraform -chdir=deploy/terraform init -input=false
+      - run: bash deploy/deploy.sh -y --if-running

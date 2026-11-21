@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-BD-INFRA |
-| 版数 | 0.6 |
+| 版数 | 0.7 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-19 |
+| 最終更新日 | 2026-11-22 |
 | 作成者 | （氏名） |
 | 上位文書 | [基本設計書](basic-design.md)（RC-BD） |
 | 元にした文書 | [要件定義書](../requirements/requirements.md)（RC-REQ）版数 0.6、[技術スタック定義書](../tech-stack.md)（RC-TECH）版数 0.2 |
@@ -21,6 +21,7 @@
 | 0.4 | 2026-11-17 | 公開して確かめたので（開発計画書 2-4）、8.1 に結果を書き、未決事項 4 を決定にした | （氏名） |
 | 0.5 | 2026-11-19 | 公開先で性能を測ったので（開発計画書 2-8）、未決事項 3 を決定にした | （氏名） |
 | 0.6 | 2026-11-19 | 検索の索引を pg_bigm にしたので（#75）、RDS で拡張を使うことを書いた | （氏名） |
+| 0.7 | 2026-11-22 | CD を入れた（#80）。5.3 を、main へのマージで GitHub Actions が反映する形に書き直し、3.3 に CD のロール・状態ファイルの置き場所、8 章に土台（deploy/bootstrap）を足した | （氏名） |
 
 本書は基本設計書の一部である。承認は[基本設計書](basic-design.md)で一括して行う。表記のルールは基本設計書 1.3 のとおり。
 
@@ -138,7 +139,10 @@ Terraform（deploy/terraform/）で作る。名前の頭は「rc-」にする。
 | CloudWatch アラーム | rc-no-healthy-task、rc-api-5xx、rc-db-free-storage | ALB のヘルスチェックに通るタスクが 3 分続けてない、API の 5xx が 5 分で 10 回以上（この 2 つは動いている間だけ作る）、RDS の空き容量 2GB 未満で、SNS（rc-alerts）からメールを送る |
 | AWS Budgets | rc-budget | 月の費用が予算（R-1。67 ドル ≒ 10,000 円）の 80% を超えたとき、月末の予測が予算を超えそうなときにメールを送る |
 
-Terraform の状態ファイル（DB のパスワードなどの秘密の値も入る）は手元に置き、リポジトリには入れない。
+| IAM の OIDC プロバイダー・IAM ロール（CD） | token.actions.githubusercontent.com、rc-github-deploy | GitHub Actions の CD（cd.yml）と起動・停止のボタン（ops.yml）が、鍵を持たずに短い時間だけ使う（5.3）。使えるのは、このリポジトリの main のワークフローだけ（Pull Request・フォーク・ほかのブランチからは使えない）。権限は PowerUserAccess と、rc- で始まる IAM ロールの作成・変更・PassRole、IAM の読み取り（公開環境の Terraform がタスクのロールを作るため）。自分自身のロールは変えられない。deploy/bootstrap が作り、公開環境を消しても残す |
+| S3 バケット（状態ファイル） | rc-tfstate-{アカウント ID} | 公開環境の Terraform の状態ファイル（DB のパスワードなどの秘密の値も入る）。手元と CD で同じものを使い、S3 の上でロックする（use_lockfile）。バージョニングあり（古い版は 30 日で消す）・暗号化あり・パブリックアクセスなし。deploy/bootstrap が作り、公開環境を消しても残す |
+
+Terraform の状態ファイルはリポジトリには入れない。公開環境のものは S3（rc-tfstate）に、土台（deploy/bootstrap）のものは手元に置く（土台の状態ファイルに秘密の値は入らない）。
 
 ## 4. セキュリティグループ（通信の許可）
 
@@ -188,14 +192,26 @@ sequenceDiagram
     E-->>B: AttachmentView（署名付きの GET の URL、1 時間）
 ```
 
-### 5.3 公開の手順（概要）
+### 5.3 公開の手順（CD）
 
-1. API：手元で `mvnw package` で jar を作り、`docker buildx build --platform linux/arm64` でイメージを作って、コミット ID をタグにして ECR に push する
-2. `terraform apply -var running=true` で、そのイメージを使う新しいタスク定義を作る。ECS が古いタスクを止めて新しいタスクを起動し、ALB のヘルスチェックに通ったら使えるようになる（方針 10。Flyway が起動時にテーブルを更新する）
+Pull Request を main にマージし、CI（.github/workflows/ci.yml）が通ると、CD（.github/workflows/cd.yml）が GitHub Actions の arm64 のランナーで `deploy/deploy.sh -y --if-running` を実行する。AWS には OIDC で rc-github-deploy のロール（3.3）を使って入り、鍵はどこにも置かない。
+
+```mermaid
+flowchart LR
+  merge["main にマージ"] --> ci["CI<br>（テスト・E2E）"]
+  ci -- 成功 --> cd["CD（cd.yml）<br>OIDC でロールを使う"]
+  cd --> q{"公開環境は"}
+  q -- 動いている --> run["イメージを ECR に push → terraform apply（新しいタスクに入れ替え）<br>→ 画面を S3 → CloudFront のキャッシュを消す → /actuator/health を待つ"]
+  q -- 止めている --> put["イメージを ECR に push、画面を S3 に置くだけ<br>（次の起動で使われる）"]
+  q -- ない --> none["何もしない"]
+```
+
+1. API：`mvnw package` で jar を作り、arm64 のイメージを作って、コミット ID をタグにして ECR に push する
+2. 動いているとき（ECS のサービスがあるとき）：`terraform apply -var running=true` で、そのイメージを使う新しいタスク定義を作る。ECS が古いタスクを止めて新しいタスクを起動し、ALB のヘルスチェックに通ったら使えるようになる（方針 10。Flyway が起動時にテーブルを更新する）
 3. 画面：frontend で `npm run build` して、できたファイルを画面のバケットに置き、index.html の CloudFront のキャッシュを消す
-4. CloudFront の URL の /actuator/health が正常（200）になったこと、2 つのブラウザでメッセージがすぐ届くこと、画像を添付できることを確かめる
+4. CloudFront の URL の /actuator/health が UP になるのを待つ。結果（反映した・置いただけ・環境がない）は Actions の実行の画面のまとめに出る
 
-詳しい手順は運用設計（基本設計書 2.2）で決める。BookLog の deploy.sh・start.sh・stop.sh と同じ形のスクリプトにする。
+動いているかは、RDS ではなく ECS のサービスがあるか（Terraform の出力 service_name）で決める。RDS は止めてから 7 日で AWS が自動で起動するので、RDS で決めると、マージで公開環境まで起動して費用がかかるため。反映・起動・停止は同じ concurrency のグループで、重ねて動かさない。起動・停止は Actions の画面のボタン（ops.yml）でも、手元のスクリプトでもできる（基本設計書 2.2.1）。
 
 ### 5.4 画面の配り方
 
@@ -257,7 +273,8 @@ AWS のリソースは、手作業ではなく Terraform で作る。BookLog の
 | 置き場所 | deploy/terraform/（止めている間のページは deploy/maintenance/） |
 | 起動・停止 | 変数 running で切り替える。running = false にすると、CloudFront をすべて止めている間のページにしてから、ECS のサービス・タスク定義・ALB・ALB のアラームを消す。running = true にすると作り直す。RDS の停止・起動はスクリプトで AWS CLI から行う |
 | 手で作るもの | なし（BookLog の Google Books API の API キーにあたるものはない） |
-| CI | GitHub Actions で terraform fmt -check・terraform validate・tflint を動かし、jar からイメージが作れることを確かめる。plan・apply は手元で行う |
+| CI・CD | CI は GitHub Actions で terraform fmt -check・terraform validate・tflint を動かし（deploy/terraform と deploy/bootstrap）、jar からイメージが作れることを確かめる。反映（plan・apply）は CD（5.3）が行い、手元の deploy.sh は予備 |
+| 土台 | deploy/bootstrap/。CD の OIDC のロールと状態ファイルのバケット（3.3）。公開環境を作る前に手元で 1 回だけ apply し、公開環境を消しても残す |
 
 ### 8.1 公開して確かめた結果
 
