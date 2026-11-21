@@ -17,13 +17,16 @@ fi
 
 # 入れ替えるか。--if-running では、ECS のサービスがあるか（running = true で作ったか）で決める。
 # RDS は止めてから 7 日で AWS が自動で起動するので、RDS の状態では決めない（起動すると費用がかかる）
+# 状態ファイルを読めないとき（権限・S3 の不具合など）は、環境がないと見なさずにエラーで止める。
+# 出力のないとき（消した後）は {}、止めているときは service_name がない（null の出力は状態ファイルに残らない）
 replace=true
 if [[ "$if_running" == true ]]; then
-  if ! tf_output db_instance_id >/dev/null 2>&1; then
+  outputs=$(terraform -chdir="$tf" output -json)
+  if [[ "$outputs" != *'"db_instance_id"'* ]]; then
     report "公開環境がないので、反映しませんでした（基本設計書 2.2.1 の「初めて作るとき」で作ると、次のマージから反映されます）"
     exit 0
   fi
-  if ! tf_output service_name >/dev/null 2>&1; then
+  if [[ "$outputs" != *'"service_name"'* ]]; then
     replace=false
   fi
 fi

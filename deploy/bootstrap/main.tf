@@ -114,7 +114,45 @@ resource "aws_iam_role_policy_attachment" "power_user" {
   policy_arn = "arn:aws:iam::aws:policy/PowerUserAccess"
 }
 
-# IAM は、公開環境が作る rc- で始まるロールだけを作り・変え・ECS に渡せる。読むのはすべて
+# 公開環境のロール（rc-task-execution・rc-app。deploy/terraform/iam.tf）に付ける権限の境界。どんなポリシーを付けても、
+# ここに書いた範囲（イメージの取得・ログ・秘密の値の読み取り・添付のバケット）より強くはならない。
+# CD のロールが rc- のロールを作って強い権限を付け、それを使う（権限の昇格）のを防ぐ
+resource "aws_iam_policy" "role_boundary" {
+  name = "rc-role-boundary"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ecr:GetAuthorizationToken", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["ecr:BatchCheckLayerAvailability", "ecr:GetDownloadUrlForLayer", "ecr:BatchGetImage"]
+        Resource = "arn:aws:ecr:*:${local.account_id}:repository/rc-*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "ssm:GetParameters"
+        Resource = "arn:aws:ssm:*:${local.account_id}:parameter/rc/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+        Resource = "arn:aws:s3:::rc-files-*/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "s3:ListBucket"
+        Resource = "arn:aws:s3:::rc-files-*"
+      },
+    ]
+  })
+}
+
+# IAM は、公開環境が作る rc- で始まるロールだけを作り・変え・ECS に渡せる。ロールを作る・権限を付けるのは、
+# 上の境界を付けたロールにだけできる（境界を外すこと、ほかのポリシーを作り・変えることはできない）。読むのはすべて
 # 採らない指摘（trivy）：IAM の読み取りを * にしている（AWS-0057）。Terraform が差分を確かめるのに要る
 #trivy:ignore:AWS-0057
 resource "aws_iam_role_policy" "github_deploy_iam" {
@@ -126,8 +164,18 @@ resource "aws_iam_role_policy" "github_deploy_iam" {
       {
         Effect = "Allow"
         Action = [
-          "iam:CreateRole", "iam:DeleteRole", "iam:UpdateRole", "iam:UpdateAssumeRolePolicy", "iam:TagRole", "iam:UntagRole",
-          "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:PassRole",
+          "iam:CreateRole", "iam:PutRolePermissionsBoundary", "iam:PutRolePolicy", "iam:DeleteRolePolicy",
+          "iam:AttachRolePolicy", "iam:DetachRolePolicy",
+        ]
+        Resource = "arn:aws:iam::${local.account_id}:role/rc-*"
+        Condition = {
+          StringEquals = { "iam:PermissionsBoundary" = aws_iam_policy.role_boundary.arn }
+        }
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:DeleteRole", "iam:UpdateRole", "iam:UpdateAssumeRolePolicy", "iam:TagRole", "iam:UntagRole", "iam:PassRole",
         ]
         Resource = "arn:aws:iam::${local.account_id}:role/rc-*"
       },
@@ -147,6 +195,10 @@ resource "aws_iam_role_policy" "github_deploy_iam" {
 
 output "tfstate_bucket" {
   value = aws_s3_bucket.tfstate.bucket
+}
+
+output "role_boundary_arn" {
+  value = aws_iam_policy.role_boundary.arn
 }
 
 output "deploy_role_arn" {

@@ -1,4 +1,9 @@
-# Fargate のタスクのロール（インフラ設計書 3.3）。アクセスキーは使わない
+# Fargate のタスクのロール（インフラ設計書 3.3）。アクセスキーは使わない。
+# どちらにも権限の境界（rc-role-boundary。deploy/bootstrap）を付ける。CD のロールは、境界を付けたロールしか作れない
+
+locals {
+  role_boundary_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/rc-role-boundary"
+}
 
 data "aws_iam_policy_document" "ecs_tasks_assume" {
   statement {
@@ -13,8 +18,9 @@ data "aws_iam_policy_document" "ecs_tasks_assume" {
 
 # 実行ロール：ECS がタスクを起動するときに使う（イメージの取得・ログの送信・秘密の値の取得）
 resource "aws_iam_role" "task_execution" {
-  name               = "rc-task-execution"
-  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
+  name                 = "rc-task-execution"
+  assume_role_policy   = data.aws_iam_policy_document.ecs_tasks_assume.json
+  permissions_boundary = local.role_boundary_arn
 }
 
 resource "aws_iam_role_policy_attachment" "task_execution" {
@@ -40,8 +46,9 @@ resource "aws_iam_role_policy" "task_execution_secrets" {
 # タスクロール：アプリ（AWS SDK）が使う。添付のバケットの workspaces/（添付）と avatars/（アバター）だけ。
 # 署名付き URL もこのロールで署名するので、ブラウザの PUT・GET もこの範囲に限られる
 resource "aws_iam_role" "task" {
-  name               = "rc-app"
-  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
+  name                 = "rc-app"
+  assume_role_policy   = data.aws_iam_policy_document.ecs_tasks_assume.json
+  permissions_boundary = local.role_boundary_arn
 }
 
 locals {

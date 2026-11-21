@@ -139,7 +139,8 @@ Terraform（deploy/terraform/）で作る。名前の頭は「rc-」にする。
 | CloudWatch アラーム | rc-no-healthy-task、rc-api-5xx、rc-db-free-storage | ALB のヘルスチェックに通るタスクが 3 分続けてない、API の 5xx が 5 分で 10 回以上（この 2 つは動いている間だけ作る）、RDS の空き容量 2GB 未満で、SNS（rc-alerts）からメールを送る |
 | AWS Budgets | rc-budget | 月の費用が予算（R-1。67 ドル ≒ 10,000 円）の 80% を超えたとき、月末の予測が予算を超えそうなときにメールを送る |
 
-| IAM の OIDC プロバイダー・IAM ロール（CD） | token.actions.githubusercontent.com、rc-github-deploy | GitHub Actions の CD（cd.yml）と起動・停止のボタン（ops.yml）が、鍵を持たずに短い時間だけ使う（5.3）。使えるのは、このリポジトリの main のワークフローだけ（Pull Request・フォーク・ほかのブランチからは使えない）。権限は PowerUserAccess と、rc- で始まる IAM ロールの作成・変更・PassRole、IAM の読み取り（公開環境の Terraform がタスクのロールを作るため）。自分自身のロールは変えられない。deploy/bootstrap が作り、公開環境を消しても残す |
+| IAM の OIDC プロバイダー・IAM ロール（CD） | token.actions.githubusercontent.com、rc-github-deploy | GitHub Actions の CD（cd.yml）と起動・停止のボタン（ops.yml）が、鍵を持たずに短い時間だけ使う（5.3）。使えるのは、このリポジトリの main のワークフローだけ（Pull Request・フォーク・ほかのブランチからは使えない）。権限は PowerUserAccess と、rc- で始まる IAM ロールの作成・変更・PassRole、IAM の読み取り（公開環境の Terraform がタスクのロールを作るため）。ロールを作る・権限を付けるのは、権限の境界 rc-role-boundary を付けたロールにだけできるので、強い権限のロールを作って使う（権限の昇格）ことはできない。自分自身のロールは変えられない。deploy/bootstrap が作り、公開環境を消しても残す |
+| IAM ポリシー（権限の境界） | rc-role-boundary | rc-task-execution・rc-app に付ける境界。ECR からのイメージの取得、ログの送信、Parameter Store の /rc/* の読み取り、rc-files-* の読み書きだけ。どんなポリシーを付けても、これより強くならない。deploy/bootstrap が作る |
 | S3 バケット（状態ファイル） | rc-tfstate-{アカウント ID} | 公開環境の Terraform の状態ファイル（DB のパスワードなどの秘密の値も入る）。手元と CD で同じものを使い、S3 の上でロックする（use_lockfile）。バージョニングあり（古い版は 30 日で消す）・暗号化あり・パブリックアクセスなし。deploy/bootstrap が作り、公開環境を消しても残す |
 
 Terraform の状態ファイルはリポジトリには入れない。公開環境のものは S3（rc-tfstate）に、土台（deploy/bootstrap）のものは手元に置く（土台の状態ファイルに秘密の値は入らない）。
@@ -211,7 +212,7 @@ flowchart LR
 3. 画面：frontend で `npm run build` して、できたファイルを画面のバケットに置き、index.html の CloudFront のキャッシュを消す
 4. CloudFront の URL の /actuator/health が UP になるのを待つ。結果（反映した・置いただけ・環境がない）は Actions の実行の画面のまとめに出る
 
-動いているかは、RDS ではなく ECS のサービスがあるか（Terraform の出力 service_name）で決める。RDS は止めてから 7 日で AWS が自動で起動するので、RDS で決めると、マージで公開環境まで起動して費用がかかるため。反映・起動・停止は同じ concurrency のグループで、重ねて動かさない。起動・停止は Actions の画面のボタン（ops.yml）でも、手元のスクリプトでもできる（基本設計書 2.2.1）。
+動いているかは、RDS ではなく ECS のサービスがあるか（Terraform の出力 service_name）で決める。状態ファイルを読めないときは、環境がないとは見なさずに失敗で終わる。続けてマージしたときは、main の先頭のコミットだけを反映する（古いコミットを後から反映しない）。RDS は止めてから 7 日で AWS が自動で起動するので、RDS で決めると、マージで公開環境まで起動して費用がかかるため。反映・起動・停止は同じ concurrency のグループで、重ねて動かさない。起動・停止は Actions の画面のボタン（ops.yml）でも、手元のスクリプトでもできる（基本設計書 2.2.1）。
 
 ### 5.4 画面の配り方
 
