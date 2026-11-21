@@ -114,10 +114,14 @@ jobs:
   terraform:
     name: Terraform（書式・構文・lint）
     runs-on: ubuntu-latest
+    # 公開環境（deploy/terraform）と、CD の土台（deploy/bootstrap。インフラ設計書 5.3）
+    strategy:
+      matrix:
+        dir: [deploy/terraform, deploy/bootstrap]
     defaults:
       run:
-        working-directory: deploy/terraform
-    # AWS には接続しない（plan・apply は手元で行う。インフラ設計書 8 章）
+        working-directory: ${{ matrix.dir }}
+    # AWS には接続しない（反映は cd.yml、土台の apply は手元で行う。インフラ設計書 5.3）
     steps:
       - uses: actions/checkout@v7
       - uses: hashicorp/setup-terraform@v4

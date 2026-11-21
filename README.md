@@ -22,7 +22,7 @@ Slack 風のチャットアプリ。ワークスペースを作り、その中�
 | 添付の置き場所 | Amazon S3（自動のテストでは MinIO） |
 | テスト | JUnit・Testcontainers・Vitest・Testing Library・Playwright（E2E）・k6（性能） |
 | 公開 | AWS（CloudFront・ALB・ECS Fargate・RDS・S3）を Terraform で作る |
-| CI | GitHub Actions（テスト・書式・lint・E2E）と、Claude Code による Pull Request の自動レビュー |
+| CI・CD | GitHub Actions（テスト・書式・lint・E2E、main へのマージで公開環境へ自動で反映。AWS には OIDC で入る）と、Claude Code による Pull Request の自動レビュー |
 
 選んだ理由と版は[技術スタック定義書](docs/tech-stack.md)にある。
 
@@ -51,7 +51,7 @@ cd frontend && npm ci && cd ..             # 画面の部品を入れる（初�
 
 テストは `backend` で `.\mvnw.cmd verify`（Docker を動かしておく）、`frontend` で `npm run lint`・`npm test`・`npm run build`。画面を通したテストは、上の 3 つを起動してから `frontend` で `npm run test:e2e`。
 
-公開は Git Bash で `bash deploy/deploy.sh`（反映）・`bash deploy/start.sh`（起動）・`bash deploy/stop.sh`（停止）。初めて作るときの手順は[基本設計書 2.2.1](docs/design/basic-design.md#221-公開環境の手順)にある。
+公開環境への反映は、Pull Request を main にマージすると GitHub Actions（CD）が自動で行う。起動・停止は Actions の画面のボタンか、Git Bash で `bash deploy/start.sh`・`bash deploy/stop.sh`。初めて作るときの手順は[基本設計書 2.2.1](docs/design/basic-design.md#221-公開環境の手順)にある。
 
 詳しい手順は[開発者向けガイド](docs/guide/README.md)にある。
 

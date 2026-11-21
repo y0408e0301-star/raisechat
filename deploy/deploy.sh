@@ -2,6 +2,8 @@
 # 今のコミットの API と画面を公開環境に反映する（インフラ設計書 5.2、基本設計書 2.2）
 # リポジトリのフォルダで実行する（Windows では Git Bash。Docker Desktop を起動しておく）：bash deploy/deploy.sh
 # ECS と ALB だけが止まっているとき（RDS は起動済み）に実行すると、そのまま起動もする。RDS が止まっていれば止まるので、先に bash deploy/start.sh
+# --if-running を付けると（CD。.github/workflows/cd.yml）、動いているときだけ入れ替える。止めているときは、イメージ（ECR）と
+# 画面（S3）を置くだけにして起動はしない（次の start.sh で使われる）。公開環境がないときは何もせずに終わる（インフラ設計書 5.3）
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -13,10 +15,27 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
-status=$(db_status)
-if [[ "$status" != available ]]; then
-  echo "RDS が $status です。先に bash deploy/start.sh で起動してください" >&2
-  exit 1
+# 入れ替えるか。--if-running では、ECS のサービスがあるか（running = true で作ったか）で決める。
+# RDS は止めてから 7 日で AWS が自動で起動するので、RDS の状態では決めない（起動すると費用がかかる）
+# 状態ファイルを読めないとき（権限・S3 の不具合など）は、環境がないと見なさずにエラーで止める。
+# 出力のないとき（消した後）は {}、止めているときは service_name がない（null の出力は状態ファイルに残らない）
+replace=true
+if [[ "$if_running" == true ]]; then
+  outputs=$(terraform -chdir="$tf" output -json)
+  if [[ "$outputs" != *'"db_instance_id"'* ]]; then
+    report "公開環境がないので、反映しませんでした（基本設計書 2.2.1 の「初めて作るとき」で作ると、次のマージから反映されます）"
+    exit 0
+  fi
+  if [[ "$outputs" != *'"service_name"'* ]]; then
+    replace=false
+  fi
+fi
+if [[ "$replace" == true ]]; then
+  status=$(db_status)
+  if [[ "$status" != available ]]; then
+    echo "RDS が $status です。先に bash deploy/start.sh で起動してください" >&2
+    exit 1
+  fi
 fi
 
 tag=$(git rev-parse --short=12 HEAD)
@@ -46,7 +65,9 @@ if [[ "$latest" != "$digest" ]]; then
   exit 1
 fi
 
-tf_apply true
+if [[ "$replace" == true ]]; then
+  tf_apply true
+fi
 
 echo "== 画面をビルドして S3 に置く"
 (cd frontend && npm ci && npm run build)
@@ -56,6 +77,11 @@ aws s3 sync frontend/dist/assets "$web/assets" --cache-control "public, max-age=
 # index.html とそれ以外のファイル（アイコンなど）は、反映したらすぐ読ませる
 aws s3 sync frontend/dist "$web" --exclude "assets/*" --cache-control "no-cache"
 
+if [[ "$replace" != true ]]; then
+  report "公開環境を止めているので、イメージ（タグ $tag）と画面を置きました。次に起動したときに使われます"
+  exit 0
+fi
+
 echo "== CloudFront のキャッシュを消す"
 distribution=$(tf_output distribution_id)
 invalidation=$(aws cloudfront create-invalidation --distribution-id "$distribution" --paths "/*" \
@@ -63,3 +89,4 @@ invalidation=$(aws cloudfront create-invalidation --distribution-id "$distributi
 aws cloudfront wait invalidation-completed --distribution-id "$distribution" --id "$invalidation"
 
 wait_healthy
+report "コミット $tag を公開環境に反映しました：$(tf_output url)"

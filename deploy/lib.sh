@@ -1,16 +1,35 @@
 #!/bin/bash
 # deploy.sh・start.sh・stop.sh が共通で使う関数（直接は実行しない）
 
+# shellcheck disable=SC2034 # if_running を使うのは source した側（deploy.sh）
 tf=deploy/terraform
 
-# -y を付けると、terraform plan の内容を確かめずに反映する（source した側のスクリプトの第 1 引数を見る）
+# source した側のスクリプトの引数を見る。
+# -y：terraform plan の内容を確かめずに反映する
+# --if-running：公開環境が動いているときだけ入れ替える（deploy.sh。CD の .github/workflows/cd.yml が付ける）
 auto_approve=false
-if [[ "${1:-}" == -y ]]; then
-  auto_approve=true
-fi
+if_running=false
+for arg in "$@"; do
+  case "$arg" in
+    -y) auto_approve=true ;;
+    --if-running) if_running=true ;;
+    *)
+      echo "知らない引数です：$arg" >&2
+      exit 2
+      ;;
+  esac
+done
 
 tf_output() {
   terraform -chdir="$tf" output -raw "$1"
+}
+
+# 結果を出す。GitHub Actions では、ジョブのまとめ（実行の画面）にも書く
+report() {
+  echo "== $1"
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    echo "$1" >>"$GITHUB_STEP_SUMMARY"
+  fi
 }
 
 # running（true / false）を切り替える terraform apply。先に plan を出し、確かめてから反映する

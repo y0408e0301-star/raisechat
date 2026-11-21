@@ -1,0 +1,44 @@
+# 公開環境を起動・停止するボタン（Actions の画面で「公開環境の起動・停止」を選び、Run workflow。ブランチは main のまま。
+# AWS のロールは main からしか使えないので、ほかのブランチを選ぶと失敗する）。
+# 手元の bash deploy/start.sh・stop.sh と同じ（基本設計書 2.2.1）。使わない時間は止めて費用を抑える（要件定義書 P-5）
+name: 公開環境の起動・停止
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: すること
+        type: choice
+        options: [start, stop]
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+# 反映（cd.yml）と重ねない
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: 公開環境を ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::467112307516:role/rc-github-deploy
+          aws-region: ap-northeast-1
+      - run: terraform -chdir=deploy/terraform init -input=false
+      # 入力は start か stop だけ（choice）。シェルには環境変数で渡す
+      - run: bash "deploy/$ACTION.sh" -y
+        env:
+          ACTION: ${{ inputs.action }}

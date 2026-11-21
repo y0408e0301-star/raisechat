@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-TECH |
-| 版数 | 0.4 |
+| 版数 | 0.5 |
 | 作成日 | 2026-11-10 |
-| 最終更新日 | 2026-11-19 |
+| 最終更新日 | 2026-11-22 |
 | 作成者 | （氏名） |
 | 元にした文書 | [要件定義書](requirements/requirements.md) 版数 0.4、[機能定義書](functions/function-definition.md) 版数 0.1 |
 | 状態 | 承認待ち |
@@ -18,6 +18,7 @@
 | 0.2 | 2026-11-10 | インフラ設計書を作ったので、1 章からリンクした | （氏名） |
 | 0.3 | 2026-11-18 | ブラウザの通知を Service Worker で出すことにした（#71。Android の Chrome は Notification のコンストラクタを受け付けないため） | （氏名） |
 | 0.4 | 2026-11-19 | 部分一致の検索を pg_trgm から pg_bigm に替えた（#75。公開先の性能の確認（開発計画書 2-8）で、1〜2 文字の言葉に索引が効かず N-5 を超えたため）。開発用・テスト用の PostgreSQL は、postgres:17 に pg_bigm を足したイメージ（db/Dockerfile）にした | （氏名） |
+| 0.5 | 2026-11-22 | CD を入れた（#80）。GitHub Actions で反映し、AWS には OIDC で入る（aws-actions/configure-aws-credentials@v6）。arm64 のランナーでイメージを作る | （氏名） |
 
 ## 承認
 
@@ -159,6 +160,7 @@
 | --- | --- | --- | --- | --- |
 | ソース管理 | Git・GitHub | | ○ | N-32 |
 | 自動のチェック | GitHub Actions | actions/checkout@v7、actions/setup-node@v7、actions/setup-java@v6（temurin 21）、actions/upload-artifact@v7、hashicorp/setup-terraform@v4、terraform-linters/setup-tflint@v6 | ○ | N-35。Pull Request ごとに書式・lint・テスト・ビルドを動かす |
+| 自動の反映（CD） | GitHub Actions（cd.yml・ops.yml）、aws-actions/configure-aws-credentials@v6（OIDC）、ランナー ubuntu-24.04-arm | v6.3.0（2026-09-15 公開） | 新 | main へのマージで公開環境に反映する（インフラ設計書 5.3）。AWS の鍵を GitHub に置かず、main のワークフローだけが使える短い時間の鍵で入る。公開先の API は arm64 なので、arm64 のランナー（パブリックのリポジトリは無料）でイメージをそのまま作る |
 | 自動の PR レビュー | Claude Code（anthropics/claude-code-action@v1） | v1 | 新 | N-35。Pull Request ごとに差分をレビューし、本書・リポジトリのルールとの食い違いを見る（[.github/workflows/claude-code-review.yml](../.github/workflows/claude-code-review.yml)） |
 | 開発用のコンテナ | Docker Compose | | ○ | PostgreSQL を起動する |
 | API のテスト | JUnit 5、MockMvc、Testcontainers（PostgreSQL・MinIO） | Spring Boot 4.1.1 に合わせる | ○ | 本物の PostgreSQL と MinIO でテストする。開発用の DB は使わない。H2 は使わない |
