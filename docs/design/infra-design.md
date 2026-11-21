@@ -3,7 +3,7 @@
 | 項目 | 内容 |
 | --- | --- |
 | 文書番号 | RC-BD-INFRA |
-| 版数 | 0.7 |
+| 版数 | 0.8 |
 | 作成日 | 2026-11-10 |
 | 最終更新日 | 2026-11-22 |
 | 作成者 | （氏名） |
@@ -22,6 +22,7 @@
 | 0.5 | 2026-11-19 | 公開先で性能を測ったので（開発計画書 2-8）、未決事項 3 を決定にした | （氏名） |
 | 0.6 | 2026-11-19 | 検索の索引を pg_bigm にしたので（#75）、RDS で拡張を使うことを書いた | （氏名） |
 | 0.7 | 2026-11-22 | CD を入れた（#80）。5.3 を、main へのマージで GitHub Actions が反映する形に書き直し、3.3 に CD のロール・状態ファイルの置き場所、8 章に土台（deploy/bootstrap）を足した | （氏名） |
+| 0.8 | 2026-11-22 | 3.3：CD のロールの信頼条件を、このリポジトリの OIDC の sub の形（ID を含む immutable subject）にした（#82。名前の形では使えなかった） | （氏名） |
 
 本書は基本設計書の一部である。承認は[基本設計書](basic-design.md)で一括して行う。表記のルールは基本設計書 1.3 のとおり。
 
@@ -139,7 +140,7 @@ Terraform（deploy/terraform/）で作る。名前の頭は「rc-」にする。
 | CloudWatch アラーム | rc-no-healthy-task、rc-api-5xx、rc-db-free-storage | ALB のヘルスチェックに通るタスクが 3 分続けてない、API の 5xx が 5 分で 10 回以上（この 2 つは動いている間だけ作る）、RDS の空き容量 2GB 未満で、SNS（rc-alerts）からメールを送る |
 | AWS Budgets | rc-budget | 月の費用が予算（R-1。67 ドル ≒ 10,000 円）の 80% を超えたとき、月末の予測が予算を超えそうなときにメールを送る |
 
-| IAM の OIDC プロバイダー・IAM ロール（CD） | token.actions.githubusercontent.com、rc-github-deploy | GitHub Actions の CD（cd.yml）と起動・停止のボタン（ops.yml）が、鍵を持たずに短い時間だけ使う（5.3）。使えるのは、このリポジトリの main のワークフローだけ（Pull Request・フォーク・ほかのブランチからは使えない）。権限は PowerUserAccess と、rc- で始まる IAM ロールの作成・変更・PassRole、IAM の読み取り（公開環境の Terraform がタスクのロールを作るため）。ロールを作る・権限を付けるのは、権限の境界 rc-role-boundary を付けたロールにだけできるので、強い権限のロールを作って使う（権限の昇格）ことはできない。自分自身のロールは変えられない。deploy/bootstrap が作り、公開環境を消しても残す |
+| IAM の OIDC プロバイダー・IAM ロール（CD） | token.actions.githubusercontent.com、rc-github-deploy | GitHub Actions の CD（cd.yml）と起動・停止のボタン（ops.yml）が、鍵を持たずに短い時間だけ使う（5.3）。使えるのは、このリポジトリの main のワークフローだけ（Pull Request・フォーク・ほかのブランチからは使えない）。信頼条件の sub は、このリポジトリの形（ID を含む immutable subject：repo:y0408e0301-star@336936322/raisechat@1452576577:ref:refs/heads/main）で書く。権限は PowerUserAccess と、rc- で始まる IAM ロールの作成・変更・PassRole、IAM の読み取り（公開環境の Terraform がタスクのロールを作るため）。ロールを作る・権限を付けるのは、権限の境界 rc-role-boundary を付けたロールにだけできるので、強い権限のロールを作って使う（権限の昇格）ことはできない。自分自身のロールは変えられない。deploy/bootstrap が作り、公開環境を消しても残す |
 | IAM ポリシー（権限の境界） | rc-role-boundary | rc-task-execution・rc-app に付ける境界。ECR からのイメージの取得、ログの送信、Parameter Store の /rc/* の読み取り、rc-files-* の読み書きだけ。どんなポリシーを付けても、これより強くならない。deploy/bootstrap が作る |
 | S3 バケット（状態ファイル） | rc-tfstate-{アカウント ID} | 公開環境の Terraform の状態ファイル（DB のパスワードなどの秘密の値も入る）。手元と CD で同じものを使い、S3 の上でロックする（use_lockfile）。バージョニングあり（古い版は 30 日で消す）・暗号化あり・パブリックアクセスなし・暗号化した通信（TLS）だけを許す。読み書きできるのは作成者と CD のロールだけ。deploy/bootstrap が作り、公開環境を消しても残す |
 
