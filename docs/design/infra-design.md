@@ -141,7 +141,9 @@ Terraform（deploy/terraform/）で作る。名前の頭は「rc-」にする。
 
 | IAM の OIDC プロバイダー・IAM ロール（CD） | token.actions.githubusercontent.com、rc-github-deploy | GitHub Actions の CD（cd.yml）と起動・停止のボタン（ops.yml）が、鍵を持たずに短い時間だけ使う（5.3）。使えるのは、このリポジトリの main のワークフローだけ（Pull Request・フォーク・ほかのブランチからは使えない）。権限は PowerUserAccess と、rc- で始まる IAM ロールの作成・変更・PassRole、IAM の読み取り（公開環境の Terraform がタスクのロールを作るため）。ロールを作る・権限を付けるのは、権限の境界 rc-role-boundary を付けたロールにだけできるので、強い権限のロールを作って使う（権限の昇格）ことはできない。自分自身のロールは変えられない。deploy/bootstrap が作り、公開環境を消しても残す |
 | IAM ポリシー（権限の境界） | rc-role-boundary | rc-task-execution・rc-app に付ける境界。ECR からのイメージの取得、ログの送信、Parameter Store の /rc/* の読み取り、rc-files-* の読み書きだけ。どんなポリシーを付けても、これより強くならない。deploy/bootstrap が作る |
-| S3 バケット（状態ファイル） | rc-tfstate-{アカウント ID} | 公開環境の Terraform の状態ファイル（DB のパスワードなどの秘密の値も入る）。手元と CD で同じものを使い、S3 の上でロックする（use_lockfile）。バージョニングあり（古い版は 30 日で消す）・暗号化あり・パブリックアクセスなし。deploy/bootstrap が作り、公開環境を消しても残す |
+| S3 バケット（状態ファイル） | rc-tfstate-{アカウント ID} | 公開環境の Terraform の状態ファイル（DB のパスワードなどの秘密の値も入る）。手元と CD で同じものを使い、S3 の上でロックする（use_lockfile）。バージョニングあり（古い版は 30 日で消す）・暗号化あり・パブリックアクセスなし・暗号化した通信（TLS）だけを許す。読み書きできるのは作成者と CD のロールだけ。deploy/bootstrap が作り、公開環境を消しても残す |
+
+CD のロールは公開環境の AWS のリソースを作り・変え・消せるので、**main に入ったコードは、そのまま AWS の権限で動く**。main に入るのは、Pull Request の CI と自動レビューを通り、作成者が了承してマージしたものだけ（CONTRIBUTING.md。リポジトリをパブリックにしたので、GitHub のブランチ保護で main への直接の push も止められる）。Pull Request・フォークのワークフローは、このロールを使えない。
 
 Terraform の状態ファイルはリポジトリには入れない。公開環境のものは S3（rc-tfstate）に、土台（deploy/bootstrap）のものは手元に置く（土台の状態ファイルに秘密の値は入らない）。
 

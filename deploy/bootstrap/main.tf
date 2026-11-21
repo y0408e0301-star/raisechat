@@ -1,5 +1,5 @@
 # 公開環境の CD（.github/workflows/cd.yml）の土台。公開環境（deploy/terraform）を destroy しても残すものだけを置く
-# （インフラ設計書 5.3）。状態ファイルは手元に置く（秘密の値は入らない）。初めに 1 回だけ、このフォルダで
+# （インフラ設計書 5.3）。このフォルダの状態ファイルは手元に置く（このフォルダの状態には秘密の値は入らない）。初めに 1 回だけ、このフォルダで
 # terraform init → terraform apply を実行する
 terraform {
   required_version = ">= 1.10"
@@ -35,7 +35,8 @@ locals {
 }
 
 # 公開環境の Terraform の状態ファイルの置き場所（deploy/terraform/versions.tf の backend）。
-# 消してしまった状態を戻せるよう、版を残す
+# 公開環境の状態には DB のパスワードと JWT の秘密の値が入るので、パブリックアクセスを止め、暗号化した通信だけを許す。
+# 読み書きできるのは、作成者と CD のロール（rc-github-deploy）だけ。消してしまった状態を戻せるよう、版を残す
 # 採らない指摘（trivy）：アクセスログ（AWS-0089）は取らない（読み書きするのは作成者と CD のロールだけ）。
 # KMS の顧客管理キー（AWS-0132）は月 1 ドルかかる。S3 の既定の暗号化（SSE-S3）で足りる
 #trivy:ignore:AWS-0089
@@ -69,6 +70,22 @@ resource "aws_s3_bucket_public_access_block" "tfstate" {
 }
 
 # 古い版は 30 日で消す（状態ファイルは小さいが、反映のたびに版が増える）
+resource "aws_s3_bucket_policy" "tfstate" {
+  bucket = aws_s3_bucket.tfstate.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "DenyInsecureTransport"
+      Effect    = "Deny"
+      Principal = "*"
+      Action    = "s3:*"
+      Resource  = [aws_s3_bucket.tfstate.arn, "${aws_s3_bucket.tfstate.arn}/*"]
+      Condition = { Bool = { "aws:SecureTransport" = "false" } }
+    }]
+  })
+  depends_on = [aws_s3_bucket_public_access_block.tfstate]
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "tfstate" {
   bucket = aws_s3_bucket.tfstate.id
   rule {
@@ -115,6 +132,7 @@ resource "aws_iam_role_policy_attachment" "power_user" {
 }
 
 # 公開環境のロール（rc-task-execution・rc-app。deploy/terraform/iam.tf）に付ける権限の境界。どんなポリシーを付けても、
+# （Resource は公開環境の名前 rc-files-*・/rc/*・rc-* に合わせている。名前を変えたら、ここも直す）
 # ここに書いた範囲（イメージの取得・ログ・秘密の値の読み取り・添付のバケット）より強くはならない。
 # CD のロールが rc- のロールを作って強い権限を付け、それを使う（権限の昇格）のを防ぐ
 resource "aws_iam_policy" "role_boundary" {
