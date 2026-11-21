@@ -69,7 +69,7 @@ resource "aws_s3_bucket_public_access_block" "tfstate" {
   restrict_public_buckets = true
 }
 
-# 古い版は 30 日で消す（状態ファイルは小さいが、反映のたびに版が増える）
+# 暗号化していない通信（http）は断る
 resource "aws_s3_bucket_policy" "tfstate" {
   bucket = aws_s3_bucket.tfstate.id
   policy = jsonencode({
@@ -86,6 +86,7 @@ resource "aws_s3_bucket_policy" "tfstate" {
   depends_on = [aws_s3_bucket_public_access_block.tfstate]
 }
 
+# 古い版は 30 日で消す（状態ファイルは小さいが、反映のたびに版が増える）
 resource "aws_s3_bucket_lifecycle_configuration" "tfstate" {
   bucket = aws_s3_bucket.tfstate.id
   rule {
