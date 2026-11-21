@@ -132,9 +132,9 @@ resource "aws_iam_role_policy_attachment" "power_user" {
 }
 
 # 公開環境のロール（rc-task-execution・rc-app。deploy/terraform/iam.tf）に付ける権限の境界。どんなポリシーを付けても、
-# （Resource は公開環境の名前 rc-files-*・/rc/*・rc-* に合わせている。名前を変えたら、ここも直す）
 # ここに書いた範囲（イメージの取得・ログ・秘密の値の読み取り・添付のバケット）より強くはならない。
-# CD のロールが rc- のロールを作って強い権限を付け、それを使う（権限の昇格）のを防ぐ
+# CD のロールが rc- のロールを作って強い権限を付け、それを使う（権限の昇格）のを防ぐ。
+# Resource は公開環境の名前（rc-files-*・/rc/*・rc-*）に合わせている。名前を変えたら、ここも直す
 resource "aws_iam_policy" "role_boundary" {
   name = "rc-role-boundary"
   policy = jsonencode({
@@ -190,12 +190,21 @@ resource "aws_iam_role_policy" "github_deploy_iam" {
           StringEquals = { "iam:PermissionsBoundary" = aws_iam_policy.role_boundary.arn }
         }
       },
+      # 信頼先の変更（UpdateAssumeRolePolicy）は境界の条件を付けられないが、変えられるのは境界を付けた rc- のロール
+      # （自分自身は下の Deny で除く）だけで、権限は境界より強くならない
       {
-        Effect = "Allow"
-        Action = [
-          "iam:DeleteRole", "iam:UpdateRole", "iam:UpdateAssumeRolePolicy", "iam:TagRole", "iam:UntagRole", "iam:PassRole",
-        ]
+        Effect   = "Allow"
+        Action   = ["iam:DeleteRole", "iam:UpdateRole", "iam:UpdateAssumeRolePolicy", "iam:TagRole", "iam:UntagRole"]
         Resource = "arn:aws:iam::${local.account_id}:role/rc-*"
+      },
+      # ロールを渡せるのは ECS のタスクにだけ
+      {
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
+        Resource = "arn:aws:iam::${local.account_id}:role/rc-*"
+        Condition = {
+          StringEquals = { "iam:PassedToService" = "ecs-tasks.amazonaws.com" }
+        }
       },
       {
         Effect   = "Deny"
