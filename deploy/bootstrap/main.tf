@@ -22,10 +22,12 @@ provider "aws" {
   }
 }
 
-variable "github_repository" {
-  description = "反映してよいリポジトリ（owner/name）"
+# 反映してよいリポジトリ。GitHub の OIDC の sub の頭の部分で、このリポジトリは ID を含む形（immutable subject）になっている。
+# 名前を変えても ID は変わらない。確かめ方：gh api repos/y0408e0301-star/raisechat/actions/oidc/customization/sub の sub_claim_prefix
+variable "github_sub_prefix" {
+  description = "GitHub の OIDC の sub の頭（repo:owner@ID/name@ID）"
   type        = string
-  default     = "y0408e0301-star/raisechat"
+  default     = "repo:y0408e0301-star@336936322/raisechat@1452576577"
 }
 
 data "aws_caller_identity" "current" {}
@@ -118,7 +120,7 @@ resource "aws_iam_role" "github_deploy" {
       Condition = {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:ref:refs/heads/main"
+          "token.actions.githubusercontent.com:sub" = "${var.github_sub_prefix}:ref:refs/heads/main"
         }
       }
     }]
